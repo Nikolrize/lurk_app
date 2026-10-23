@@ -8,7 +8,7 @@ class FirebaseService {
   // returns currently signed-in user, or null of signed out
   User? get currentUser => _auth.currentUser;
 
-  //notifies app 
+  //notifies app
   Stream<User?> get authStateChanges => _auth.authStateChanges();
 
   // creates email password account and signs in
@@ -16,7 +16,10 @@ class FirebaseService {
     required String email,
     required String password,
   }) {
-    return _auth.createUserWithEmailAndPassword(email: email.trim(), password: password,);
+    return _auth.createUserWithEmailAndPassword(
+      email: email.trim(),
+      password: password,
+    );
   }
 
   //sign in
@@ -24,7 +27,10 @@ class FirebaseService {
     required String email,
     required String password,
   }) {
-    return _auth.signInWithEmailAndPassword(email: email.trim(), password: password);
+    return _auth.signInWithEmailAndPassword(
+      email: email.trim(),
+      password: password,
+    );
   }
 
   // google sign in for web and android
@@ -43,18 +49,18 @@ class FirebaseService {
         throw StateError('Google sign-in did not return an ID token.');
       }
 
-      final credential = GoogleAuthProvider.credential(idToken : idToken,);
+      final credential = GoogleAuthProvider.credential(idToken: idToken);
 
       return _auth.signInWithCredential(credential);
     }
 
-    throw UnsupportedError('Google sign-in is currently configured for web and Android.',);
+    throw UnsupportedError(
+      'Google sign-in is currently configured for web and Android.',
+    );
   }
 
-  //sends email containing password reset 
-  Future<void> sendPasswordReset({
-    required String email,
-  }) {
+  //sends email containing password reset
+  Future<void> sendPasswordReset({required String email}) {
     return _auth.sendPasswordResetEmail(email: email.trim());
   }
 

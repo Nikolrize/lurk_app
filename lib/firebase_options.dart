@@ -63,8 +63,10 @@ class DefaultFirebaseOptions {
     messagingSenderId: '411881549954',
     projectId: 'lurk-mae',
     storageBucket: 'lurk-mae.firebasestorage.app',
-    androidClientId: '411881549954-ph8kn5pv46hifp0fecvjtevv7trp78ig.apps.googleusercontent.com',
-    iosClientId: '411881549954-vr2bb1os4shjnmhuq482v2j2uhsj1qa8.apps.googleusercontent.com',
+    androidClientId:
+        '411881549954-ph8kn5pv46hifp0fecvjtevv7trp78ig.apps.googleusercontent.com',
+    iosClientId:
+        '411881549954-vr2bb1os4shjnmhuq482v2j2uhsj1qa8.apps.googleusercontent.com',
     iosBundleId: 'com.example.lurkApp',
   );
   static const FirebaseOptions macos = FirebaseOptions(
@@ -73,8 +75,10 @@ class DefaultFirebaseOptions {
     messagingSenderId: '411881549954',
     projectId: 'lurk-mae',
     storageBucket: 'lurk-mae.firebasestorage.app',
-    androidClientId: '411881549954-ph8kn5pv46hifp0fecvjtevv7trp78ig.apps.googleusercontent.com',
-    iosClientId: '411881549954-vr2bb1os4shjnmhuq482v2j2uhsj1qa8.apps.googleusercontent.com',
+    androidClientId:
+        '411881549954-ph8kn5pv46hifp0fecvjtevv7trp78ig.apps.googleusercontent.com',
+    iosClientId:
+        '411881549954-vr2bb1os4shjnmhuq482v2j2uhsj1qa8.apps.googleusercontent.com',
     iosBundleId: 'com.example.lurkApp',
   );
 
