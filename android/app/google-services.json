@@ -1,0 +1,54 @@
+{
+  "project_info": {
+    "project_number": "411881549954",
+    "project_id": "lurk-mae",
+    "storage_bucket": "lurk-mae.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:411881549954:android:34af00e8bb0ec95df1c49b",
+        "android_client_info": {
+          "package_name": "com.example.lurk_app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "411881549954-ph8kn5pv46hifp0fecvjtevv7trp78ig.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.lurk_app",
+            "certificate_hash": "25699bf6fccf4c6b3be259f6e4def1e940bd6e4d"
+          }
+        },
+        {
+          "client_id": "411881549954-v0l9sd12sqmbahnqli8nfkgq2pempd4p.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBCpDgNScpIFEdTd_BoJARBC7Vbv7Cr_oY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "411881549954-v0l9sd12sqmbahnqli8nfkgq2pempd4p.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "411881549954-vr2bb1os4shjnmhuq482v2j2uhsj1qa8.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.lurkApp"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
