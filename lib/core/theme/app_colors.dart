@@ -7,5 +7,6 @@ class AppColors {
   static const secondary = Color(0xFFD946EF);
   static const text = Color(0xFFFFFFFF);
   static const textSecondary = Color(0xFFA6A1B5);
+  static const outline = Color(0xFF332D45);
   static const error = Color(0xFFFF6B6B);
 }
