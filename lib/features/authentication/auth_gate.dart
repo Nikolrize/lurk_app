@@ -5,6 +5,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../providers/auth_provider.dart';
 import 'login_screen.dart';
 
+import '../profile/profile_gate.dart';
+import '../profile/profile_foundation_screen.dart';
+
 class AuthGate extends ConsumerWidget {
   const AuthGate({super.key});
 
@@ -37,7 +40,11 @@ class AuthGate extends ConsumerWidget {
           return const LoginScreen();
         }
 
-        return _SignedInScreen(user: user);
+        return ProfileGate(
+          key: ValueKey(user.uid),
+          uid: user.uid,
+          child: _SignedInScreen(user: user),
+        );
       },
     );
   }
@@ -65,6 +72,19 @@ class _SignedInScreen extends ConsumerWidget {
               const SizedBox(height: 8),
               Text(user.email ?? 'Lurk player'),
               const SizedBox(height: 24),
+              OutlinedButton(
+              onPressed: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => ProfileFoundationScreen(
+                      uid: user.uid,
+                    ),
+                  ),
+                );
+              },
+              child: const Text('Test profile backend'),
+            ),
+            const SizedBox(height: 12),
               FilledButton(
                 onPressed: () async {
                   final service = ref.read(firebaseServiceProvider);
