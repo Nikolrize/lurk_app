@@ -6,6 +6,8 @@ import 'package:lurk_app/providers/auth_provider.dart';
 import 'package:lurk_app/providers/profile_provider.dart';
 import 'package:lurk_app/features/profile/screens/edit_profile_screen.dart';
 
+import 'profile_page_layout.dart';
+
 class ProfileGate extends ConsumerWidget {
   const ProfileGate({super.key, required this.uid, required this.child});
 
@@ -90,46 +92,35 @@ class ProfileGate extends ConsumerWidget {
               ),
             ],
           ),
-          body: SafeArea(
-            child: Center(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(16, 20, 16, 24),
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 520),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Center(
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(20),
-                          child: Image.asset(
-                            'assets/images/lurk_logo.jpg',
-                            width: 140,
-                            height: 140,
-                            semanticLabel: 'Lurk logo',
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 24),
-                      Text(
-                        'Your next lobby starts here.',
-                        textAlign: TextAlign.center,
-                        style: Theme.of(context).textTheme.headlineSmall,
-                      ),
-                      const SizedBox(height: 16),
-                      const Text(
-                        'Introduce yourself before finding teammates. '
-                        'Create your player profile and choose '
-                        'which personal details you want to share.',
-                        textAlign: TextAlign.center,
-                      ),
-                      const SizedBox(height: 24),
-                      FilledButton(
-                        onPressed: () => _openSetup(context, ref, data),
-                        child: const Text('Complete my profile'),
-                      ),
-                    ],
-                  ),
+          body: ProfilePageLayout(
+            introduction: const ProfileIntroduction(
+              title: 'Your next lobby starts here.',
+              description:
+                  'Meet players, discover parties, and find teammates '
+                  'who suit the way you play.',
+            ),
+            child: Card(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text(
+                      'Complete your player profile',
+                      style: Theme.of(context).textTheme.headlineSmall,
+                    ),
+                    const SizedBox(height: 16),
+                    const Text(
+                      'Add your player name, region and introduction. '
+                      'Your full birth date stays private, and you choose '
+                      'whether to display your age and pronouns.',
+                    ),
+                    const SizedBox(height: 24),
+                    FilledButton(
+                      onPressed: () => _openSetup(context, ref, data),
+                      child: const Text('Complete my profile'),
+                    ),
+                  ],
                 ),
               ),
             ),

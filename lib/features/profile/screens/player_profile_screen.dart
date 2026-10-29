@@ -8,10 +8,10 @@ class PlayerProfileScreen extends ConsumerWidget {
 
   final String uid;
 
-  static const _genderLabels = {
-    'male': 'Male',
-    'female': 'Female',
-    'other': 'Other',
+  static const _pronounLabels = {
+    'male': 'He/him',
+    'female': 'She/her',
+    'other': 'They/them',
   };
 
   @override
@@ -40,7 +40,7 @@ class PlayerProfileScreen extends ConsumerWidget {
 
             final sharedAge = profile.sharedAge;
             final sharedDate = profile.ageSharedAt;
-            final gender = _genderLabels[profile.sharedGender];
+            final pronouns = _pronounLabels[profile.sharedGender];
 
             return Center(
               child: ConstrainedBox(
@@ -89,7 +89,7 @@ class PlayerProfileScreen extends ConsumerWidget {
                                 ),
                               ),
                             ],
-                            if (sharedAge != null || gender != null) ...[
+                            if (sharedAge != null || pronouns != null) ...[
                               const SizedBox(height: 16),
                               Wrap(
                                 alignment: WrapAlignment.center,
@@ -98,7 +98,8 @@ class PlayerProfileScreen extends ConsumerWidget {
                                 children: [
                                   if (sharedAge != null)
                                     Chip(label: Text('Shared age: $sharedAge')),
-                                  if (gender != null) Chip(label: Text(gender)),
+                                  if (pronouns != null)
+                                    Chip(label: Text(pronouns)),
                                 ],
                               ),
                             ],

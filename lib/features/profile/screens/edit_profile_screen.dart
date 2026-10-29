@@ -5,6 +5,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lurk_app/models/player_profile.dart';
 import 'package:lurk_app/providers/profile_provider.dart';
 
+import '../widgets/profile_page_layout.dart';
+
 class EditProfileScreen extends ConsumerStatefulWidget {
   const EditProfileScreen({
     super.key,
@@ -36,7 +38,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
   static const _genders = {
     'male': 'Male',
     'female': 'Female',
-    'other': 'Other',
+    'other': 'Others',
     'prefer_not_to_say': 'Prefer not to say',
   };
 
@@ -169,173 +171,176 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
             widget.initialSetup ? 'Complete your profile' : 'Edit profile',
           ),
         ),
-        body: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 520),
-              child: Form(
-                key: _formKey,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    const Text(
-                      'Username, bio and region are visible to signed-in players. '
-                      'Your full birth date stays private. '
-                      'You can choose to share your age and gender below.',
-                    ),
-                    const SizedBox(height: 24),
-                    TextFormField(
-                      controller: _usernameController,
-                      enabled: !_isSaving,
-                      maxLength: 30,
-                      decoration: const InputDecoration(
-                        labelText: 'Username',
-                        helperText: 'Display name; not a unique login.',
-                      ),
-                      validator: (value) {
-                        final name = value?.trim() ?? '';
-                        if (name.length < 3 || name.length > 30) {
-                          return 'Use 3–30 characters.';
-                        }
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 16),
-                    TextFormField(
-                      controller: _bioController,
-                      enabled: !_isSaving,
-                      maxLength: 500,
-                      minLines: 3,
-                      maxLines: 5,
-                      decoration: const InputDecoration(
-                        labelText: 'Bio (optional)',
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    TextFormField(
-                      controller: _regionController,
-                      enabled: !_isSaving,
-                      maxLength: 60,
-                      decoration: const InputDecoration(
-                        labelText: 'Region',
-                        hintText: 'For example: Malaysia',
-                      ),
-                      validator: (value) {
-                        if ((value?.trim() ?? '').isEmpty) {
-                          return 'Please enter your region.';
-                        }
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 16),
-                    FormField<DateTime>(
-                      initialValue: _dateOfBirth,
-                      validator: (value) {
-                        if (value == null) {
-                          return 'Please select your birth date.';
-                        }
-                        return null;
-                      },
-                      builder: (field) {
-                        return InkWell(
-                          onTap: _isSaving ? null : () => _pickBirthDate(field),
-                          child: InputDecorator(
-                            decoration: InputDecoration(
-                              labelText: 'Birth date (private)',
-                              errorText: field.errorText,
-                              suffixIcon: const Icon(Icons.calendar_month),
-                            ),
-                            child: Text(birthday),
-                          ),
-                        );
-                      },
-                    ),
-                    const SizedBox(height: 16),
-                    DropdownButtonFormField<String>(
-                      initialValue: _gender,
-                      isExpanded: true,
-                      decoration: const InputDecoration(labelText: 'Gender'),
-                      items: _genders.entries.map((entry) {
-                        return DropdownMenuItem(
-                          value: entry.key,
-                          child: Text(entry.value),
-                        );
-                      }).toList(),
-                      onChanged: _isSaving
-                          ? null
-                          : (value) {
-                              setState(() {
-                                _gender = value;
-                                if (value == 'prefer_not_to_say') {
-                                  _showGender = false;
-                                }
-                              });
-                            },
-                      validator: (value) {
-                        if (value == null) {
-                          return 'Please select a gender option.';
-                        }
-                        return null;
-                      },
-                    ),
-                    if (_errorMessage != null) ...[
-                      const SizedBox(height: 16),
-                      Text(
-                        _errorMessage!,
-                        style: TextStyle(
-                          color: Theme.of(context).colorScheme.error,
-                        ),
-                      ),
-                    ],
-                    const SizedBox(height: 24),
-                    Text(
-                      'Profile visibility',
-                      style: Theme.of(context).textTheme.titleMedium,
-                    ),
-                    const SizedBox(height: 8),
-                    SwitchListTile.adaptive(
-                      contentPadding: EdgeInsets.zero,
-                      title: const Text('Show my age'),
-                      subtitle: const Text(
-                        'Shares your age when saved, with the sharing date. '
-                        'Your full birth date stays private.',
-                      ),
-                      value: _showAge,
-                      onChanged: _isSaving
-                          ? null
-                          : (value) {
-                              setState(() {
-                                _showAge = value;
-                              });
-                            },
-                    ),
-                    SwitchListTile.adaptive(
-                      contentPadding: EdgeInsets.zero,
-                      title: const Text('Show my gender'),
-                      subtitle: const Text(
-                        'Visible to signed-in players when enabled.',
-                      ),
-                      value: _showGender,
-                      onChanged:
-                          _isSaving ||
-                              _gender == null ||
-                              _gender == 'prefer_not_to_say'
-                          ? null
-                          : (value) {
-                              setState(() {
-                                _showGender = value;
-                              });
-                            },
-                    ),
-                    const SizedBox(height: 24),
-                    FilledButton(
-                      onPressed: _isSaving ? null : _save,
-                      child: Text(_isSaving ? 'Saving...' : 'Save profile'),
-                    ),
-                  ],
+        body: ProfilePageLayout(
+          introduction: ProfileIntroduction(
+            title: widget.initialSetup
+                ? 'Build your player identity'
+                : 'Keep your profile up to date',
+            description:
+                'Introduce yourself to other players and choose '
+                'which personal details appear on your public profile.',
+          ),
+          child: Form(
+            key: _formKey,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const Text(
+                  'Username, bio and region are visible to signed-in players. '
+                  'Your full birth date stays private. '
+                  'You can choose to share your age and pronouns below.',
                 ),
-              ),
+                const SizedBox(height: 24),
+                TextFormField(
+                  controller: _usernameController,
+                  enabled: !_isSaving,
+                  maxLength: 30,
+                  decoration: const InputDecoration(
+                    labelText: 'Username',
+                    helperText: 'Display name; not a unique login.',
+                  ),
+                  validator: (value) {
+                    final name = value?.trim() ?? '';
+                    if (name.length < 3 || name.length > 30) {
+                      return 'Use 3–30 characters.';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: _bioController,
+                  enabled: !_isSaving,
+                  maxLength: 500,
+                  minLines: 3,
+                  maxLines: 5,
+                  decoration: const InputDecoration(
+                    labelText: 'Bio (optional)',
+                  ),
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: _regionController,
+                  enabled: !_isSaving,
+                  maxLength: 60,
+                  decoration: const InputDecoration(
+                    labelText: 'Region',
+                    hintText: 'For example: Malaysia',
+                  ),
+                  validator: (value) {
+                    if ((value?.trim() ?? '').isEmpty) {
+                      return 'Please enter your region.';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 16),
+                FormField<DateTime>(
+                  initialValue: _dateOfBirth,
+                  validator: (value) {
+                    if (value == null) {
+                      return 'Please select your birth date.';
+                    }
+                    return null;
+                  },
+                  builder: (field) {
+                    return InkWell(
+                      onTap: _isSaving ? null : () => _pickBirthDate(field),
+                      child: InputDecorator(
+                        decoration: InputDecoration(
+                          labelText: 'Birth date (private)',
+                          errorText: field.errorText,
+                          suffixIcon: const Icon(Icons.calendar_month),
+                        ),
+                        child: Text(birthday),
+                      ),
+                    );
+                  },
+                ),
+                const SizedBox(height: 16),
+                DropdownButtonFormField<String>(
+                  initialValue: _gender,
+                  isExpanded: true,
+                  decoration: const InputDecoration(labelText: 'Gender'),
+                  items: _genders.entries.map((entry) {
+                    return DropdownMenuItem(
+                      value: entry.key,
+                      child: Text(entry.value),
+                    );
+                  }).toList(),
+                  onChanged: _isSaving
+                      ? null
+                      : (value) {
+                          setState(() {
+                            _gender = value;
+                            if (value == 'prefer_not_to_say') {
+                              _showGender = false;
+                            }
+                          });
+                        },
+                  validator: (value) {
+                    if (value == null) {
+                      return 'Please select a gender option.';
+                    }
+                    return null;
+                  },
+                ),
+                if (_errorMessage != null) ...[
+                  const SizedBox(height: 16),
+                  Text(
+                    _errorMessage!,
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.error,
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 24),
+                Text(
+                  'Profile visibility',
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+                const SizedBox(height: 8),
+                SwitchListTile.adaptive(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Show my age'),
+                  subtitle: const Text(
+                    'Shares your age when saved, with the sharing date. '
+                    'Your full birth date stays private.',
+                  ),
+                  value: _showAge,
+                  onChanged: _isSaving
+                      ? null
+                      : (value) {
+                          setState(() {
+                            _showAge = value;
+                          });
+                        },
+                ),
+                SwitchListTile.adaptive(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Show my pronouns'),
+                  subtitle: const Text(
+                    'Displays He/him for Male, She/her for Female, '
+                    'or They/them for Others.',
+                  ),
+                  value: _showGender,
+                  onChanged:
+                      _isSaving ||
+                          _gender == null ||
+                          _gender == 'prefer_not_to_say'
+                      ? null
+                      : (value) {
+                          setState(() {
+                            _showGender = value;
+                          });
+                        },
+                ),
+                const SizedBox(height: 24),
+                FilledButton(
+                  onPressed: _isSaving ? null : _save,
+                  child: Text(_isSaving ? 'Saving...' : 'Save profile'),
+                ),
+              ],
             ),
           ),
         ),
