@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/widgets/app_shell.dart';
 import '../../providers/auth_provider.dart';
-import 'login_screen.dart';
-
 import '../profile/profile_gate.dart';
-import '../profile/my_profile_screen.dart';
+import 'login_screen.dart';
 
 class AuthGate extends ConsumerWidget {
   const AuthGate({super.key});
@@ -15,8 +14,9 @@ class AuthGate extends ConsumerWidget {
     final authState = ref.watch(authStateProvider);
 
     return authState.when(
-      loading: () =>
-          const Scaffold(body: Center(child: CircularProgressIndicator())),
+      loading: () => const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      ),
       error: (error, stackTrace) => Scaffold(
         body: Center(
           child: Column(
@@ -42,7 +42,7 @@ class AuthGate extends ConsumerWidget {
         return ProfileGate(
           key: ValueKey(user.uid),
           uid: user.uid,
-          child: MyProfileScreen(uid: user.uid),
+          child: AppShell(uid: user.uid),
         );
       },
     );
