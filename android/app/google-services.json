@@ -22,6 +22,14 @@
           }
         },
         {
+          "client_id": "411881549954-tc78m98pmgopqn53mur9igtadler58uv.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.lurk_app",
+            "certificate_hash": "df757e79d3e0fe1bfa2228bb450d0994a7b1d51f"
+          }
+        },
+        {
           "client_id": "411881549954-v0l9sd12sqmbahnqli8nfkgq2pempd4p.apps.googleusercontent.com",
           "client_type": 3
         }
