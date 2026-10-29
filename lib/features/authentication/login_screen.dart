@@ -222,37 +222,43 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         child: const Text('Log in'),
                       ),
                       const SizedBox(height: 12),
-                        TextButton(
-                          onPressed: _isLoading ? null : () {
-                                  Navigator.of(context).push(
-                                    MaterialPageRoute<void>(
-                                      builder: (_) => const AccountFormScreen(
-                                        action: AccountAction.resetPassword,
-                                      ),
+                      TextButton(
+                        onPressed: _isLoading
+                            ? null
+                            : () {
+                                Navigator.of(context).push(
+                                  MaterialPageRoute<void>(
+                                    builder: (_) => const AccountFormScreen(
+                                      action: AccountAction.resetPassword,
                                     ),
-                                  );
-                                },
-                          child: const Text('Forgot password?'),
-                        ),
-                        TextButton(
-                          onPressed: _isLoading? null : () {
-                                  Navigator.of(context).push(
-                                    MaterialPageRoute<void>(
-                                      builder: (_) => const AccountFormScreen(
-                                        action: AccountAction.signUp,
-                                      ),
+                                  ),
+                                );
+                              },
+                        child: const Text('Forgot password?'),
+                      ),
+                      TextButton(
+                        onPressed: _isLoading
+                            ? null
+                            : () {
+                                Navigator.of(context).push(
+                                  MaterialPageRoute<void>(
+                                    builder: (_) => const AccountFormScreen(
+                                      action: AccountAction.signUp,
                                     ),
-                                  );
-                                },
-                          child: const Text('New to Lurk? Create account'),
+                                  ),
+                                );
+                              },
+                        child: const Text('New to Lurk? Create account'),
+                      ),
+                      if (supportsGoogle) ...[
+                        const SizedBox(height: 12),
+                        OutlinedButton(
+                          onPressed: _isLoading
+                              ? null
+                              : () => _login(withGoogle: true),
+                          child: const Text('Continue with Google'),
                         ),
-                        if (supportsGoogle) ...[
-                          const SizedBox(height: 12),
-                          OutlinedButton(
-                            onPressed: _isLoading ? null : () => _login(withGoogle: true),
-                            child: const Text('Continue with Google'),
-                          ),
-                        ],
+                      ],
                       if (_isLoading) ...[
                         const SizedBox(height: 20),
                         const Center(child: CircularProgressIndicator()),

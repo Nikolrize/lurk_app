@@ -106,153 +106,264 @@ class _MyProfileScreenState extends ConsumerState<MyProfileScreen> {
   }
 
   @override
+  @override
   Widget build(BuildContext context) {
     final currentUser = ref.watch(authStateProvider).asData?.value;
+    final colors = Theme.of(context).colorScheme;
+    final text = Theme.of(context).textTheme;
 
-    // MyProfile refer to signed-in account
     if (currentUser?.uid != widget.uid) {
-      return const Scaffold(
-        body: Center(child: Text('Please sign in to view your profile.')),
+      return const SafeArea(
+        child: Center(child: Text('Please sign in to view your profile.')),
       );
     }
 
     final profileState = ref.watch(playerProfileProvider(widget.uid));
 
-    return Scaffold(
-      body: SafeArea(
-        child: profileState.when(
-          loading: () => const Center(child: CircularProgressIndicator()),
-          error: (error, stackTrace) => Center(
-            child: FilledButton(
-              onPressed: () {
-                ref.invalidate(playerProfileProvider(widget.uid));
-              },
-              child: const Text('Unload to load profile. Please retry'),
-            ),
+    // AppShell already provides the Scaffold and bottom navigation.
+    return SafeArea(
+      bottom: false,
+      child: profileState.when(
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (error, stackTrace) => Center(
+          child: FilledButton(
+            onPressed: () {
+              ref.invalidate(playerProfileProvider(widget.uid));
+            },
+            child: const Text('Unable to load profile. Retry'),
           ),
-          data: (profile) {
-            if (profile == null) {
-              return const Center(
-                child: Text('Your profile could not be found.'),
-              );
-            }
+        ),
+        data: (profile) {
+          if (profile == null) {
+            return const Center(
+              child: Text('Your profile could not be found.'),
+            );
+          }
 
-            return Center(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 600),
-                child: ListView(
-                  padding: const EdgeInsets.all(24),
-                  children: [
-                    Text(
-                      'My Profile',
-                      style: Theme.of(context).textTheme.headlineSmall,
-                    ),
-                    const SizedBox(height: 24),
+          return LayoutBuilder(
+            builder: (context, constraints) {
+              final compact = constraints.maxWidth < 360;
 
-                    //profile header
-                    Row(
+              final twoColumns =
+                  constraints.maxWidth >= 760 &&
+                  MediaQuery.textScalerOf(context).scale(16) <= 24;
+
+              final horizontalPadding = compact ? 16.0 : 24.0;
+
+              return SingleChildScrollView(
+                padding: EdgeInsets.fromLTRB(
+                  horizontalPadding,
+                  20,
+                  horizontalPadding,
+                  MediaQuery.paddingOf(context).bottom + 24,
+                ),
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 1000),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        const CircleAvatar(
-                          radius: 38,
-                          child: Icon(Icons.person_outline, size: 42),
+                        Text(
+                          'My Profile',
+                          style: text.headlineMedium?.copyWith(
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
-                        const SizedBox(width: 20),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                profile.username.isEmpty
-                                    ? 'New player'
-                                    : profile.username,
-                                style: Theme.of(context).textTheme.titleLarge,
-                              ),
-                              const SizedBox(height: 6),
-                              Text(
-                                profile.region.isEmpty
-                                    ? 'Region not set'
-                                    : profile.region,
-                                style: Theme.of(context).textTheme.bodySmall,
-                              ),
-                            ],
+                        const SizedBox(height: 8),
+                        Text(
+                          'Your player identity and preferences.',
+                          style: text.bodyLarge?.copyWith(
+                            color: colors.onSurfaceVariant,
+                          ),
+                        ),
+                        const SizedBox(height: 24),
+
+                        Card(
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(20),
+                            side: BorderSide(color: colors.outline),
+                          ),
+                          child: Padding(
+                            padding: EdgeInsets.all(compact ? 16 : 24),
+                            child: Row(
+                              children: [
+                                CircleAvatar(
+                                  radius: compact ? 28 : 36,
+                                  backgroundColor: colors.primary.withValues(
+                                    alpha: 0.18,
+                                  ),
+                                  child: Icon(
+                                    Icons.person_outline,
+                                    size: compact ? 32 : 40,
+                                    color: colors.secondary,
+                                  ),
+                                ),
+                                const SizedBox(width: 16),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        profile.username.isEmpty
+                                            ? 'New player'
+                                            : profile.username,
+                                        style: text.titleLarge?.copyWith(
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 8),
+                                      Text(
+                                        profile.region.isEmpty
+                                            ? 'Region not set'
+                                            : profile.region,
+                                        style: text.bodyMedium?.copyWith(
+                                          color: colors.onSurfaceVariant,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 28),
+
+                        Text(
+                          'Games you play',
+                          style: text.titleLarge?.copyWith(
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const SizedBox(height: 14),
+                        Card(
+                          child: Padding(
+                            padding: const EdgeInsets.all(20),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  Icons.sports_esports_outlined,
+                                  color: colors.secondary,
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Text(
+                                    'No games added yet.',
+                                    style: text.bodyMedium?.copyWith(
+                                      color: colors.onSurfaceVariant,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 28),
+
+                        Text(
+                          'Manage your profile',
+                          style: text.titleLarge?.copyWith(
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const SizedBox(height: 14),
+
+                        LayoutBuilder(
+                          builder: (context, menuConstraints) {
+                            final itemWidth = twoColumns
+                                ? (menuConstraints.maxWidth - 16) / 2
+                                : menuConstraints.maxWidth;
+
+                            final entries =
+                                <
+                                  ({
+                                    IconData icon,
+                                    String title,
+                                    VoidCallback? onTap,
+                                  })
+                                >[
+                                  (
+                                    icon: Icons.edit_outlined,
+                                    title: 'Edit Profile',
+                                    onTap: _editProfile,
+                                  ),
+                                  (
+                                    icon: Icons.sports_esports_outlined,
+                                    title: 'Gaming Preferences',
+                                    onTap: widget.onGamingPreferences,
+                                  ),
+                                  (
+                                    icon: Icons.schedule_outlined,
+                                    title: 'Availability',
+                                    onTap: widget.onAvailability,
+                                  ),
+                                  (
+                                    icon: Icons.history,
+                                    title: 'Party History',
+                                    onTap: widget.onPartyHistory,
+                                  ),
+                                  (
+                                    icon: Icons.verified_user_outlined,
+                                    title: 'Verification',
+                                    onTap: widget.onVerification,
+                                  ),
+                                  (
+                                    icon: Icons.shield_outlined,
+                                    title: 'Privacy & Safety',
+                                    onTap: widget.onPrivacyAndSafety,
+                                  ),
+                                  (
+                                    icon: Icons.block_outlined,
+                                    title: 'Blocked Players',
+                                    onTap: widget.onBlockedPlayers,
+                                  ),
+                                  (
+                                    icon: Icons.settings_outlined,
+                                    title: 'Settings',
+                                    onTap: widget.onSettings,
+                                  ),
+                                ];
+
+                            return Wrap(
+                              spacing: 16,
+                              children: [
+                                for (final entry in entries)
+                                  SizedBox(
+                                    width: itemWidth,
+                                    child: _menuItem(
+                                      icon: entry.icon,
+                                      title: entry.title,
+                                      onTap: entry.onTap,
+                                    ),
+                                  ),
+                              ],
+                            );
+                          },
+                        ),
+                        const SizedBox(height: 12),
+
+                        if (_isBusy) ...[
+                          const Center(child: CircularProgressIndicator()),
+                          const SizedBox(height: 16),
+                        ],
+
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: OutlinedButton.icon(
+                            onPressed: _isBusy ? null : _signOut,
+                            icon: const Icon(Icons.logout),
+                            label: const Text('Log out'),
                           ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 24),
-
-                    //replaced by the games row in step 3
-                    const Card(
-                      child: Padding(
-                        padding: EdgeInsets.all(20),
-                        child: Row(
-                          children: [
-                            Icon(Icons.sports_esports_outlined),
-                            SizedBox(width: 12),
-                            Expanded(child: Text('No games added yet.')),
-                          ],
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-                    _menuItem(
-                      icon: Icons.edit_outlined,
-                      title: 'Edit Profile',
-                      onTap: _editProfile,
-                    ),
-                    _menuItem(
-                      icon: Icons.sports_esports_outlined,
-                      title: 'Gaming Preferences',
-                      onTap: widget.onGamingPreferences,
-                    ),
-                    _menuItem(
-                      icon: Icons.schedule_outlined,
-                      title: 'Availability',
-                      onTap: widget.onAvailability,
-                    ),
-                    _menuItem(
-                      icon: Icons.history,
-                      title: 'Party History',
-                      onTap: widget.onPartyHistory,
-                    ),
-                    _menuItem(
-                      icon: Icons.verified_user_outlined,
-                      title: 'Verification',
-                      onTap: widget.onVerification,
-                    ),
-                    _menuItem(
-                      icon: Icons.shield_outlined,
-                      title: 'Privacy & Safety',
-                      onTap: widget.onPrivacyAndSafety,
-                    ),
-                    _menuItem(
-                      icon: Icons.block_outlined,
-                      title: 'Blocked Players',
-                      onTap: widget.onBlockedPlayers,
-                    ),
-                    _menuItem(
-                      icon: Icons.settings_outlined,
-                      title: 'Settings',
-                      onTap: widget.onSettings,
-                    ),
-                    const SizedBox(height: 16),
-
-                    if (_isBusy) ...[
-                      const Center(child: CircularProgressIndicator()),
-                      const SizedBox(height: 16),
-                    ],
-
-                    OutlinedButton.icon(
-                      onPressed: _isBusy ? null : _signOut,
-                      icon: const Icon(Icons.logout),
-                      label: const Text('Log out'),
-                    ),
-                  ],
+                  ),
                 ),
-              ),
-            );
-          },
-        ),
+              );
+            },
+          );
+        },
       ),
     );
   }
@@ -262,15 +373,43 @@ class _MyProfileScreenState extends ConsumerState<MyProfileScreen> {
     required String title,
     required VoidCallback? onTap,
   }) {
+    final colors = Theme.of(context).colorScheme;
+    final available = onTap != null;
+    final enabled = available && !_isBusy;
+
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: Card(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: BorderSide(color: colors.outline),
+        ),
         child: ListTile(
-          enabled: !_isBusy && onTap != null,
-          leading: Icon(icon),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 16,
+            vertical: 8,
+          ),
+          enabled: enabled,
+          leading: Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: colors.primary.withValues(alpha: 0.14),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(
+              icon,
+              color: enabled ? colors.secondary : colors.onSurfaceVariant,
+            ),
+          ),
           title: Text(title),
-          trailing: const Icon(Icons.chevron_right),
-          onTap: _isBusy ? null : onTap,
+          trailing: Icon(
+            Icons.chevron_right,
+            color: enabled
+                ? colors.onSurfaceVariant
+                : colors.onSurfaceVariant.withValues(alpha: 0.4),
+          ),
+          onTap: enabled ? onTap : null,
         ),
       ),
     );
