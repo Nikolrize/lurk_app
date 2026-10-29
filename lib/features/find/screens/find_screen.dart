@@ -1,3 +1,5 @@
+import '../models/filter_preferences.dart';
+import 'filter_preferences_screen.dart';
 import 'package:flutter/material.dart';
 
 import '../../player/data/sample_players.dart';
@@ -16,11 +18,8 @@ class _FindSreenState extends State<FindSreen> {
   bool _showPlayers = false;
   final _searchController = TextEditingController();
   String _query = '';
-  String? _partyGame;
-  String? _playerGame;
-  String? _playStyle;
-  bool _availableOnly = false;
-  bool _activeOnly = false;
+  FilterPreferences _partyFilters = const FilterPreferences();
+  FilterPreferences _playerFilters = const FilterPreferences();
 
   @override
   void dispose() {
@@ -29,126 +28,27 @@ class _FindSreenState extends State<FindSreen> {
   }
 
   Future<void> _openFilters() async {
-    final players = _showPlayers;
-    String? game = players ? _playerGame : _partyGame;
-    String? style = _playStyle;
-    bool only = players ? _activeOnly : _availableOnly;
-    final games =
-        (players
-                ? samplePlayers
-                      .map((p) => p.currentGame?.trim())
-                      .whereType<String>()
-                : sampleParties.map((p) => p.gameName))
-            .where((g) => g.isNotEmpty)
-            .toSet()
-            .toList()
-          ..sort();
-    final styles = sampleParties.map((p) => p.playStyle).toSet().toList()
-      ..sort();
-    final applied = await showModalBottomSheet<bool>(
-      context: context,
-      isScrollControlled: true,
-      showDragHandle: true,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setSheetState) {
-          return SafeArea(
-            child: SingleChildScrollView(
-              child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Text(
-                      players ? 'Player filters' : 'Party filters',
-                      style: Theme.of(context).textTheme.titleLarge,
-                    ),
-                    const SizedBox(height: 20),
-                    const Text('Game'),
-                    const SizedBox(height: 8),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: [
-                        ChoiceChip(
-                          label: const Text('All games'),
-                          selected: game == null,
-                          onSelected: (_) => setSheetState(() => game = null),
-                        ),
-                        for (final value in games)
-                          ChoiceChip(
-                            label: Text(value),
-                            selected: game == value,
-                            onSelected: (_) =>
-                                setSheetState(() => game = value),
-                          ),
-                      ],
-                    ),
-                    if (!players) ...[
-                      const SizedBox(height: 16),
-                      const Text('Play style'),
-                      const SizedBox(height: 8),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: [
-                          ChoiceChip(
-                            label: const Text('Any style'),
-                            selected: style == null,
-                            onSelected: (_) =>
-                                setSheetState(() => style = null),
-                          ),
-                          for (final value in styles)
-                            ChoiceChip(
-                              label: Text(value),
-                              selected: style == value,
-                              onSelected: (_) =>
-                                  setSheetState(() => style = value),
-                            ),
-                        ],
-                      ),
-                    ],
-                    const SizedBox(height: 12),
-                    SwitchListTile(
-                      contentPadding: EdgeInsets.zero,
-                      title: Text(
-                        players
-                            ? 'Active players only'
-                            : 'Available spots only',
-                      ),
-                      value: only,
-                      onChanged: (value) => setSheetState(() => only = value),
-                    ),
-                    const SizedBox(height: 16),
-                    FilledButton(
-                      onPressed: () => Navigator.pop(context, true),
-                      child: const Text('Apply filters'),
-                    ),
-                    TextButton(
-                      onPressed: () => setSheetState(() {
-                        game = null;
-                        style = null;
-                        only = false;
-                      }),
-                      child: const Text('Reset filters'),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          );
-        },
+    FocusManager.instance.primaryFocus?.unfocus();
+    final forPlayers = _showPlayers;
+    final games = {
+      ...sampleParties.map((p) => p.gameName),
+      ...samplePlayers.map((p) => p.currentGame).whereType<String>(),
+    }.toList()..sort();
+    final result = await Navigator.of(context).push<FilterPreferences>(
+      MaterialPageRoute(
+        builder: (_) => FilterPreferencesScreen(
+          initial: forPlayers ? _playerFilters : _partyFilters,
+          games: games,
+          forPlayers: forPlayers,
+        ),
       ),
     );
-    if (applied != true || !mounted) return;
+    if (!mounted || result == null) return;
     setState(() {
-      if (players) {
-        _playerGame = game;
-        _activeOnly = only;
+      if (forPlayers) {
+        _playerFilters = result;
       } else {
-        _partyGame = game;
-        _playStyle = style;
-        _availableOnly = only;
+        _partyFilters = result;
       }
     });
   }
@@ -156,28 +56,47 @@ class _FindSreenState extends State<FindSreen> {
   @override
   Widget build(BuildContext context) {
     final query = _query.trim().toLowerCase();
-    final parties = sampleParties.where((party) {
-      return '${party.title} ${party.gameName} ${party.playStyle}'
-              .toLowerCase()
-              .contains(query) &&
-          (_partyGame == null || party.gameName == _partyGame) &&
-          (_playStyle == null || party.playStyle == _playStyle) &&
-          (!_availableOnly || !party.isFull);
-    }).toList();
-    final players = samplePlayers.where((player) {
-      return '${player.name} ${player.currentGame ?? ''}'
-              .toLowerCase()
-              .contains(query) &&
-          (_playerGame == null || player.currentGame?.trim() == _playerGame) &&
-          (!_activeOnly || player.isActive);
-    }).toList();
-    final count = _showPlayers ? players.length : parties.length;
-    final filterCount = _showPlayers
-        ? (_playerGame != null ? 1 : 0) + (_activeOnly ? 1 : 0)
-        : (_partyGame != null ? 1 : 0) +
-              (_playStyle != null ? 1 : 0) +
-              (_availableOnly ? 1 : 0);
+    final parties = sampleParties
+        .where(
+          (p) =>
+              '${p.title} ${p.gameName} ${p.playStyle}'.toLowerCase().contains(
+                query,
+              ) &&
+              _partyFilters.matches(
+                gameName: p.gameName,
+                regionName: p.region,
+                gameMode: p.mode ?? p.playStyle,
+                rank: p.rank,
+                style: p.style,
+                comms: p.communication,
+                rating: p.rating,
 
+                partySize: p.maxPlayers,
+                hasAvailability: !p.isFull,
+              ),
+        )
+        .toList();
+    final players = samplePlayers
+        .where(
+          (p) =>
+              '${p.name} ${p.currentGame ?? ''}'.toLowerCase().contains(
+                query,
+              ) &&
+              _playerFilters.matches(
+                gameName: p.currentGame,
+                regionName: p.region,
+                gameMode: p.mode,
+                rank: p.rank,
+                style: p.style,
+                comms: p.communication,
+                rating: p.rating,
+                playerAvailability: p.availability,
+                hasAvailability: p.isActive,
+              ),
+        )
+        .toList();
+    final count = _showPlayers ? players.length : parties.length;
+    final filterCount = (_showPlayers ? _playerFilters : _partyFilters).count;
     return SafeArea(
       bottom: false,
       child: Padding(
@@ -254,7 +173,7 @@ class _FindSreenState extends State<FindSreen> {
                     )
                   : ListView.separated(
                       padding: EdgeInsets.only(
-                        bottom: MediaQuery.paddingOf(context).bottom + 20,
+                        bottom: MediaQuery.paddingOf(context).bottom,
                       ),
                       itemCount: count,
                       separatorBuilder: (_, index) =>

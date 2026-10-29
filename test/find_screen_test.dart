@@ -27,8 +27,13 @@ void main() {
     expect(find.text('Late Night Ranked'), findsNothing);
     await tester.tap(find.byTooltip('Filters'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Active players only'));
-    await tester.tap(find.text('Apply filters'));
+    await tester.scrollUntilVisible(
+      find.text('Evening'),
+      250,
+      scrollable: find.byType(Scrollable).last,
+    );
+    await tester.tap(find.text('Evening'));
+    await tester.tap(find.text('Show Results'));
     await tester.pumpAndSettle();
     expect(find.text('Jay'), findsOneWidget);
     expect(find.text('Alex'), findsNothing);

@@ -1,4 +1,7 @@
 class Party {
+  final String? region, mode, style, communication, availability;
+  final int? rank;
+  final double? rating;
   final String id;
   final String title;
   final String gameName;
@@ -7,6 +10,13 @@ class Party {
   final int maxPlayers;
 
   const Party({
+    this.region,
+    this.mode,
+    this.rank,
+    this.style,
+    this.communication,
+    this.rating,
+    this.availability,
     required this.id,
     required this.title,
     required this.gameName,
