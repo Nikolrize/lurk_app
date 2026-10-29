@@ -129,7 +129,10 @@ class _AccountFormScreenState extends ConsumerState<AccountFormScreen> {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     Text(
-                      _isSignUp ? 'Find your next teammates.' : 'Enter your account email to request ''a password reset link.',
+                      _isSignUp
+                          ? 'Find your next teammates.'
+                          : 'Enter your account email to request '
+                                'a password reset link.',
                     ),
                     const SizedBox(height: 24),
                     TextFormField(

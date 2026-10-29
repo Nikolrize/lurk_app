@@ -6,8 +6,12 @@ import 'package:flutter/material.dart';
 import '../../features/home/screens/home_screen.dart';
 import '../../features/find/screens/find_screen.dart';
 
+import '../../features/profile/my_profile_screen.dart';
+
 class AppShell extends StatefulWidget {
-  const AppShell({super.key});
+  const AppShell({super.key, required this.uid});
+
+  final String uid;
 
   @override
   State<AppShell> createState() => _AppShellState();
@@ -31,9 +35,7 @@ class _AppShellState extends State<AppShell> {
           const SafeArea(
             child: Center(child: Text('Your messages will appear here')),
           ),
-          const SafeArea(
-            child: Center(child: Text('Your profile will appear here')),
-          ),
+          MyProfileScreen(uid: widget.uid),
         ],
       ),
       bottomNavigationBar: SafeArea(
