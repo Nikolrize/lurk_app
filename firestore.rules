@@ -96,6 +96,13 @@ service cloud.firestore {
         && data.updatedAt is timestamp;
     }
 
+    // Initial party integration: discovery reads only. Writes remain blocked.
+    match /parties/{partyId} {
+      allow read: if signedIn()
+        && resource.data.visibility == 'public'
+        && resource.data.status == 'open';
+      allow write: if false;
+    }
     match /players/{uid} {
       allow read: if signedIn();
 

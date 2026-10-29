@@ -43,13 +43,17 @@ class PlayerCard extends StatelessWidget {
                     Icon(
                       Icons.circle,
                       size: 8,
-                      color: player.isActive
+                      color: player.isActive == true
                           ? colors.secondary
                           : colors.onSurfaceVariant,
                     ),
                     const SizedBox(width: 6),
                     Text(
-                      player.isActive ? 'Active now' : 'Offline',
+                      switch (player.isActive) {
+                        true => 'Active now',
+                        false => 'Offline',
+                        null => 'Status unavailable',
+                      },
                       style: text.bodySmall?.copyWith(
                         color: colors.onSurfaceVariant,
                       ),

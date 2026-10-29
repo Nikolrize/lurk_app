@@ -1,3 +1,8 @@
+import 'package:lurk_app/providers/player_provider.dart';
+import 'fixtures/players.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:lurk_app/providers/party_provider.dart';
+import 'fixtures/parties.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:lurk_app/core/theme/app_theme.dart';
@@ -8,11 +13,22 @@ void main() {
     tester,
   ) async {
     await tester.pumpWidget(
-      MaterialApp(
-        theme: AppTheme.dark,
-        home: const Scaffold(body: FindSreen()),
+      ProviderScope(
+        overrides: [
+          discoverablePlayersProvider.overrideWith(
+            (ref) => Stream.value(testPlayers),
+          ),
+          availablePartiesProvider.overrideWith(
+            (ref) => Stream.value(testParties),
+          ),
+        ],
+        child: MaterialApp(
+          theme: AppTheme.dark,
+          home: const Scaffold(body: FindSreen()),
+        ),
       ),
     );
+    await tester.pumpAndSettle();
     expect(find.text('Late Night Ranked'), findsOneWidget);
     expect(find.text('Jay'), findsNothing);
     await tester.enterText(find.byType(TextField), 'no-match');
@@ -27,8 +43,13 @@ void main() {
     expect(find.text('Late Night Ranked'), findsNothing);
     await tester.tap(find.byTooltip('Filters'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Active players only'));
-    await tester.tap(find.text('Apply filters'));
+    await tester.scrollUntilVisible(
+      find.text('Evening'),
+      250,
+      scrollable: find.byType(Scrollable).last,
+    );
+    await tester.tap(find.text('Evening'));
+    await tester.tap(find.text('Show Results'));
     await tester.pumpAndSettle();
     expect(find.text('Jay'), findsOneWidget);
     expect(find.text('Alex'), findsNothing);

@@ -1,10 +1,13 @@
 import '../../../core/widgets/action_card.dart';
-import '../../player/data/sample_players.dart';
+import '../../../providers/player_provider.dart';
+import '../../player/widgets/player_load_error.dart';
+import '../../profile/screens/player_profile_screen.dart';
 import '../../player/widgets/player_card.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lurk_app/features/parties/widgets/party_card.dart';
-import '../../parties/data/sample_parties.dart';
+import '../../../providers/party_provider.dart';
+import '../../parties/widgets/party_load_error.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../providers/auth_provider.dart';
 
@@ -45,6 +48,8 @@ class HomeScreen extends ConsumerWidget {
         ? displayName
         : 'Player';
     final text = Theme.of(context).textTheme;
+    final partyState = ref.watch(availablePartiesProvider);
+    final playerState = ref.watch(discoverablePlayersProvider);
 
     return SafeArea(
       bottom: false,
@@ -162,18 +167,42 @@ class HomeScreen extends ConsumerWidget {
             style: text.titleLarge?.copyWith(fontWeight: FontWeight.w700),
           ),
           const SizedBox(height: 14),
-          ...sampleParties.map(
-            (party) => Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: PartyCard(
-                party: party,
-                onJoin: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('You selected ${party.title}')),
-                  );
-                },
+          partyState.when(
+            loading: () => const Center(
+              child: Padding(
+                padding: EdgeInsets.all(24),
+                child: CircularProgressIndicator(),
               ),
             ),
+            error: (error, _) => PartyLoadError(
+              error: error,
+              onRetry: () => ref.invalidate(availablePartiesProvider),
+            ),
+            data: (parties) => parties.isEmpty
+                ? const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 16),
+                    child: Text('No open parties yet. Check back soon.'),
+                  )
+                : Column(
+                    children: [
+                      for (final party in parties.take(3))
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 12),
+                          child: PartyCard(
+                            party: party,
+                            onJoin: () {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text(
+                                    'Party joining is not connected yet.',
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                    ],
+                  ),
           ),
           const SizedBox(height: 30),
           Text(
@@ -185,13 +214,47 @@ class HomeScreen extends ConsumerWidget {
             ),
           ),
           const SizedBox(height: 12),
-          PlayerCard(
-            player: samplePlayers.first,
-            onTap: () => _preview(
-              context,
-              samplePlayers.first.name,
-              'Sample player preview. Live availability and profiles are not connected yet.',
+          playerState.when(
+            loading: () => const Center(
+              child: Padding(
+                padding: EdgeInsets.all(24),
+                child: CircularProgressIndicator(),
+              ),
             ),
+            error: (error, _) => PlayerLoadError(
+              error: error,
+              onRetry: () => ref.invalidate(discoverablePlayersProvider),
+            ),
+            data: (players) {
+              final available = players
+                  .where((p) => p.availability.availableNow)
+                  .take(3)
+                  .toList();
+              if (available.isEmpty) {
+                return const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 16),
+                  child: Text(
+                    'No players have marked themselves available yet. Explore the Player tab in Find.',
+                  ),
+                );
+              }
+              return Column(
+                children: [
+                  for (final player in available)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: PlayerCard(
+                        player: player,
+                        onTap: () => Navigator.of(context).push(
+                          MaterialPageRoute<void>(
+                            builder: (_) => PlayerProfileScreen(uid: player.id),
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              );
+            },
           ),
         ],
       ),
