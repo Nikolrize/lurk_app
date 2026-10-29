@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../core/widgets/app_shell.dart';
-import '../../providers/auth_provider.dart';
-import '../profile/profile_gate.dart';
-import 'login_screen.dart';
+import 'package:lurk_app/core/widgets/app_shell.dart';
+import 'package:lurk_app/providers/auth_provider.dart';
+import 'package:lurk_app/features/profile/widgets/profile_gate.dart';
+import 'package:lurk_app/features/authentication/screens/login_screen.dart';
 
 class AuthGate extends ConsumerWidget {
   const AuthGate({super.key});

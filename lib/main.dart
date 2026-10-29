@@ -5,7 +5,7 @@ import 'package:google_sign_in/google_sign_in.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lurk_app/core/theme/app_theme.dart';
 
-import 'features/authentication/auth_gate.dart';
+import 'package:lurk_app/features/authentication/widgets/auth_gate.dart';
 import 'firebase_options.dart';
 
 Future<void> main() async {

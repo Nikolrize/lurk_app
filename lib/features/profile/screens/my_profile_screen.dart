@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../providers/auth_provider.dart';
-import '../../providers/profile_provider.dart';
-import 'edit_profile_screen.dart';
+import 'package:lurk_app/providers/auth_provider.dart';
+import 'package:lurk_app/providers/profile_provider.dart';
+import 'package:lurk_app/features/profile/screens/edit_profile_screen.dart';
 
-import 'player_profile_screen.dart';
+import 'package:lurk_app/features/profile/screens/player_profile_screen.dart';
 
 class MyProfileScreen extends ConsumerStatefulWidget {
   const MyProfileScreen({
