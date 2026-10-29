@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:lurk_app/features/authentication/account_form_screen.dart';
-import 'package:lurk_app/features/authentication/auth_gate.dart';
+import 'package:lurk_app/features/authentication/screens/account_form_screen.dart';
+import 'package:lurk_app/features/authentication/widgets/auth_gate.dart';
 import 'package:lurk_app/providers/auth_provider.dart';
 
 void main() {

@@ -4,8 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 
-import '../../providers/auth_provider.dart';
-import 'account_form_screen.dart';
+import 'package:lurk_app/providers/auth_provider.dart';
+import 'package:lurk_app/features/authentication/screens/account_form_screen.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -114,10 +114,17 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      Text(
-                        'Lurk',
-                        textAlign: TextAlign.center,
-                        style: Theme.of(context).textTheme.displaySmall,
+                      Center(
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(20),
+                          child: Image.asset(
+                            'assets/images/lurk_logo.png',
+                            width: 140,
+                            height: 140,
+                            fit: BoxFit.contain,
+                            semanticLabel: 'Lurk logo',
+                          ),
+                        ),
                       ),
                       const SizedBox(height: 8),
                       const Text(
@@ -215,37 +222,43 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         child: const Text('Log in'),
                       ),
                       const SizedBox(height: 12),
-                        TextButton(
-                          onPressed: _isLoading ? null : () {
-                                  Navigator.of(context).push(
-                                    MaterialPageRoute<void>(
-                                      builder: (_) => const AccountFormScreen(
-                                        action: AccountAction.resetPassword,
-                                      ),
+                      TextButton(
+                        onPressed: _isLoading
+                            ? null
+                            : () {
+                                Navigator.of(context).push(
+                                  MaterialPageRoute<void>(
+                                    builder: (_) => const AccountFormScreen(
+                                      action: AccountAction.resetPassword,
                                     ),
-                                  );
-                                },
-                          child: const Text('Forgot password?'),
-                        ),
-                        TextButton(
-                          onPressed: _isLoading? null : () {
-                                  Navigator.of(context).push(
-                                    MaterialPageRoute<void>(
-                                      builder: (_) => const AccountFormScreen(
-                                        action: AccountAction.signUp,
-                                      ),
+                                  ),
+                                );
+                              },
+                        child: const Text('Forgot password?'),
+                      ),
+                      TextButton(
+                        onPressed: _isLoading
+                            ? null
+                            : () {
+                                Navigator.of(context).push(
+                                  MaterialPageRoute<void>(
+                                    builder: (_) => const AccountFormScreen(
+                                      action: AccountAction.signUp,
                                     ),
-                                  );
-                                },
-                          child: const Text('New to Lurk? Create account'),
+                                  ),
+                                );
+                              },
+                        child: const Text('New to Lurk? Create account'),
+                      ),
+                      if (supportsGoogle) ...[
+                        const SizedBox(height: 12),
+                        OutlinedButton(
+                          onPressed: _isLoading
+                              ? null
+                              : () => _login(withGoogle: true),
+                          child: const Text('Continue with Google'),
                         ),
-                        if (supportsGoogle) ...[
-                          const SizedBox(height: 12),
-                          OutlinedButton(
-                            onPressed: _isLoading ? null : () => _login(withGoogle: true),
-                            child: const Text('Continue with Google'),
-                          ),
-                        ],
+                      ],
                       if (_isLoading) ...[
                         const SizedBox(height: 20),
                         const Center(child: CircularProgressIndicator()),

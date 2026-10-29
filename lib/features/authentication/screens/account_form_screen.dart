@@ -2,7 +2,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../providers/auth_provider.dart';
+import 'package:lurk_app/providers/auth_provider.dart';
 
 enum AccountAction { signUp, resetPassword }
 
@@ -129,7 +129,10 @@ class _AccountFormScreenState extends ConsumerState<AccountFormScreen> {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     Text(
-                      _isSignUp ? 'Find your next teammates.' : 'Enter your account email to request ''a password reset link.',
+                      _isSignUp
+                          ? 'Find your next teammates.'
+                          : 'Enter your account email to request '
+                                'a password reset link.',
                     ),
                     const SizedBox(height: 24),
                     TextFormField(

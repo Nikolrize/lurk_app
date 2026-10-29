@@ -1,0 +1,136 @@
+rules_version = '2';
+
+// players/{uid}:
+// username, bio, region: required strings.
+// createdAt: immutable timestamp; updatedAt: server timestamp.
+//
+// player_private/{uid}:
+// dateOfBirth: required nullable timestamp.
+// gender: required string from the allowed values.
+// createdAt: immutable timestamp; updatedAt: server timestamp.
+//
+// document IDs are firebase auth UIDs
+// unmactched paths are denied
+
+
+// optional public sharing
+// sharedAge: nullable integer, 0 - 150 
+// ageSharedAt: nullable timestamp, required with a shared age
+//sharedGender : nullable male/female/other
+//full birth date remains in player_private
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function owns(uid) {
+      return signedIn() && request.auth.uid == uid;
+    }
+
+    function validSharing(data) {
+      let age = data.get('sharedAge', null);
+      let sharedAt = data.get('ageSharedAt', null);
+      let gender = data.get('sharedGender', null);
+
+      return (
+        (age == null && sharedAt == null)
+        || (
+          age is int
+          && age >= 0
+          && age <= 150
+          && sharedAt is timestamp
+          && sharedAt <= request.time
+        )
+      )
+      && (
+        gender == null
+        || gender in ['male', 'female', 'other']
+      );
+    }
+
+    function validPublicProfile(data) {
+      return data.keys().hasAll([
+          'username', 'bio', 'region', 'createdAt', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'username', 'bio', 'region', 'createdAt', 'updatedAt',
+          'sharedAge', 'ageSharedAt', 'sharedGender'
+        ])
+        && data.username is string
+        && (
+          data.username.size() == 0
+          || data.username.size() >= 3
+        )
+        && data.username.size() <= 30
+        && data.bio is string
+        && data.bio.size() <= 500
+        && data.region is string
+        && data.region.size() <= 60
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp
+        && validSharing(data);
+    }
+
+    function validPrivateInfo(data) {
+      return data.keys().hasAll([
+          'dateOfBirth', 'gender', 'createdAt', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'dateOfBirth', 'gender', 'createdAt', 'updatedAt'
+        ])
+        && (
+          data.dateOfBirth == null
+          || (
+            data.dateOfBirth is timestamp
+            && data.dateOfBirth >= timestamp.date(1900, 1, 1)
+            && data.dateOfBirth <= request.time
+          )
+        )
+        && data.gender is string
+        && data.gender in [
+          '', 'male', 'female', 'other', 'prefer_not_to_say'
+        ]
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    match /players/{uid} {
+      allow read: if signedIn();
+
+      allow create: if owns(uid)
+        && validPublicProfile(request.resource.data)
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.updatedAt == request.time;
+
+      allow update: if owns(uid)
+        && validPublicProfile(request.resource.data)
+        && request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly([
+            'username', 'bio', 'region', 'updatedAt',
+            'sharedAge', 'ageSharedAt', 'sharedGender'
+          ])
+        && request.resource.data.updatedAt == request.time;
+
+      allow delete: if false;
+    }
+
+    match /player_private/{uid} {
+      allow read: if owns(uid);
+
+      allow create: if owns(uid)
+        && validPrivateInfo(request.resource.data)
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.updatedAt == request.time;
+
+      allow update: if owns(uid)
+        && validPrivateInfo(request.resource.data)
+        && request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['dateOfBirth', 'gender', 'updatedAt'])
+        && request.resource.data.updatedAt == request.time;
+
+      allow delete: if false;
+    }
+  }
+}
