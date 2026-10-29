@@ -1,3 +1,5 @@
+import 'package:lurk_app/providers/player_provider.dart';
+import 'package:lurk_app/features/player/models/player.dart';
 import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
@@ -59,6 +61,9 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
+          discoverablePlayersProvider.overrideWith(
+            (ref) => Stream.value(const <Player>[]),
+          ),
           availablePartiesProvider.overrideWith((ref) => stream.stream),
         ],
         child: const MaterialApp(home: Scaffold(body: FindSreen())),

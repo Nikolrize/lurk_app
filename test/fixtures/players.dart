@@ -1,8 +1,8 @@
-import '../models/player_availability.dart';
-import '../models/player.dart';
+import 'package:lurk_app/features/player/models/player_availability.dart';
+import 'package:lurk_app/features/player/models/player.dart';
 
 // Sample presence only; replace with backend data when available.
-const samplePlayers = [
+const testPlayers = [
   Player(
     id: 'player-1',
     region: 'Asia',

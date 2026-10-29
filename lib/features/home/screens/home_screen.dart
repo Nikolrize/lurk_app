@@ -1,5 +1,7 @@
 import '../../../core/widgets/action_card.dart';
-import '../../player/data/sample_players.dart';
+import '../../../providers/player_provider.dart';
+import '../../player/widgets/player_load_error.dart';
+import '../../profile/screens/player_profile_screen.dart';
 import '../../player/widgets/player_card.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -47,6 +49,7 @@ class HomeScreen extends ConsumerWidget {
         : 'Player';
     final text = Theme.of(context).textTheme;
     final partyState = ref.watch(availablePartiesProvider);
+    final playerState = ref.watch(discoverablePlayersProvider);
 
     return SafeArea(
       bottom: false,
@@ -211,13 +214,47 @@ class HomeScreen extends ConsumerWidget {
             ),
           ),
           const SizedBox(height: 12),
-          PlayerCard(
-            player: samplePlayers.first,
-            onTap: () => _preview(
-              context,
-              samplePlayers.first.name,
-              'Sample player preview. Live availability and profiles are not connected yet.',
+          playerState.when(
+            loading: () => const Center(
+              child: Padding(
+                padding: EdgeInsets.all(24),
+                child: CircularProgressIndicator(),
+              ),
             ),
+            error: (error, _) => PlayerLoadError(
+              error: error,
+              onRetry: () => ref.invalidate(discoverablePlayersProvider),
+            ),
+            data: (players) {
+              final available = players
+                  .where((p) => p.availability.availableNow)
+                  .take(3)
+                  .toList();
+              if (available.isEmpty) {
+                return const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 16),
+                  child: Text(
+                    'No players have marked themselves available yet. Explore the Player tab in Find.',
+                  ),
+                );
+              }
+              return Column(
+                children: [
+                  for (final player in available)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: PlayerCard(
+                        player: player,
+                        onTap: () => Navigator.of(context).push(
+                          MaterialPageRoute<void>(
+                            builder: (_) => PlayerProfileScreen(uid: player.id),
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              );
+            },
           ),
         ],
       ),

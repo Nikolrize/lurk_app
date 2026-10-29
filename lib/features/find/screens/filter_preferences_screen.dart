@@ -8,10 +8,12 @@ class FilterPreferencesScreen extends StatefulWidget {
     required this.initial,
     required this.games,
     required this.forPlayers,
+    this.regions = const ['Asia', 'Europe', 'North America', 'Oceania'],
   });
   final FilterPreferences initial;
   final List<String> games;
   final bool forPlayers;
+  final List<String> regions;
   @override
   State<FilterPreferencesScreen> createState() =>
       _FilterPreferencesScreenState();
@@ -149,12 +151,12 @@ class _FilterPreferencesScreenState extends State<FilterPreferencesScreen> {
         padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
         children: [
           _select('Game', _game, widget.games, (v) => _game = v),
-          _select('Region', _region, const [
-            'Asia',
-            'Europe',
-            'North America',
-            'Oceania',
-          ], (v) => _region = v),
+          _select(
+            'Region',
+            _region,
+            {...widget.regions, ?_region}.toList(),
+            (v) => _region = v,
+          ),
           _select('Mode', _mode, const [
             'Competitive',
             'Casual',

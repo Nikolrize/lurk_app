@@ -1,3 +1,5 @@
+import 'package:lurk_app/providers/player_provider.dart';
+import 'fixtures/players.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lurk_app/providers/party_provider.dart';
 import 'fixtures/parties.dart';
@@ -13,6 +15,9 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
+          discoverablePlayersProvider.overrideWith(
+            (ref) => Stream.value(testPlayers),
+          ),
           availablePartiesProvider.overrideWith(
             (ref) => Stream.value(testParties),
           ),

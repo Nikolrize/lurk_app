@@ -5,7 +5,9 @@ import '../models/filter_preferences.dart';
 import 'filter_preferences_screen.dart';
 import 'package:flutter/material.dart';
 
-import '../../player/data/sample_players.dart';
+import '../../../providers/player_provider.dart';
+import '../../player/widgets/player_load_error.dart';
+import '../../profile/screens/player_profile_screen.dart';
 import '../../player/widgets/player_card.dart';
 
 import '../../parties/widgets/party_card.dart';
@@ -37,7 +39,9 @@ class _FindSreenState extends ConsumerState<FindSreen> {
       ...(ref.read(availablePartiesProvider).asData?.value ?? []).map(
         (p) => p.gameName,
       ),
-      ...samplePlayers.map((p) => p.currentGame).whereType<String>(),
+      ...(ref.read(discoverablePlayersProvider).asData?.value ?? [])
+          .map((p) => p.currentGame)
+          .whereType<String>(),
     }.toList()..sort();
     final result = await Navigator.of(context).push<FilterPreferences>(
       MaterialPageRoute(
@@ -45,6 +49,14 @@ class _FindSreenState extends ConsumerState<FindSreen> {
           initial: forPlayers ? _playerFilters : _partyFilters,
           games: games,
           forPlayers: forPlayers,
+          regions: forPlayers
+              ? ((ref.read(discoverablePlayersProvider).asData?.value ?? [])
+                    .map((p) => p.region)
+                    .whereType<String>()
+                    .toSet()
+                    .toList()
+                  ..sort())
+              : const ['Asia', 'Europe', 'North America', 'Oceania'],
         ),
       ),
     );
@@ -85,7 +97,8 @@ class _FindSreenState extends ConsumerState<FindSreen> {
               ),
         )
         .toList();
-    final players = samplePlayers
+    final playerState = ref.watch(discoverablePlayersProvider);
+    final players = (playerState.asData?.value ?? [])
         .where(
           (p) =>
               '${p.name} ${p.currentGame ?? ''}'.toLowerCase().contains(
@@ -95,12 +108,13 @@ class _FindSreenState extends ConsumerState<FindSreen> {
                 gameName: p.currentGame,
                 regionName: p.region,
                 gameMode: p.mode,
+                styleOptions: p.playstyles,
                 rank: p.rank,
                 style: p.style,
                 comms: p.communication,
                 rating: p.rating,
                 playerAvailability: p.availability,
-                hasAvailability: p.isActive,
+                hasAvailability: p.isActive == true,
               ),
         )
         .toList();
@@ -173,7 +187,17 @@ class _FindSreenState extends ConsumerState<FindSreen> {
             ),
             const SizedBox(height: 12),
             Expanded(
-              child: !_showPlayers && partyState.isLoading
+              child: _showPlayers && playerState.isLoading
+                  ? const Center(child: CircularProgressIndicator())
+                  : _showPlayers && playerState.hasError
+                  ? Center(
+                      child: PlayerLoadError(
+                        error: playerState.error!,
+                        onRetry: () =>
+                            ref.invalidate(discoverablePlayersProvider),
+                      ),
+                    )
+                  : !_showPlayers && partyState.isLoading
                   ? const Center(child: CircularProgressIndicator())
                   : !_showPlayers && partyState.hasError
                   ? Center(
@@ -197,7 +221,16 @@ class _FindSreenState extends ConsumerState<FindSreen> {
                       separatorBuilder: (_, index) =>
                           const SizedBox(height: 12),
                       itemBuilder: (context, index) => _showPlayers
-                          ? PlayerCard(player: players[index])
+                          ? PlayerCard(
+                              player: players[index],
+                              onTap: () => Navigator.of(context).push(
+                                MaterialPageRoute<void>(
+                                  builder: (_) => PlayerProfileScreen(
+                                    uid: players[index].id,
+                                  ),
+                                ),
+                              ),
+                            )
                           : PartyCard(
                               party: parties[index],
                               onJoin: () {
