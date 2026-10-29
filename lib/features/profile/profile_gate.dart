@@ -5,24 +5,18 @@ import '../../providers/auth_provider.dart';
 import '../../providers/profile_provider.dart';
 
 class ProfileGate extends ConsumerWidget {
-  const ProfileGate({
-    super.key,
-    required this.uid,
-    required this.child,
-  });
+  const ProfileGate({super.key, required this.uid, required this.child});
 
   final String uid;
   final Widget child;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final initialization =
-        ref.watch(profileInitializationProvider(uid));
+    final initialization = ref.watch(profileInitializationProvider(uid));
 
     return initialization.when(
-      loading: () => const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      ),
+      loading: () =>
+          const Scaffold(body: Center(child: CircularProgressIndicator())),
       error: (error, stackTrace) => Scaffold(
         appBar: AppBar(title: const Text('Profile setup')),
         body: Center(

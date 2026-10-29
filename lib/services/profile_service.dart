@@ -17,7 +17,7 @@ class ProfileService {
     return user.uid;
   }
 
-  // creates missing documents 
+  // creates missing documents
   Future<void> ensureMyProfile(String uid) async {
     if (_currentUid != uid) {
       throw StateError('The account changed. Please try again.');
@@ -53,23 +53,21 @@ class ProfileService {
   }
 
   Stream<PlayerProfile?> watchProfile(String uid) {
-    return _db.collection('players').doc(uid).snapshots().map(
-      (document) {
-        if (!document.exists) return null;
+    return _db.collection('players').doc(uid).snapshots().map((document) {
+      if (!document.exists) return null;
 
-        return PlayerProfile.fromDocument(document);
-      },
-    );
+      return PlayerProfile.fromDocument(document);
+    });
   }
 
   Stream<PlayerPrivateInfo?> watchPrivateInfo(String uid) {
-    return _db.collection('player_private').doc(uid).snapshots().map(
-      (document) {
-        if (!document.exists) return null;
+    return _db.collection('player_private').doc(uid).snapshots().map((
+      document,
+    ) {
+      if (!document.exists) return null;
 
-        return PlayerPrivateInfo.fromDocument(document);
-      },
-    );
+      return PlayerPrivateInfo.fromDocument(document);
+    });
   }
 
   Future<void> updateMyProfile({
@@ -104,13 +102,7 @@ class ProfileService {
   }) {
     final uid = _currentUid;
 
-    const allowedGenders = {
-      '',
-      'male',
-      'female',
-      'other',
-      'prefer_not_to_say',
-    };
+    const allowedGenders = {'', 'male', 'female', 'other', 'prefer_not_to_say'};
 
     if (!allowedGenders.contains(gender)) {
       throw ArgumentError('Invalid gender selection.');
@@ -119,11 +111,7 @@ class ProfileService {
     // Birth date represents a calendar date, stored at midnight UTC.
     final birthDate = dateOfBirth == null
         ? null
-        : DateTime.utc(
-            dateOfBirth.year,
-            dateOfBirth.month,
-            dateOfBirth.day,
-          );
+        : DateTime.utc(dateOfBirth.year, dateOfBirth.month, dateOfBirth.day);
 
     final today = DateTime.now();
     final todayUtc = DateTime.utc(today.year, today.month, today.day);
@@ -134,10 +122,105 @@ class ProfileService {
     }
 
     return _db.collection('player_private').doc(uid).update({
-      'dateOfBirth':
-          birthDate == null ? null : Timestamp.fromDate(birthDate),
+      'dateOfBirth': birthDate == null ? null : Timestamp.fromDate(birthDate),
       'gender': gender,
       'updatedAt': FieldValue.serverTimestamp(),
     });
+  }
+
+  //loading
+  Future<ProfileSetupData> loadMyProfileSetup(String uid) async {
+    if (_currentUid != uid) {
+      throw StateError('The account changed. Please try again.');
+    }
+
+    await ensureMyProfile(uid);
+
+    final publicDocument = await _db
+        .collection('players')
+        .doc(uid)
+        .get(const GetOptions(source: Source.server));
+
+    final privateDocument = await _db
+        .collection('player_private')
+        .doc(uid)
+        .get(const GetOptions(source: Source.server));
+
+    if (!publicDocument.exists || !privateDocument.exists) {
+      throw StateError('Profile information is missing.');
+    }
+
+    return ProfileSetupData(
+      profile: PlayerProfile.fromDocument(publicDocument),
+      privateInfo: PlayerPrivateInfo.fromDocument(privateDocument),
+    );
+  }
+
+  //atomic saving
+  Future<void> saveMyProfileDetails({
+    required String expectedUid,
+    required String username,
+    required String bio,
+    required String region,
+    required DateTime dateOfBirth,
+    required String gender,
+  }) async {
+    final uid = _currentUid;
+
+    if (uid != expectedUid) {
+      throw StateError('The account changed. Reopen your profile.');
+    }
+
+    final cleanUsername = username.trim();
+    final cleanBio = bio.trim();
+    final cleanRegion = region.trim();
+
+    if (cleanUsername.length < 3 || cleanUsername.length > 30) {
+      throw ArgumentError('Username must contain 3-30 characters.');
+    }
+
+    if (cleanBio.length > 500) {
+      throw ArgumentError('Bio must not exceed 500 characters.');
+    }
+
+    if (cleanRegion.isEmpty || cleanRegion.length > 60) {
+      throw ArgumentError('Enter a region using at most 60 characters.');
+    }
+
+    const allowedGenders = {'male', 'female', 'other', 'prefer_not_to_say'};
+
+    if (!allowedGenders.contains(gender)) {
+      throw ArgumentError('Please select a gender option.');
+    }
+
+    final birthDate = DateTime.utc(
+      dateOfBirth.year,
+      dateOfBirth.month,
+      dateOfBirth.day,
+    );
+
+    final now = DateTime.now();
+    final today = DateTime.utc(now.year, now.month, now.day);
+
+    if (birthDate.year < 1900 || birthDate.isAfter(today)) {
+      throw ArgumentError('Please select a valid birth date.');
+    }
+
+    final batch = _db.batch();
+
+    batch.update(_db.collection('players').doc(uid), {
+      'username': cleanUsername,
+      'bio': cleanBio,
+      'region': cleanRegion,
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+
+    batch.update(_db.collection('player_private').doc(uid), {
+      'dateOfBirth': Timestamp.fromDate(birthDate),
+      'gender': gender,
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+
+    await batch.commit();
   }
 }

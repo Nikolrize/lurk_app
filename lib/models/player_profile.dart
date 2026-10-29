@@ -51,9 +51,21 @@ class PlayerPrivateInfo {
 
     return PlayerPrivateInfo(
       uid: document.id,
-      dateOfBirth:
-          (data['dateOfBirth'] as Timestamp?)?.toDate().toUtc(),
+      dateOfBirth: (data['dateOfBirth'] as Timestamp?)?.toDate().toUtc(),
       gender: data['gender'] as String,
     );
   }
+}
+
+class ProfileSetupData {
+  const ProfileSetupData({required this.profile, required this.privateInfo});
+
+  final PlayerProfile profile;
+  final PlayerPrivateInfo privateInfo;
+
+  bool get isComplete =>
+      profile.username.trim().length >= 3 &&
+      profile.region.trim().isNotEmpty &&
+      privateInfo.dateOfBirth != null &&
+      privateInfo.gender.isNotEmpty;
 }

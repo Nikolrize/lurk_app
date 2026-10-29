@@ -114,10 +114,17 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      Text(
-                        'Lurk',
-                        textAlign: TextAlign.center,
-                        style: Theme.of(context).textTheme.displaySmall,
+                      Center(
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(20),
+                          child: Image.asset(
+                            'assets/images/lurk_logo.jpg',
+                            width: 140,
+                            height: 140,
+                            fit: BoxFit.contain,
+                            semanticLabel: 'Lurk logo',
+                          ),
+                        ),
                       ),
                       const SizedBox(height: 8),
                       const Text(

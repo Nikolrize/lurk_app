@@ -4,10 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../providers/profile_provider.dart';
 
 class ProfileFoundationScreen extends ConsumerStatefulWidget {
-  const ProfileFoundationScreen({
-    super.key,
-    required this.uid,
-  });
+  const ProfileFoundationScreen({super.key, required this.uid});
 
   final String uid;
 
@@ -27,10 +24,7 @@ class _ProfileFoundationScreenState
     super.dispose();
   }
 
-  Future<void> _save({
-    required String bio,
-    required String region,
-  }) async {
+  Future<void> _save({required String bio, required String region}) async {
     if (_isSaving) return;
 
     setState(() {
@@ -38,17 +32,19 @@ class _ProfileFoundationScreenState
     });
 
     try {
-      await ref.read(profileServiceProvider).updateMyProfile(
-        username: _usernameController.text,
-        bio: bio,
-        region: region,
-      );
+      await ref
+          .read(profileServiceProvider)
+          .updateMyProfile(
+            username: _usernameController.text,
+            bio: bio,
+            region: region,
+          );
 
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Profile saved.')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Profile saved.')));
     } catch (error) {
       if (!mounted) return;
 
@@ -56,9 +52,9 @@ class _ProfileFoundationScreenState
           ? error.message.toString()
           : 'Unable to save. Check your connection and permissions.';
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(message)),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(message)));
     } finally {
       if (mounted) {
         setState(() {
@@ -70,24 +66,18 @@ class _ProfileFoundationScreenState
 
   @override
   Widget build(BuildContext context) {
-    final profileState =
-        ref.watch(playerProfileProvider(widget.uid));
+    final profileState = ref.watch(playerProfileProvider(widget.uid));
     final privateState = ref.watch(myPrivateInfoProvider);
 
     return Scaffold(
       appBar: AppBar(title: const Text('Profile backend test')),
       body: profileState.when(
-        loading: () => const Center(
-          child: CircularProgressIndicator(),
-        ),
-        error: (error, stackTrace) => const Center(
-          child: Text('Unable to read the profile.'),
-        ),
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (error, stackTrace) =>
+            const Center(child: Text('Unable to read the profile.')),
         data: (profile) {
           if (profile == null) {
-            return const Center(
-              child: Text('Profile document is missing.'),
-            );
+            return const Center(child: Text('Profile document is missing.'));
           }
 
           return Center(
@@ -106,8 +96,7 @@ class _ProfileFoundationScreenState
                     ),
                     const SizedBox(height: 12),
                     privateState.when(
-                      loading: () =>
-                          const Text('Loading private details...'),
+                      loading: () => const Text('Loading private details...'),
                       error: (error, stackTrace) =>
                           const Text('Unable to read private details.'),
                       data: (info) => Text(
@@ -129,13 +118,9 @@ class _ProfileFoundationScreenState
                     FilledButton(
                       onPressed: _isSaving
                           ? null
-                          : () => _save(
-                              bio: profile.bio,
-                              region: profile.region,
-                            ),
-                      child: Text(
-                        _isSaving ? 'Saving...' : 'Save username',
-                      ),
+                          : () =>
+                                _save(bio: profile.bio, region: profile.region),
+                      child: Text(_isSaving ? 'Saving...' : 'Save username'),
                     ),
                   ],
                 ),
