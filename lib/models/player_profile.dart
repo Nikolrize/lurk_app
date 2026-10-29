@@ -8,6 +8,9 @@ class PlayerProfile {
     required this.region,
     required this.createdAt,
     required this.updatedAt,
+    this.sharedAge,
+    this.ageSharedAt,
+    this.sharedGender,
   });
 
   final String uid;
@@ -16,6 +19,11 @@ class PlayerProfile {
   final String region;
   final DateTime? createdAt;
   final DateTime? updatedAt;
+
+  //? null mean information is not shared
+  final int? sharedAge;
+  final DateTime? ageSharedAt;
+  final String? sharedGender;
 
   factory PlayerProfile.fromDocument(
     DocumentSnapshot<Map<String, dynamic>> document,
@@ -29,6 +37,9 @@ class PlayerProfile {
       region: data['region'] as String,
       createdAt: (data['createdAt'] as Timestamp?)?.toDate(),
       updatedAt: (data['updatedAt'] as Timestamp?)?.toDate(),
+      sharedAge: data['sharedAge'] as int?,
+      ageSharedAt: (data['ageSharedAt'] as Timestamp?)?.toDate(),
+      sharedGender: data['sharedGender'] as String?,
     );
   }
 }
@@ -68,4 +79,18 @@ class ProfileSetupData {
       profile.region.trim().isNotEmpty &&
       privateInfo.dateOfBirth != null &&
       privateInfo.gender.isNotEmpty;
+}
+
+int calculateAge(DateTime birthDate, DateTime onDate) {
+  var age = onDate.year - birthDate.year;
+
+  final birthdayHasNotPassed =
+      onDate.month < birthDate.month ||
+      (onDate.month == birthDate.month && onDate.day < birthDate.day);
+
+  if (birthdayHasNotPassed) {
+    age--;
+  }
+
+  return age;
 }

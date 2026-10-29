@@ -29,6 +29,8 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
   DateTime? _dateOfBirth;
   String? _gender;
   bool _isSaving = false;
+  bool _showAge = false;
+  bool _showGender = false;
   String? _errorMessage;
 
   static const _genders = {
@@ -50,6 +52,11 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
 
     _dateOfBirth = data.privateInfo.dateOfBirth;
     _gender = data.privateInfo.gender.isEmpty ? null : data.privateInfo.gender;
+
+    _showAge = data.profile.sharedAge != null;
+    _showGender =
+        data.profile.sharedGender != null &&
+        data.privateInfo.gender != 'prefer_not_to_say';
   }
 
   @override
@@ -106,6 +113,8 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
             region: _regionController.text,
             dateOfBirth: _dateOfBirth!,
             gender: _gender!,
+            showAge: _showAge,
+            showGender: _showGender,
           );
 
       if (!mounted) return;
@@ -171,9 +180,9 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     const Text(
-                      'Username, bio and region are visible to '
-                      'signed-in players. Birth date and gender '
-                      'are private in this version.',
+                      'Username, bio and region are visible to signed-in players. '
+                      'Your full birth date stays private. '
+                      'You can choose to share your age and gender below.',
                     ),
                     const SizedBox(height: 24),
                     TextFormField(
@@ -246,9 +255,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                     DropdownButtonFormField<String>(
                       initialValue: _gender,
                       isExpanded: true,
-                      decoration: const InputDecoration(
-                        labelText: 'Gender (private)',
-                      ),
+                      decoration: const InputDecoration(labelText: 'Gender'),
                       items: _genders.entries.map((entry) {
                         return DropdownMenuItem(
                           value: entry.key,
@@ -260,6 +267,9 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                           : (value) {
                               setState(() {
                                 _gender = value;
+                                if (value == 'prefer_not_to_say') {
+                                  _showGender = false;
+                                }
                               });
                             },
                       validator: (value) {
@@ -278,6 +288,46 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                         ),
                       ),
                     ],
+                    const SizedBox(height: 24),
+                    Text(
+                      'Profile visibility',
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                    const SizedBox(height: 8),
+                    SwitchListTile.adaptive(
+                      contentPadding: EdgeInsets.zero,
+                      title: const Text('Show my age'),
+                      subtitle: const Text(
+                        'Shares your age when saved, with the sharing date. '
+                        'Your full birth date stays private.',
+                      ),
+                      value: _showAge,
+                      onChanged: _isSaving
+                          ? null
+                          : (value) {
+                              setState(() {
+                                _showAge = value;
+                              });
+                            },
+                    ),
+                    SwitchListTile.adaptive(
+                      contentPadding: EdgeInsets.zero,
+                      title: const Text('Show my gender'),
+                      subtitle: const Text(
+                        'Visible to signed-in players when enabled.',
+                      ),
+                      value: _showGender,
+                      onChanged:
+                          _isSaving ||
+                              _gender == null ||
+                              _gender == 'prefer_not_to_say'
+                          ? null
+                          : (value) {
+                              setState(() {
+                                _showGender = value;
+                              });
+                            },
+                    ),
                     const SizedBox(height: 24),
                     FilledButton(
                       onPressed: _isSaving ? null : _save,

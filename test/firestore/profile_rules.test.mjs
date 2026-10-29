@@ -18,6 +18,9 @@ import {
     updateDoc,
 } from 'firebase/firestore';
 
+
+import assert from 'node:assert/strict';
+
 test('profile ownership, privacy, and validation', async () => {
     const environment = await initializeTestEnvironment({
     projectId: 'demo-lurk-profiles',
@@ -165,6 +168,71 @@ try {
     await assertFails(
         deleteDoc(doc(alice, 'players/alice')),
     );
+
+    //owner can publish selected profile information
+    await assertSucceeds(
+    updateDoc(doc(alice, 'players/alice'), {
+        sharedAge: 26,
+        ageSharedAt: serverTimestamp(),
+        sharedGender: 'female',
+        updatedAt: serverTimestamp(),
+    }),
+    );
+
+    // Another signed-in player can read the published values.
+    const shared = (await getDoc(doc(bob, 'players/alice'))).data();
+
+    assert.equal(shared.sharedAge, 26);
+    assert.equal(shared.sharedGender, 'female');
+    assert.equal(Object.hasOwn(shared, 'dateOfBirth'), false);
+
+    // Another player cannot change those values.
+    await assertFails(
+    updateDoc(doc(bob, 'players/alice'), {
+        sharedAge: 30,
+        ageSharedAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+    }),
+    );
+
+    // Invalid values and publishing a full birth date are rejected.
+    await assertFails(
+    updateDoc(doc(alice, 'players/alice'), {
+        sharedAge: -1,
+        ageSharedAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+    }),
+    );
+
+    await assertFails(
+    updateDoc(doc(alice, 'players/alice'), {
+        sharedGender: 'invalid',
+        updatedAt: serverTimestamp(),
+    }),
+    );
+
+    await assertFails(
+    updateDoc(doc(alice, 'players/alice'), {
+        dateOfBirth: Timestamp.fromMillis(0),
+        updatedAt: serverTimestamp(),
+    }),
+    );
+
+    // Turning sharing off clears all public sharing values.
+    await assertSucceeds(
+    updateDoc(doc(alice, 'players/alice'), {
+        sharedAge: null,
+        ageSharedAt: null,
+        sharedGender: null,
+        updatedAt: serverTimestamp(),
+    }),
+    );
+
+    const hidden = (await getDoc(doc(bob, 'players/alice'))).data();
+
+    assert.equal(hidden.sharedAge, null);
+    assert.equal(hidden.ageSharedAt, null);
+    assert.equal(hidden.sharedGender, null);
         } finally {
     await environment.cleanup();
     }
