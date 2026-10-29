@@ -1,3 +1,4 @@
+import '../../../providers/profile_provider.dart';
 import '../../../core/widgets/action_card.dart';
 import '../../../providers/player_provider.dart';
 import '../../player/widgets/player_load_error.dart';
@@ -38,12 +39,10 @@ class HomeScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final displayName = ref
-        .watch(authStateProvider)
-        .asData
-        ?.value
-        ?.displayName
-        ?.trim();
+    final uid = ref.watch(authStateProvider).asData?.value?.uid;
+    final displayName = uid == null
+        ? null
+        : ref.watch(playerProfileProvider(uid)).asData?.value?.username.trim();
     final name = displayName != null && displayName.isNotEmpty
         ? displayName
         : 'Player';
