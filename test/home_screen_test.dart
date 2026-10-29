@@ -18,7 +18,10 @@ void main() {
         overrides: [
           authStateProvider.overrideWith((ref) => Stream.value(null)),
         ],
-        child: MaterialApp(theme: AppTheme.dark, home: const AppShell()),
+        child: MaterialApp(
+          theme: AppTheme.dark,
+          home: const AppShell(uid: 'test-user'),
+        ),
       ),
     );
     await tester.pumpAndSettle();
