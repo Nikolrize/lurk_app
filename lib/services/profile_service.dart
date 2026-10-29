@@ -164,6 +164,8 @@ class ProfileService {
     required String region,
     required DateTime dateOfBirth,
     required String gender,
+    bool showAge = false,
+    bool showGender = false,
   }) async {
     final uid = _currentUid;
 
@@ -212,6 +214,11 @@ class ProfileService {
       'username': cleanUsername,
       'bio': cleanBio,
       'region': cleanRegion,
+      'sharedAge': showAge ? calculateAge(birthDate, today) : null,
+      'ageSharedAt': showAge ? FieldValue.serverTimestamp() : null,
+      'sharedGender': showGender && gender != 'prefer_not_to_say'
+          ? gender
+          : null,
       'updatedAt': FieldValue.serverTimestamp(),
     });
 
