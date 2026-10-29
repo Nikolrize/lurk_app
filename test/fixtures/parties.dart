@@ -1,7 +1,7 @@
-import '../models/party.dart';
+import 'package:lurk_app/features/parties/models/party.dart';
 
-// dummy data for now
-const sampleParties = [
+// Test fixtures only; production screens read parties from Firestore.
+const testParties = [
   Party(
     id: 'party-1',
     region: 'Asia',

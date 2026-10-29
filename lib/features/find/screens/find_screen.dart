@@ -1,20 +1,23 @@
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../providers/party_provider.dart';
+import '../../parties/widgets/party_load_error.dart';
 import '../models/filter_preferences.dart';
 import 'filter_preferences_screen.dart';
 import 'package:flutter/material.dart';
 
 import '../../player/data/sample_players.dart';
 import '../../player/widgets/player_card.dart';
-import '../../parties/data/sample_parties.dart';
+
 import '../../parties/widgets/party_card.dart';
 
-class FindSreen extends StatefulWidget {
+class FindSreen extends ConsumerStatefulWidget {
   const FindSreen({super.key});
 
   @override
-  State<FindSreen> createState() => _FindSreenState();
+  ConsumerState<FindSreen> createState() => _FindSreenState();
 }
 
-class _FindSreenState extends State<FindSreen> {
+class _FindSreenState extends ConsumerState<FindSreen> {
   bool _showPlayers = false;
   final _searchController = TextEditingController();
   String _query = '';
@@ -31,7 +34,9 @@ class _FindSreenState extends State<FindSreen> {
     FocusManager.instance.primaryFocus?.unfocus();
     final forPlayers = _showPlayers;
     final games = {
-      ...sampleParties.map((p) => p.gameName),
+      ...(ref.read(availablePartiesProvider).asData?.value ?? []).map(
+        (p) => p.gameName,
+      ),
       ...samplePlayers.map((p) => p.currentGame).whereType<String>(),
     }.toList()..sort();
     final result = await Navigator.of(context).push<FilterPreferences>(
@@ -56,7 +61,8 @@ class _FindSreenState extends State<FindSreen> {
   @override
   Widget build(BuildContext context) {
     final query = _query.trim().toLowerCase();
-    final parties = sampleParties
+    final partyState = ref.watch(availablePartiesProvider);
+    final parties = (partyState.asData?.value ?? [])
         .where(
           (p) =>
               '${p.title} ${p.gameName} ${p.playStyle}'.toLowerCase().contains(
@@ -66,10 +72,13 @@ class _FindSreenState extends State<FindSreen> {
                 gameName: p.gameName,
                 regionName: p.region,
                 gameMode: p.mode ?? p.playStyle,
+                minAllowedRank: p.minRank,
+                maxAllowedRank: p.maxRank,
+                styleOptions: p.playstyles,
                 rank: p.rank,
                 style: p.style,
                 comms: p.communication,
-                rating: p.rating,
+                rating: p.minimumRating,
 
                 partySize: p.maxPlayers,
                 hasAvailability: !p.isFull,
@@ -164,7 +173,16 @@ class _FindSreenState extends State<FindSreen> {
             ),
             const SizedBox(height: 12),
             Expanded(
-              child: count == 0
+              child: !_showPlayers && partyState.isLoading
+                  ? const Center(child: CircularProgressIndicator())
+                  : !_showPlayers && partyState.hasError
+                  ? Center(
+                      child: PartyLoadError(
+                        error: partyState.error!,
+                        onRetry: () => ref.invalidate(availablePartiesProvider),
+                      ),
+                    )
+                  : count == 0
                   ? Center(
                       child: Text(
                         'No ${_showPlayers ? 'players' : 'parties'} match.\nTry another search or adjust your filters.',
@@ -186,7 +204,7 @@ class _FindSreenState extends State<FindSreen> {
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   SnackBar(
                                     content: Text(
-                                      'You selected ${parties[index].title}',
+                                      'Party joining is not connected yet.',
                                     ),
                                   ),
                                 );

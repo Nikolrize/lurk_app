@@ -55,6 +55,9 @@ class FilterPreferences {
     required String? regionName,
     required String? gameMode,
     required int? rank,
+    int? minAllowedRank,
+    int? maxAllowedRank,
+    Iterable<String> styleOptions = const [],
     required String? style,
     required String? comms,
     required double? rating,
@@ -66,8 +69,12 @@ class FilterPreferences {
         (region == null || region == regionName) &&
         (mode == null || mode == gameMode) &&
         ((minRank == 0 && maxRank == 7) ||
-            (rank != null && rank >= minRank && rank <= maxRank)) &&
-        (playstyles.isEmpty || playstyles.contains(style)) &&
+            ((minAllowedRank != null && maxAllowedRank != null)
+                ? minAllowedRank <= maxRank && maxAllowedRank >= minRank
+                : (rank != null && rank >= minRank && rank <= maxRank))) &&
+        (playstyles.isEmpty ||
+            playstyles.contains(style) ||
+            styleOptions.any(playstyles.contains)) &&
         (communication == null || communication == comms) &&
         (minimumRating == 0 || (rating != null && rating >= minimumRating)) &&
         (!availableNowOnly || playerAvailability?.availableNow == true) &&

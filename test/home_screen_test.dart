@@ -1,3 +1,5 @@
+import 'package:lurk_app/providers/party_provider.dart';
+import 'fixtures/parties.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -16,6 +18,9 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
+          availablePartiesProvider.overrideWith(
+            (ref) => Stream.value(testParties),
+          ),
           authStateProvider.overrideWith((ref) => Stream.value(null)),
         ],
         child: MaterialApp(
