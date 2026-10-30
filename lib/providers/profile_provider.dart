@@ -6,6 +6,8 @@ import 'auth_provider.dart';
 
 import '../models/gaming_preferences.dart';
 
+import 'package:lurk_app/features/player/models/player_availability.dart';
+
 final profileServiceProvider = Provider<ProfileService>((ref) {
   return ProfileService();
 });
@@ -47,3 +49,8 @@ final profileSetupProvider = FutureProvider.autoDispose
 final gamingPreferencesProvider = StreamProvider.autoDispose.family<GamingPreferences, String> ((ref,uid){
   return ref.watch(profileServiceProvider).watchGamingPreferences(uid);
 });
+
+final playerAvailabilityProvider = StreamProvider.autoDispose
+    .family<PlayerAvailability, String>((ref, uid) {
+      return ref.watch(profileServiceProvider).watchAvailability(uid);
+    });

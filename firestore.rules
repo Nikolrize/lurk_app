@@ -171,6 +171,80 @@ service cloud.firestore {
         );
     }
 
+  //availability: optional public map
+  //timezone: malaysia for this ver
+  //preferred periods: unique permitted labels, max 4
+  //weekly schedule: max 7 slots, ordered by unique weekday
+  //times: mins after midnight; overnight sessions are allowed
+  function validAvailabilitySlot(slot) {
+    return slot is map
+      && slot.keys().hasAll([
+        'weekday', 'startMinute', 'endMinute'
+      ])
+      && slot.keys().hasOnly([
+        'weekday', 'startMinute', 'endMinute'
+      ])
+      && slot.weekday is int
+      && slot.weekday >= 1
+      && slot.weekday <= 7
+      && slot.startMinute is int
+      && slot.startMinute >= 0
+      && slot.startMinute < 1440
+      && slot.endMinute is int
+      && slot.endMinute >= 0
+      && slot.endMinute <= 1440
+      && slot.startMinute != slot.endMinute;
+  }
+
+  function validAvailabilitySlotAt(slots, index) {
+    return slots.size() <= index
+      || (
+        validAvailabilitySlot(slots[index])
+        && (
+          index == 0
+          || slots[index - 1].weekday < slots[index].weekday
+        )
+      );
+  }
+
+  function validAvailability(data) {
+    let availability = data.get('availability', {});
+    let periods = availability is map
+      ? availability.get('preferredTimes', [])
+      : [];
+    let slots = availability is map
+      ? availability.get('weeklySchedule', [])
+      : [];
+
+    return !('availability' in data)
+      || (
+        availability is map
+        && availability.keys().hasAll([
+          'availableNow', 'preferredTimes', 'weeklySchedule', 'timeZone'
+        ])
+        && availability.keys().hasOnly([
+          'availableNow', 'preferredTimes', 'weeklySchedule', 'timeZone'
+        ])
+        && availability.availableNow is bool
+        && availability.timeZone == 'Asia/Kuala_Lumpur'
+        && periods is list
+        && periods.size() <= 4
+        && periods.toSet().size() == periods.size()
+        && periods.hasOnly([
+          'Morning', 'Afternoon', 'Evening', 'Night'
+        ])
+        && slots is list
+        && slots.size() <= 7
+        && validAvailabilitySlotAt(slots, 0)
+        && validAvailabilitySlotAt(slots, 1)
+        && validAvailabilitySlotAt(slots, 2)
+        && validAvailabilitySlotAt(slots, 3)
+        && validAvailabilitySlotAt(slots, 4)
+        && validAvailabilitySlotAt(slots, 5)
+        && validAvailabilitySlotAt(slots, 6)
+      );
+  }
+
     function validPublicProfile(data) {
       return data.keys().hasAll([
           'username', 'bio', 'region', 'createdAt', 'updatedAt'
@@ -179,7 +253,7 @@ service cloud.firestore {
           'username', 'bio', 'region', 'createdAt', 'updatedAt',
           'sharedAge', 'ageSharedAt', 'sharedGender',
           'games', 'currentGame', 'mode', 'playstyles',
-          'communication', 'rank', 'gameRanks'
+          'communication', 'rank', 'gameRanks', 'availability'
         ])
         && data.username is string
         && (
@@ -194,7 +268,8 @@ service cloud.firestore {
         && data.createdAt is timestamp
         && data.updatedAt is timestamp
         && validSharing(data)
-        && validGamingPreferences(data);
+        && validGamingPreferences(data)
+        && validAvailability(data);
     }
 
     function validPrivateInfo(data) {
@@ -325,7 +400,7 @@ service cloud.firestore {
           'username', 'bio', 'region', 'updatedAt',
           'sharedAge', 'ageSharedAt', 'sharedGender',
           'games', 'currentGame', 'mode', 'playstyles',
-          'communication', 'rank', 'gameRanks'
+          'communication', 'rank', 'gameRanks', 'availability'
         ])
         && request.resource.data.updatedAt == request.time;
 
