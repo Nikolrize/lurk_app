@@ -7,6 +7,9 @@ import 'package:lurk_app/features/profile/screens/edit_profile_screen.dart';
 
 import 'package:lurk_app/features/profile/screens/player_profile_screen.dart';
 
+import 'gaming_preferences_screen.dart';
+import '../widgets/gaming_preferences_card.dart';
+
 class MyProfileScreen extends ConsumerStatefulWidget {
   const MyProfileScreen({
     super.key,
@@ -39,6 +42,21 @@ class MyProfileScreen extends ConsumerStatefulWidget {
 class _MyProfileScreenState extends ConsumerState<MyProfileScreen> {
   bool _isBusy = false;
 
+  Future<void> _openGamingPreferences() async {
+    if (_isBusy) return;
+
+    final saved = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) => GamingPreferencesScreen(uid: widget.uid),
+      ),     
+    );
+
+    if (!mounted || saved != true) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Gaming preferences updated')),
+    );
+  }
   Future<void> _editProfile() async {
     if (_isBusy) return;
 
@@ -107,7 +125,6 @@ class _MyProfileScreenState extends ConsumerState<MyProfileScreen> {
     }
   }
 
-  @override
   @override
   Widget build(BuildContext context) {
     final currentUser = ref.watch(authStateProvider).asData?.value;
@@ -253,28 +270,7 @@ class _MyProfileScreenState extends ConsumerState<MyProfileScreen> {
                           ),
                         ),
                         const SizedBox(height: 14),
-                        Card(
-                          child: Padding(
-                            padding: const EdgeInsets.all(20),
-                            child: Row(
-                              children: [
-                                Icon(
-                                  Icons.sports_esports_outlined,
-                                  color: colors.secondary,
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: Text(
-                                    'No games added yet.',
-                                    style: text.bodyMedium?.copyWith(
-                                      color: colors.onSurfaceVariant,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
+                        GamingPreferencesCard(uid: widget.uid),
                         const SizedBox(height: 28),
 
                         Text(
@@ -307,7 +303,7 @@ class _MyProfileScreenState extends ConsumerState<MyProfileScreen> {
                                   (
                                     icon: Icons.sports_esports_outlined,
                                     title: 'Gaming Preferences',
-                                    onTap: widget.onGamingPreferences,
+                                    onTap: widget.onGamingPreferences ?? _openGamingPreferences,
                                   ),
                                   (
                                     icon: Icons.schedule_outlined,

@@ -7,6 +7,8 @@ import 'package:lurk_app/providers/profile_provider.dart';
 
 import '../widgets/profile_page_layout.dart';
 
+import 'package:lurk_app/core/data/gaming_regions.dart';
+
 class EditProfileScreen extends ConsumerStatefulWidget {
   const EditProfileScreen({
     super.key,
@@ -26,7 +28,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
 
   late final TextEditingController _usernameController;
   late final TextEditingController _bioController;
-  late final TextEditingController _regionController;
+  String? _region;
 
   DateTime? _dateOfBirth;
   String? _gender;
@@ -50,7 +52,8 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
 
     _usernameController = TextEditingController(text: data.profile.username);
     _bioController = TextEditingController(text: data.profile.bio);
-    _regionController = TextEditingController(text: data.profile.region);
+    final savedRegion = data.profile.region.trim();
+    _region = GamingRegions.values.contains(savedRegion) ? savedRegion : null;
 
     _dateOfBirth = data.privateInfo.dateOfBirth;
     _gender = data.privateInfo.gender.isEmpty ? null : data.privateInfo.gender;
@@ -65,7 +68,6 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
   void dispose() {
     _usernameController.dispose();
     _bioController.dispose();
-    _regionController.dispose();
     super.dispose();
   }
 
@@ -112,7 +114,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
             expectedUid: widget.initialData.profile.uid,
             username: _usernameController.text,
             bio: _bioController.text,
-            region: _regionController.text,
+            region: _region!,
             dateOfBirth: _dateOfBirth!,
             gender: _gender!,
             showAge: _showAge,
@@ -219,17 +221,28 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                   ),
                 ),
                 const SizedBox(height: 16),
-                TextFormField(
-                  controller: _regionController,
-                  enabled: !_isSaving,
-                  maxLength: 60,
+                DropdownButtonFormField<String>(
+                  initialValue: _region,
+                  isExpanded: true,
                   decoration: const InputDecoration(
-                    labelText: 'Region',
-                    hintText: 'For example: Malaysia',
+                    labelText: 'Preferred gaming region',
+                    hintText: 'Select a region',
                   ),
+                  items: [
+                    for (final region in GamingRegions.values)
+                      DropdownMenuItem(
+                        value: region,
+                        child: Text(region),
+                      ),
+                  ],
+                  onChanged: _isSaving ? null : (value) {
+                          setState(() {
+                            _region = value;
+                          });
+                        },
                   validator: (value) {
-                    if ((value?.trim() ?? '').isEmpty) {
-                      return 'Please enter your region.';
+                    if (value == null || !GamingRegions.values.contains(value)) {
+                      return 'Please select your gaming region.';
                     }
                     return null;
                   },

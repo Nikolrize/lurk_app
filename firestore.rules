@@ -50,13 +50,58 @@ service cloud.firestore {
       );
     }
 
+
+    function validGamingPreferences(data) {
+      let games = data.get('games', []);
+      let game = data.get('currentGame', null);
+      let mode = data.get('mode', null);
+      let styles = data.get('playstyles', []);
+      let communication = data.get('communication', null);
+      let rank = data.get('rank', null);
+
+      return games is list
+        && games.size() <= 3
+        && games.toSet().size() == games.size()
+        && games.hasOnly([
+          'valorant', 'mobile_legends', 'fortnite'
+        ])
+        && (
+          (game == null && games.size() == 0)
+          || (game is string && game in games)
+        )
+        && (
+          mode == null
+          || mode in ['competitive', 'casual']
+        )
+        && styles is list
+        && styles.size() <= 3
+        && styles.toSet().size() == styles.size()
+        && styles.hasOnly(['chill', 'serious', 'fun'])
+        && (
+          communication == null
+          || communication in [
+            'mic_required', 'voice_optional', 'chat_only'
+          ]
+        )
+        && (
+          rank == null
+          || (
+            game == 'valorant'
+            && rank is int
+            && rank >= 0
+            && rank <= 7
+          )
+        );
+    }
     function validPublicProfile(data) {
       return data.keys().hasAll([
           'username', 'bio', 'region', 'createdAt', 'updatedAt'
         ])
         && data.keys().hasOnly([
           'username', 'bio', 'region', 'createdAt', 'updatedAt',
-          'sharedAge', 'ageSharedAt', 'sharedGender'
+          'sharedAge', 'ageSharedAt', 'sharedGender',
+          'games', 'currentGame', 'mode', 'playstyles',
+          'communication', 'rank'
         ])
         && data.username is string
         && (
@@ -70,7 +115,8 @@ service cloud.firestore {
         && data.region.size() <= 60
         && data.createdAt is timestamp
         && data.updatedAt is timestamp
-        && validSharing(data);
+        && validSharing(data)
+        && validGamingPreferences(data);
     }
 
     function validPrivateInfo(data) {
@@ -247,10 +293,12 @@ service cloud.firestore {
       allow update: if owns(uid)
         && validPublicProfile(request.resource.data)
         && request.resource.data.diff(resource.data).affectedKeys()
-          .hasOnly([
-            'username', 'bio', 'region', 'updatedAt',
-            'sharedAge', 'ageSharedAt', 'sharedGender'
-          ])
+        .hasOnly([
+          'username', 'bio', 'region', 'updatedAt',
+          'sharedAge', 'ageSharedAt', 'sharedGender',
+          'games', 'currentGame', 'mode', 'playstyles',
+          'communication', 'rank'
+        ])
         && request.resource.data.updatedAt == request.time;
 
       allow delete: if false;

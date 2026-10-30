@@ -1,6 +1,7 @@
 import '../../player/models/player_availability.dart';
 import 'package:flutter/material.dart';
 import '../models/filter_preferences.dart';
+import 'package:lurk_app/core/data/gaming_regions.dart';
 
 class FilterPreferencesScreen extends StatefulWidget {
   const FilterPreferencesScreen({
@@ -8,7 +9,7 @@ class FilterPreferencesScreen extends StatefulWidget {
     required this.initial,
     required this.games,
     required this.forPlayers,
-    this.regions = const ['Asia', 'Europe', 'North America', 'Oceania'],
+    this.regions = GamingRegions.values,
   });
   final FilterPreferences initial;
   final List<String> games;
@@ -29,6 +30,19 @@ class _FilterPreferencesScreenState extends State<FilterPreferencesScreen> {
   late RangeValues _ranks;
   late double _rating;
   late bool _onlyAvailable;
+
+  List<String> get _rankNames =>
+    FilterPreferences.ranksForGame(_game);
+
+    void _changeGame(String? value) {
+      _game = value;
+
+      final names = _rankNames;
+
+      _ranks = names.isEmpty
+          ? const RangeValues(0, 0)
+          : RangeValues(0, (names.length - 1).toDouble());
+    }
   @override
   void initState() {
     super.initState();
@@ -42,7 +56,17 @@ class _FilterPreferencesScreenState extends State<FilterPreferencesScreen> {
     _preferredTimes = Set.of(f.preferredTimes);
     _weekday = f.scheduleWindow?.weekday;
     _maxPartySize = f.maxPartySize;
-    _ranks = RangeValues(f.minRank.toDouble(), f.maxRank.toDouble());
+    final names = _rankNames;
+    //restores selected range while keeping slider within bounds
+    if (names.isEmpty) {
+      _ranks = const RangeValues(0, 0);
+    } else {
+      final last = names.length - 1;
+      final start = f.minRank.clamp(0, last).toDouble();
+      final end = (f.maxRank ?? last).clamp(start.toInt(), last).toDouble();
+
+      _ranks = RangeValues(start, end);
+    }
     _rating = f.minimumRating;
     _onlyAvailable = f.onlyAvailable;
   }
@@ -57,7 +81,7 @@ class _FilterPreferencesScreenState extends State<FilterPreferencesScreen> {
     _preferredTimes = {};
     _weekday = null;
     _maxPartySize = null;
-    _ranks = const RangeValues(0, 7);
+    _ranks = const RangeValues(0, 0);
     _rating = 0;
     _onlyAvailable = false;
   });
@@ -134,7 +158,7 @@ class _FilterPreferencesScreenState extends State<FilterPreferencesScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final names = FilterPreferences.ranks;
+    final names = _rankNames;
     return Scaffold(
       appBar: AppBar(
         title: const Text('Filter Preferences'),
@@ -150,7 +174,12 @@ class _FilterPreferencesScreenState extends State<FilterPreferencesScreen> {
       body: ListView(
         padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
         children: [
-          _select('Game', _game, widget.games, (v) => _game = v),
+          _select(
+            'Game',
+            _game,
+            {...widget.games, ?_game}.toList(),
+            _changeGame,
+          ),
           _select(
             'Region',
             _region,
@@ -161,19 +190,28 @@ class _FilterPreferencesScreenState extends State<FilterPreferencesScreen> {
             'Competitive',
             'Casual',
           ], (v) => _mode = v),
-          _label('Rank'),
-          Text('${names[_ranks.start.round()]} — ${names[_ranks.end.round()]}'),
-          RangeSlider(
-            values: _ranks,
-            min: 0,
-            max: 7,
-            divisions: 7,
-            labels: RangeLabels(
-              names[_ranks.start.round()],
-              names[_ranks.end.round()],
+          if (names.length > 1) ...[
+            _label('Rank'),
+            Text(
+              '${names[_ranks.start.round()]} — '
+              '${names[_ranks.end.round()]}',
             ),
-            onChanged: (value) => setState(() => _ranks = value),
-          ),
+            RangeSlider(
+              values: _ranks,
+              min: 0,
+              max: (names.length - 1).toDouble(),
+              divisions: names.length - 1,
+              labels: RangeLabels(
+                names[_ranks.start.round()],
+                names[_ranks.end.round()],
+              ),
+              onChanged: (value) {
+                setState(() {
+                  _ranks = value;
+                });
+              },
+            ),
+          ],
           _label('Playstyle'),
           Wrap(
             spacing: 8,
@@ -304,8 +342,8 @@ class _FilterPreferencesScreenState extends State<FilterPreferencesScreen> {
                 game: _game,
                 region: _region,
                 mode: _mode,
-                minRank: _ranks.start.round(),
-                maxRank: _ranks.end.round(),
+                minRank: names.isEmpty ? 0 : _ranks.start.round(),
+                maxRank: names.isEmpty ? null : _ranks.end.round(),   
                 playstyles: Set.unmodifiable(_playstyles),
                 communication: _communication,
                 minimumRating: _rating,

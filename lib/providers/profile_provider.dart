@@ -4,6 +4,8 @@ import '../models/player_profile.dart';
 import '../services/profile_service.dart';
 import 'auth_provider.dart';
 
+import '../models/gaming_preferences.dart';
+
 final profileServiceProvider = Provider<ProfileService>((ref) {
   return ProfileService();
 });
@@ -41,3 +43,7 @@ final profileSetupProvider = FutureProvider.autoDispose
     .family<ProfileSetupData, String>((ref, uid) {
       return ref.watch(profileServiceProvider).loadMyProfileSetup(uid);
     });
+
+final gamingPreferencesProvider = StreamProvider.autoDispose.family<GamingPreferences, String> ((ref,uid){
+  return ref.watch(profileServiceProvider).watchGamingPreferences(uid);
+});
