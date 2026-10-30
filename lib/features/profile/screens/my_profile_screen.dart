@@ -270,7 +270,12 @@ class _MyProfileScreenState extends ConsumerState<MyProfileScreen> {
                           ),
                         ),
                         const SizedBox(height: 14),
-                        GamingPreferencesCard(uid: widget.uid),
+                        GamingPreferencesCard(
+                          uid: widget.uid,
+                          onEdit: _isBusy
+                              ? null
+                              : widget.onGamingPreferences ?? _openGamingPreferences,
+                        ),
                         const SizedBox(height: 28),
 
                         Text(
