@@ -4,11 +4,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lurk_app/providers/auth_provider.dart';
 import 'package:lurk_app/providers/profile_provider.dart';
 import 'package:lurk_app/features/profile/screens/edit_profile_screen.dart';
-
 import 'package:lurk_app/features/profile/screens/player_profile_screen.dart';
 
 import 'gaming_preferences_screen.dart';
 import '../widgets/gaming_preferences_card.dart';
+
+import 'package:lurk_app/features/availability/screens/availability_screen.dart';
+import 'package:lurk_app/features/availability/widgets/availability_summary_card.dart';
 
 class MyProfileScreen extends ConsumerStatefulWidget {
   const MyProfileScreen({
@@ -42,6 +44,15 @@ class MyProfileScreen extends ConsumerStatefulWidget {
 class _MyProfileScreenState extends ConsumerState<MyProfileScreen> {
   bool _isBusy = false;
 
+  void _openAvailability() {
+    if (_isBusy) return;
+
+    Navigator.of(context).push<void>(
+      MaterialPageRoute(
+        builder: (_) => AvailabilityScreen(uid: widget.uid),
+      ),
+    );
+  }
   Future<void> _openGamingPreferences() async {
     if (_isBusy) return;
 
@@ -270,7 +281,26 @@ class _MyProfileScreenState extends ConsumerState<MyProfileScreen> {
                           ),
                         ),
                         const SizedBox(height: 14),
-                        GamingPreferencesCard(uid: widget.uid),
+                        GamingPreferencesCard(
+                          uid: widget.uid,
+                          onEdit: _isBusy
+                              ? null
+                              : widget.onGamingPreferences ?? _openGamingPreferences,
+                        ),
+                        const SizedBox(height: 24),
+                        Text(
+                          'Availability',
+                          style: text.titleLarge?.copyWith(
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        AvailabilitySummaryCard(
+                          uid: widget.uid,
+                          onEdit: _isBusy
+                              ? null
+                              : widget.onAvailability ?? _openAvailability,
+                        ),
                         const SizedBox(height: 28),
 
                         Text(
@@ -308,7 +338,7 @@ class _MyProfileScreenState extends ConsumerState<MyProfileScreen> {
                                   (
                                     icon: Icons.schedule_outlined,
                                     title: 'Availability',
-                                    onTap: widget.onAvailability,
+                                    onTap: widget.onAvailability ?? _openAvailability,
                                   ),
                                   (
                                     icon: Icons.history,
