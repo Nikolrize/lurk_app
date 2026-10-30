@@ -291,7 +291,6 @@ class _GamingPreferencesFormState extends ConsumerState<_GamingPreferencesForm> 
                       isExpanded: true,
                       decoration: const InputDecoration(
                         labelText: 'Valorant rank',
-                        helperText: 'Self-reported, not verified.'
                       ),
                       items: [
                         const DropdownMenuItem(

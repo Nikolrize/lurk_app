@@ -52,8 +52,6 @@ class GamingPreferencesCard extends ConsumerWidget {
                       ),
                   ],
                 ),
-                const SizedBox(height:8),
-                const Text('The starred game is the main matchmaking game.'),
                 if (mode != null) ...[
                   const SizedBox(height: 12),
                   Text('Mode: $mode'),
@@ -72,9 +70,7 @@ class GamingPreferencesCard extends ConsumerWidget {
                 if (preferences.currentGame == 'valorant' && rank != null && rank >=0 && rank < GamingPreferences.valorantRanks.length) ... [
                   const SizedBox(height: 12),
                   Text(
-                    'Valorant rank: '
-                    '${GamingPreferences.valorantRanks[rank]}'
-                    '(self-reported)',
+                    'Valorant rank:${GamingPreferences.valorantRanks[rank]}',
                   ),
                 ],
               ],

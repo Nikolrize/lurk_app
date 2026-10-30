@@ -1,3 +1,5 @@
+import 'package:lurk_app/core/data/game_catalog.dart';
+
 class GamingPreferences {
   const GamingPreferences({
     this.games = const [],
@@ -8,11 +10,11 @@ class GamingPreferences {
     this.rank,
   });
 
-  static const gameLabels = {
-    'valorant': 'Valorant',
-    'mobile_legends': 'Mobile Legends',
-    'fortnite': 'Fortnite',
-  };
+  static final Map<String, String> gameLabels =
+    Map<String, String>.unmodifiable({
+      for (final game in GameCatalog.games.values)
+        game.id: game.name,
+    });
 
   static const modeLabels = {
     'competitive': 'Competitive',
