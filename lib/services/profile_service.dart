@@ -3,6 +3,10 @@ import 'package:firebase_auth/firebase_auth.dart';
 
 import '../models/player_profile.dart';
 
+import '../models/gaming_preferences.dart';
+
+import 'package:lurk_app/core/data/gaming_regions.dart';
+
 class ProfileService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
@@ -84,8 +88,12 @@ class ProfileService {
       throw ArgumentError('Username must contain 3–30 characters.');
     }
 
-    if (cleanBio.length > 500 || cleanRegion.length > 60) {
-      throw ArgumentError('Profile information is too long.');
+    if (cleanBio.length > 500) {
+      throw ArgumentError('Bio must not exceed 500 characters.');
+    }
+
+    if (!GamingRegions.values.contains(cleanRegion)) {
+      throw ArgumentError('Please select a supported gaming region.');
     }
 
     return _db.collection('players').doc(uid).update({
@@ -185,8 +193,8 @@ class ProfileService {
       throw ArgumentError('Bio must not exceed 500 characters.');
     }
 
-    if (cleanRegion.isEmpty || cleanRegion.length > 60) {
-      throw ArgumentError('Enter a region using at most 60 characters.');
+    if (!GamingRegions.values.contains(cleanRegion)) {
+      throw ArgumentError('Please select a supported gaming region.');
     }
 
     const allowedGenders = {'male', 'female', 'other', 'prefer_not_to_say'};
@@ -229,5 +237,34 @@ class ProfileService {
     });
 
     await batch.commit();
+  }
+
+  Stream<GamingPreferences> watchGamingPreferences(String uid) {
+    return _db.collection('players').doc(uid).snapshots().map((document){
+      final data = document.data();
+
+      if (data == null) {
+        throw StateError('Player profile not found.');
+      }
+
+      return GamingPreferences.fromMap(data);
+    });
+  }
+
+  Future<void> saveMyGamingPreferences({
+    required String expectedUid,
+    required GamingPreferences preferences,
+  }) {
+    final uid = _currentUid;
+    if (uid != expectedUid) {
+      throw StateError('The account changed. Reopen gaming preferences');
+    }
+
+    preferences.validate();
+
+    return _db.collection('players').doc(uid).update({
+      ...preferences.toMap(),
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
   }
 }
