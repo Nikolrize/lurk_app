@@ -1,3 +1,4 @@
+import 'package:lurk_app/services/player_safety_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -20,6 +21,7 @@ import 'package:lurk_app/features/chat/models/chat_settings.dart';
 Widget _optionsApp(_ChatService service) => ProviderScope(
   overrides: [
     authStateProvider.overrideWith((ref) => Stream.value(_User())),
+    blockedPlayersProvider.overrideWith((ref) => Stream.value(<String>{})),
 
     chatServiceProvider.overrideWithValue(service),
 
@@ -160,6 +162,9 @@ void main() {
         ProviderScope(
           overrides: [
             authStateProvider.overrideWith((ref) => Stream.value(_User())),
+            blockedPlayersProvider.overrideWith(
+              (ref) => Stream.value(<String>{}),
+            ),
 
             chatSettingsProvider.overrideWith(
               (ref, id) => Stream.value(const ChatSettings()),
@@ -219,6 +224,9 @@ void main() {
       ProviderScope(
         overrides: [
           authStateProvider.overrideWith((ref) => Stream.value(_User())),
+          blockedPlayersProvider.overrideWith(
+            (ref) => Stream.value(<String>{}),
+          ),
 
           chatSettingsProvider.overrideWith(
             (ref, id) => Stream.value(const ChatSettings()),
@@ -277,6 +285,9 @@ void main() {
         ProviderScope(
           overrides: [
             authStateProvider.overrideWith((ref) => Stream.value(_User())),
+            blockedPlayersProvider.overrideWith(
+              (ref) => Stream.value(<String>{}),
+            ),
 
             chatSettingsProvider.overrideWith(
               (ref, id) => Stream.value(const ChatSettings()),

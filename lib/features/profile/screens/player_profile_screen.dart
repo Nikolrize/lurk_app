@@ -1,4 +1,5 @@
-import '../../../models/gaming_preferences.dart';
+import '../widgets/gaming_preferences_card.dart';
+import '../../availability/widgets/availability_summary_card.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -191,132 +192,11 @@ class _PlayerProfileScreenState extends ConsumerState<PlayerProfileScreen> {
                   const SizedBox(height: 24),
                   Text('Gaming Preferences', style: text.titleLarge),
                   const SizedBox(height: 8),
-                  ref
-                      .watch(gamingPreferencesProvider(widget.uid))
-                      .when(
-                        loading: () =>
-                            const Center(child: CircularProgressIndicator()),
-                        error: (_, _) => TextButton(
-                          onPressed: () => ref.invalidate(
-                            gamingPreferencesProvider(widget.uid),
-                          ),
-                          child: const Text(
-                            'Unable to load preferences. Retry',
-                          ),
-                        ),
-                        data: (prefs) {
-                          final rank = prefs.rank;
-                          final peer = ref
-                              .watch(chatPlayerProvider(widget.uid))
-                              .asData
-                              ?.value;
-                          final values = [
-                            (
-                              'Rank',
-                              rank != null &&
-                                      rank >= 0 &&
-                                      rank <
-                                          GamingPreferences.valorantRanks.length
-                                  ? GamingPreferences.valorantRanks[rank]
-                                  : 'Not shared',
-                              Icons.military_tech_outlined,
-                            ),
-                            (
-                              'Playstyle',
-                              prefs.playstyles
-                                  .map(
-                                    (s) =>
-                                        GamingPreferences.styleLabels[s] ?? s,
-                                  )
-                                  .join(', '),
-                              Icons.sports_esports_outlined,
-                            ),
-                            (
-                              'Communication',
-                              GamingPreferences.communicationLabels[prefs
-                                      .communication] ??
-                                  'Not shared',
-                              Icons.headset_mic_outlined,
-                            ),
-                            (
-                              'Availability',
-                              peer?.availability.availableNow == true
-                                  ? 'Available now'
-                                  : peer?.availability.preferredTimes.join(
-                                          ', ',
-                                        ) ??
-                                        '',
-                              Icons.schedule,
-                            ),
-                          ];
-                          return Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Wrap(
-                                spacing: 8,
-                                children: [
-                                  for (final game in prefs.games)
-                                    Chip(
-                                      label: Text(
-                                        GamingPreferences.gameLabels[game] ??
-                                            game,
-                                      ),
-                                    ),
-                                ],
-                              ),
-                              const SizedBox(height: 12),
-                              LayoutBuilder(
-                                builder: (context, constraints) => Wrap(
-                                  spacing: 8,
-                                  runSpacing: 8,
-                                  children: [
-                                    for (final value in values)
-                                      SizedBox(
-                                        width: (constraints.maxWidth - 8) / 2,
-                                        child: Card(
-                                          margin: EdgeInsets.zero,
-                                          child: Padding(
-                                            padding: const EdgeInsets.all(12),
-                                            child: Row(
-                                              children: [
-                                                Icon(value.$3, size: 24),
-                                                const SizedBox(width: 8),
-                                                Expanded(
-                                                  child: Column(
-                                                    crossAxisAlignment:
-                                                        CrossAxisAlignment
-                                                            .start,
-                                                    children: [
-                                                      Text(
-                                                        value.$1,
-                                                        style: Theme.of(
-                                                          context,
-                                                        ).textTheme.bodySmall,
-                                                      ),
-                                                      Text(
-                                                        value.$2.isEmpty
-                                                            ? 'Not shared'
-                                                            : value.$2,
-                                                        style: const TextStyle(
-                                                          fontWeight:
-                                                              FontWeight.w600,
-                                                        ),
-                                                      ),
-                                                    ],
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          );
-                        },
-                      ),
+                  GamingPreferencesCard(uid: widget.uid),
+                  const SizedBox(height: 24),
+                  Text('Availability', style: text.titleLarge),
+                  const SizedBox(height: 8),
+                  AvailabilitySummaryCard(uid: widget.uid),
                   if (!own) ...[
                     const SizedBox(height: 24),
                     FilledButton(
