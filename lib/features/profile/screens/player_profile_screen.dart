@@ -126,16 +126,6 @@ class PlayerProfileScreen extends ConsumerWidget {
                         fontWeight: FontWeight.w700,
                       ),
                     ),
-                    const SizedBox(height: 24),
-                    Text(
-                      'Gaming Preferences',
-                      style: text.titleLarge?.copyWith(
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    GamingPreferencesCard(uid: uid),
-                    
                     const SizedBox(height: 12),
                     Card(
                       child: Padding(
@@ -147,6 +137,15 @@ class PlayerProfileScreen extends ConsumerWidget {
                         ),
                       ),
                     ),
+                    const SizedBox(height: 24),
+                    Text(
+                      'Gaming Preferences',
+                      style: text.titleLarge?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    GamingPreferencesCard(uid: uid),
                   ],
                 ),
               ),
