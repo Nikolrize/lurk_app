@@ -210,6 +210,18 @@ class _CreatePartyScreenState extends ConsumerState<CreatePartyScreen> {
   Widget build(BuildContext context) {
     final ranks = FilterPreferences.ranksForGame(_game);
     final authState = ref.watch(authStateProvider);
+    final joinedId = ref.watch(joinedPartyIdProvider).asData?.value;
+    final joinedParty = joinedId == null
+        ? null
+        : ref.watch(partyByIdProvider(joinedId)).asData?.value;
+    final membership = joinedId == null
+        ? null
+        : ref.watch(myPartyMembershipProvider(joinedId)).asData?.value;
+    final activeJoined =
+        widget.party == null &&
+        joinedParty?.status == 'open' &&
+        membership != null &&
+        membership['leftAt'] == null;
     return PopScope(
       canPop: !_saving,
       child: Scaffold(
@@ -225,6 +237,16 @@ class _CreatePartyScreenState extends ConsumerState<CreatePartyScreen> {
             child: ListView(
               padding: const EdgeInsets.all(24),
               children: [
+                if (activeJoined)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 20),
+                    child: Text(
+                      'Leave your current party before creating a new one.',
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.error,
+                      ),
+                    ),
+                  ),
                 _field(
                   'Party name',
                   TextFormField(
@@ -382,7 +404,9 @@ class _CreatePartyScreenState extends ConsumerState<CreatePartyScreen> {
           child: Padding(
             padding: const EdgeInsets.fromLTRB(24, 12, 24, 16),
             child: FilledButton(
-              onPressed: _saving || authState.isLoading ? null : _create,
+              onPressed: _saving || authState.isLoading || activeJoined
+                  ? null
+                  : _create,
               child: _saving
                   ? const Row(
                       mainAxisSize: MainAxisSize.min,

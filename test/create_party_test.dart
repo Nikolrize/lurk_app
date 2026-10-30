@@ -238,4 +238,47 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+
+  testWidgets(
+    'Active squad membership disables creating a party and explains why',
+    (tester) async {
+      final service = TestPartyService();
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            authStateProvider.overrideWith((ref) => Stream.value(TestUser())),
+            partyServiceProvider.overrideWithValue(service),
+            joinedPartyIdProvider.overrideWith((ref) => Stream.value('other')),
+            myPartyMembershipProvider(
+              'other',
+            ).overrideWith((ref) => Stream.value({'leftAt': null})),
+            partyByIdProvider('other').overrideWith(
+              (ref) => Stream.value(
+                const Party(
+                  id: 'other',
+                  hostId: 'friend',
+                  title: 'Existing squad',
+                  gameName: 'Valorant',
+                  playStyle: 'Competitive',
+                  currentPlayers: 2,
+                  maxPlayers: 5,
+                ),
+              ),
+            ),
+          ],
+          child: const MaterialApp(home: CreatePartyScreen()),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(
+        find.text('Leave your current party before creating a new one.'),
+        findsOneWidget,
+      );
+      expect(
+        tester.widget<FilledButton>(find.byType(FilledButton)).onPressed,
+        isNull,
+      );
+      expect(service.calls, 0);
+    },
+  );
 }

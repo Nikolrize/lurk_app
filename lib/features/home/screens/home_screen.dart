@@ -126,18 +126,7 @@ class HomeScreen extends ConsumerWidget {
                       for (final party in parties.take(3))
                         Padding(
                           padding: const EdgeInsets.only(bottom: 12),
-                          child: PartyCard(
-                            party: party,
-                            onJoin: () {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text(
-                                    'Party joining is not connected yet.',
-                                  ),
-                                ),
-                              );
-                            },
-                          ),
+                          child: PartyCard(party: party),
                         ),
                     ],
                   ),

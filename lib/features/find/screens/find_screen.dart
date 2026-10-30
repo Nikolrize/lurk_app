@@ -263,18 +263,7 @@ class _FindSreenState extends ConsumerState<FindSreen> {
                                 ),
                               ),
                             )
-                          : PartyCard(
-                              party: parties[index],
-                              onJoin: () {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text(
-                                      'Party joining is not connected yet.',
-                                    ),
-                                  ),
-                                );
-                              },
-                            ),
+                          : PartyCard(party: parties[index]),
                     ),
             ),
           ],

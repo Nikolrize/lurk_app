@@ -14,7 +14,7 @@ test('direct chat privacy, sender identity, immutable history and atomic preview
       for (const [id, hostId, visibility, status] of [
         ['owned', 'alice', 'public', 'open'], ['other', 'bob', 'public', 'open'],
         ['private', 'alice', 'private', 'open'], ['ended', 'alice', 'public', 'completed']]) {
-        await setDoc(doc(context.firestore(), `parties/${id}`), {hostId, visibility, status});
+        await setDoc(doc(context.firestore(), `parties/${id}`), {hostId, visibility, status, memberCount:1, maxPlayers:5});
       }
     });
     const alice = env.authenticatedContext('alice').firestore();

@@ -192,6 +192,80 @@ service cloud.firestore {
         );
     }
 
+  //availability: optional public map
+  //timezone: malaysia for this ver
+  //preferred periods: unique permitted labels, max 4
+  //weekly schedule: max 7 slots, ordered by unique weekday
+  //times: mins after midnight; overnight sessions are allowed
+  function validAvailabilitySlot(slot) {
+    return slot is map
+      && slot.keys().hasAll([
+        'weekday', 'startMinute', 'endMinute'
+      ])
+      && slot.keys().hasOnly([
+        'weekday', 'startMinute', 'endMinute'
+      ])
+      && slot.weekday is int
+      && slot.weekday >= 1
+      && slot.weekday <= 7
+      && slot.startMinute is int
+      && slot.startMinute >= 0
+      && slot.startMinute < 1440
+      && slot.endMinute is int
+      && slot.endMinute >= 0
+      && slot.endMinute <= 1440
+      && slot.startMinute != slot.endMinute;
+  }
+
+  function validAvailabilitySlotAt(slots, index) {
+    return slots.size() <= index
+      || (
+        validAvailabilitySlot(slots[index])
+        && (
+          index == 0
+          || slots[index - 1].weekday < slots[index].weekday
+        )
+      );
+  }
+
+  function validAvailability(data) {
+    let availability = data.get('availability', {});
+    let periods = availability is map
+      ? availability.get('preferredTimes', [])
+      : [];
+    let slots = availability is map
+      ? availability.get('weeklySchedule', [])
+      : [];
+
+    return !('availability' in data)
+      || (
+        availability is map
+        && availability.keys().hasAll([
+          'availableNow', 'preferredTimes', 'weeklySchedule', 'timeZone'
+        ])
+        && availability.keys().hasOnly([
+          'availableNow', 'preferredTimes', 'weeklySchedule', 'timeZone'
+        ])
+        && availability.availableNow is bool
+        && availability.timeZone == 'Asia/Kuala_Lumpur'
+        && periods is list
+        && periods.size() <= 4
+        && periods.toSet().size() == periods.size()
+        && periods.hasOnly([
+          'Morning', 'Afternoon', 'Evening', 'Night'
+        ])
+        && slots is list
+        && slots.size() <= 7
+        && validAvailabilitySlotAt(slots, 0)
+        && validAvailabilitySlotAt(slots, 1)
+        && validAvailabilitySlotAt(slots, 2)
+        && validAvailabilitySlotAt(slots, 3)
+        && validAvailabilitySlotAt(slots, 4)
+        && validAvailabilitySlotAt(slots, 5)
+        && validAvailabilitySlotAt(slots, 6)
+      );
+  }
+
     function validPublicProfile(data) {
       return data.keys().hasAll([
           'username', 'bio', 'region', 'createdAt', 'updatedAt'
@@ -200,7 +274,7 @@ service cloud.firestore {
           'username', 'bio', 'region', 'createdAt', 'updatedAt',
           'sharedAge', 'ageSharedAt', 'sharedGender',
           'games', 'currentGame', 'mode', 'playstyles',
-          'communication', 'rank', 'gameRanks'
+          'communication', 'rank', 'gameRanks', 'availability'
         ])
         && data.username is string
         && (
@@ -215,7 +289,8 @@ service cloud.firestore {
         && data.createdAt is timestamp
         && data.updatedAt is timestamp
         && validSharing(data)
-        && validGamingPreferences(data);
+        && validGamingPreferences(data)
+        && validAvailability(data);
     }
 
     function validPrivateInfo(data) {
@@ -295,6 +370,8 @@ service cloud.firestore {
 
       match /messages/{messageId} {
         function validMessageKind(data) {
+          let users = get(/databases/$(database)/documents/chats/$(chatId)).data.userIds;
+          let recipient = users[0] == request.auth.uid ? users[1] : users[0];
           let kind = data.get('type', 'text');
           return (kind == 'text'
               && data.keys().hasOnly(['senderId', 'text', 'createdAt', 'type']))
@@ -305,8 +382,13 @@ service cloud.firestore {
               && data.partyId.matches('[^/]+')
               && data.text == 'Party invitation'
               && get(/databases/$(database)/documents/parties/$(data.partyId)).data.hostId == request.auth.uid
-              && get(/databases/$(database)/documents/parties/$(data.partyId)).data.visibility == 'public'
-              && get(/databases/$(database)/documents/parties/$(data.partyId)).data.status == 'open');
+              && get(/databases/$(database)/documents/parties/$(data.partyId)).data.status == 'open'
+              && get(/databases/$(database)/documents/parties/$(data.partyId)).data.memberCount
+                < get(/databases/$(database)/documents/parties/$(data.partyId)).data.maxPlayers
+              && (get(/databases/$(database)/documents/parties/$(data.partyId)).data.visibility == 'public'
+                || (getAfter(/databases/$(database)/documents/parties/$(data.partyId)/invitations/$(recipient)).data.hostId == request.auth.uid
+                  && getAfter(/databases/$(database)/documents/parties/$(data.partyId)/invitations/$(recipient)).data.chatId == chatId
+                  && getAfter(/databases/$(database)/documents/parties/$(data.partyId)/invitations/$(recipient)).data.messageId == messageId)));
         }
         function parent() {
           return get(/databases/$(database)/documents/chats/$(chatId)).data;
@@ -338,7 +420,7 @@ service cloud.firestore {
           'title', 'hostId', 'gameId', 'region', 'mode', 'visibility',
           'maxPlayers', 'memberCount', 'minRank', 'maxRank', 'playstyles',
           'communication', 'minimumRating', 'description', 'status',
-          'createdAt', 'updatedAt', 'startedAt', 'completedAt'
+          'createdAt', 'updatedAt', 'startedAt', 'completedAt', 'lastRemovedMemberId'
         ])
         && data.hostId == request.auth.uid
         && data.title is string && data.title.size() >= 1 && data.title.size() <= 60
@@ -364,6 +446,7 @@ service cloud.firestore {
 
     function validNewParty(data) {
       return validPartyDetails(data)
+        && !('lastRemovedMemberId' in data)
         && data.memberCount == 1 && data.status == 'open'
         && data.createdAt == request.time && data.updatedAt == request.time
         && data.startedAt == null && data.completedAt == null;
@@ -401,14 +484,47 @@ service cloud.firestore {
         );
     }
 
+    match /party_memberships/{uid} {
+      allow get: if owns(uid);
+      allow list: if false;
+      function canReplace() {
+        return resource == null
+          || get(/databases/$(database)/documents/parties/$(resource.data.partyId)).data.status != 'open'
+          || get(/databases/$(database)/documents/parties/$(resource.data.partyId)/members/$(uid)).data.leftAt != null;
+      }
+      allow create, update: if owns(uid) && canReplace()
+        && request.resource.data.keys().hasAll(['partyId', 'updatedAt'])
+        && request.resource.data.keys().hasOnly(['partyId', 'updatedAt'])
+        && request.resource.data.partyId is string
+        && request.resource.data.updatedAt == request.time
+        && getAfter(/databases/$(database)/documents/parties/$(request.resource.data.partyId)/members/$(uid)).data.role == 'member'
+        && getAfter(/databases/$(database)/documents/parties/$(request.resource.data.partyId)/members/$(uid)).data.leftAt == null
+        && getAfter(/databases/$(database)/documents/parties/$(request.resource.data.partyId)/members/$(uid)).data.joinedAt == request.time
+        && getAfter(/databases/$(database)/documents/parties/$(request.resource.data.partyId)).data.memberCount
+          == get(/databases/$(database)/documents/parties/$(request.resource.data.partyId)).data.memberCount + 1;
+      allow delete: if owns(uid) && (
+        get(/databases/$(database)/documents/parties/$(resource.data.partyId)).data.status != 'open'
+        || getAfter(/databases/$(database)/documents/parties/$(resource.data.partyId)/members/$(uid)).data.leftAt == request.time);
+    }
+
+    function noActiveJoinedParty(uid) {
+      let pointer = /databases/$(database)/documents/party_memberships/$(uid);
+      return !existsAfter(pointer)
+        || getAfter(/databases/$(database)/documents/parties/$(getAfter(pointer).data.partyId)).data.status != 'open'
+        || getAfter(/databases/$(database)/documents/parties/$(getAfter(pointer).data.partyId)/members/$(uid)).data.leftAt != null;
+    }
+
     match /parties/{partyId} {
       allow read: if signedIn() && (
         (resource.data.visibility == 'public' && resource.data.status == 'open')
         || resource.data.hostId == request.auth.uid
         || activeMember(request.auth.uid)
+        || (resource.data.status == 'open'
+          && exists(/databases/$(database)/documents/parties/$(partyId)/invitations/$(request.auth.uid)))
       );
       // The host membership must be included in the same atomic write.
       allow create: if signedIn() && validNewParty(request.resource.data)
+        && noActiveJoinedParty(request.auth.uid)
         && (!exists(/databases/$(database)/documents/party_host_slots/$(request.auth.uid))
           || get(/databases/$(database)/documents/party_host_slots/$(request.auth.uid)).data.activeCount == 0)
         && getAfter(/databases/$(database)/documents/party_host_slots/$(request.auth.uid)).data.activeCount == 1
@@ -419,6 +535,26 @@ service cloud.firestore {
       function activeMember(uid) {
         return exists(/databases/$(database)/documents/parties/$(partyId)/members/$(uid))
           && get(/databases/$(database)/documents/parties/$(partyId)/members/$(uid)).data.leftAt == null;
+      }
+      function canJoin() {
+        let member = /databases/$(database)/documents/parties/$(partyId)/members/$(request.auth.uid);
+        let joined = getAfter(member).data;
+        return resource.data.status == 'open' && request.auth.uid != resource.data.hostId
+          && (!existsAfter(/databases/$(database)/documents/party_host_slots/$(request.auth.uid))
+            || getAfter(/databases/$(database)/documents/party_host_slots/$(request.auth.uid)).data.activeCount == 0)
+          && resource.data.memberCount < resource.data.maxPlayers
+          && (resource.data.visibility == 'public'
+            || exists(/databases/$(database)/documents/parties/$(partyId)/invitations/$(request.auth.uid)))
+          && (!exists(member) || (get(member).data.leftAt != null
+            && (get(member).data.get('removedBy', null) == null
+              || (exists(/databases/$(database)/documents/parties/$(partyId)/invitations/$(request.auth.uid))
+                && get(/databases/$(database)/documents/parties/$(partyId)/invitations/$(request.auth.uid)).data.createdAt > get(member).data.leftAt))))
+          && !exists(/databases/$(database)/documents/player_blocks/$(resource.data.hostId)/users/$(request.auth.uid))
+          && !exists(/databases/$(database)/documents/player_blocks/$(request.auth.uid)/users/$(resource.data.hostId))
+          && joined.keys().hasAll(['role', 'joinedAt', 'leftAt'])
+          && joined.keys().hasOnly(['role', 'joinedAt', 'leftAt'])
+          && joined.role == 'member' && joined.joinedAt == request.time && joined.leftAt == null
+          && getAfter(/databases/$(database)/documents/party_memberships/$(request.auth.uid)).data.partyId == partyId;
       }
       function leftSelf() {
         return activeMember(request.auth.uid)
@@ -434,6 +570,19 @@ service cloud.firestore {
               'title', 'gameId', 'region', 'mode', 'visibility', 'maxPlayers',
               'minRank', 'maxRank', 'playstyles', 'communication',
               'minimumRating', 'description', 'updatedAt']))
+          || (resource.data.hostId == request.auth.uid
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['memberCount', 'updatedAt', 'lastRemovedMemberId'])
+            && request.resource.data.lastRemovedMemberId is string
+            && request.resource.data.lastRemovedMemberId != resource.data.hostId
+            && resource.data.memberCount > 1
+            && request.resource.data.memberCount == resource.data.memberCount - 1
+            && get(/databases/$(database)/documents/parties/$(partyId)/members/$(request.resource.data.lastRemovedMemberId)).data.role == 'member'
+            && get(/databases/$(database)/documents/parties/$(partyId)/members/$(request.resource.data.lastRemovedMemberId)).data.leftAt == null
+            && getAfter(/databases/$(database)/documents/parties/$(partyId)/members/$(request.resource.data.lastRemovedMemberId)).data.leftAt == request.time
+            && getAfter(/databases/$(database)/documents/parties/$(partyId)/members/$(request.resource.data.lastRemovedMemberId)).data.removedBy == request.auth.uid)
+          || (canJoin()
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['memberCount', 'updatedAt'])
+            && request.resource.data.memberCount == resource.data.memberCount + 1)
           || (leftSelf()
             && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'memberCount', 'updatedAt'])
             && (resource.data.hostId == request.auth.uid
@@ -447,24 +596,73 @@ service cloud.firestore {
         );
       allow delete: if false;
 
+      match /invitations/{uid} {
+        function partyData() {
+          return get(/databases/$(database)/documents/parties/$(partyId)).data;
+        }
+        function validInvite(data) {
+          let chat = getAfter(/databases/$(database)/documents/chats/$(data.chatId)).data;
+          let message = getAfter(/databases/$(database)/documents/chats/$(data.chatId)/messages/$(data.messageId)).data;
+          return data.keys().hasAll(['hostId', 'chatId', 'messageId', 'createdAt'])
+            && data.keys().hasOnly(['hostId', 'chatId', 'messageId', 'createdAt'])
+            && data.hostId == request.auth.uid && uid != request.auth.uid
+            && partyData().hostId == request.auth.uid && partyData().status == 'open'
+            && partyData().memberCount < partyData().maxPlayers
+            && exists(/databases/$(database)/documents/players/$(uid))
+            && (!exists(/databases/$(database)/documents/parties/$(partyId)/members/$(uid))
+              || get(/databases/$(database)/documents/parties/$(partyId)/members/$(uid)).data.leftAt != null)
+            && data.createdAt == request.time
+            && chat.type == 'direct' && chat.userIds.size() == 2
+            && uid in chat.userIds && request.auth.uid in chat.userIds
+            && message.type == 'party_invite' && message.partyId == partyId
+            && message.senderId == request.auth.uid && message.createdAt == request.time;
+        }
+        allow get: if signedIn() && (owns(uid) || partyData().hostId == request.auth.uid);
+        allow list: if signedIn() && partyData().hostId == request.auth.uid;
+        allow create, update: if signedIn() && validInvite(request.resource.data);
+        allow delete: if false;
+      }
+
       match /members/{uid} {
-        allow read: if signedIn() && get(
-          /databases/$(database)/documents/parties/$(partyId)
-        ).data.hostId == request.auth.uid || (owns(uid) && resource != null);
-        allow create: if owns(uid)
-          && !exists(/databases/$(database)/documents/parties/$(partyId))
-          && getAfter(/databases/$(database)/documents/parties/$(partyId)).data.hostId == uid
-          && validHostMembership(request.resource.data);
-        allow update: if owns(uid) && resource.data.leftAt == null
-          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['leftAt'])
-          && request.resource.data.leftAt == request.time
-          && get(/databases/$(database)/documents/parties/$(partyId)).data.status == 'open'
-          && (get(/databases/$(database)/documents/parties/$(partyId)).data.hostId == uid
-            ? getAfter(/databases/$(database)/documents/parties/$(partyId)).data.status == 'closed'
-              && getAfter(/databases/$(database)/documents/parties/$(partyId)).data.memberCount == 0
-            : getAfter(/databases/$(database)/documents/parties/$(partyId)).data.status == 'open'
-              && getAfter(/databases/$(database)/documents/parties/$(partyId)).data.memberCount
-                == get(/databases/$(database)/documents/parties/$(partyId)).data.memberCount - 1);
+        function parent() { return get(/databases/$(database)/documents/parties/$(partyId)).data; }
+        function joining() {
+          let data = request.resource.data;
+          return uid != parent().hostId && parent().status == 'open'
+            && parent().memberCount < parent().maxPlayers
+            && (parent().visibility == 'public' || exists(/databases/$(database)/documents/parties/$(partyId)/invitations/$(uid)))
+            && data.keys().hasAll(['role', 'joinedAt', 'leftAt']) && data.keys().hasOnly(['role', 'joinedAt', 'leftAt'])
+            && data.role == 'member' && data.joinedAt == request.time && data.leftAt == null
+            && getAfter(/databases/$(database)/documents/parties/$(partyId)).data.memberCount == parent().memberCount + 1
+            && getAfter(/databases/$(database)/documents/party_memberships/$(uid)).data.partyId == partyId;
+        }
+        function canPreviewRoster() {
+          return parent().status == 'open' && (parent().visibility == 'public'
+            || activeMember(request.auth.uid)
+            || exists(/databases/$(database)/documents/parties/$(partyId)/invitations/$(request.auth.uid)));
+        }
+        allow get: if signedIn() && (owns(uid) || parent().hostId == request.auth.uid || canPreviewRoster());
+        allow list: if signedIn() && (parent().hostId == request.auth.uid || canPreviewRoster());
+        allow create: if owns(uid) && (
+          (!exists(/databases/$(database)/documents/parties/$(partyId))
+            && getAfter(/databases/$(database)/documents/parties/$(partyId)).data.hostId == uid
+            && validHostMembership(request.resource.data)) || joining());
+        allow update: if owns(uid) && (
+          (resource.data.leftAt != null && joining())
+          || (resource.data.leftAt == null
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['leftAt'])
+            && request.resource.data.leftAt == request.time
+            && parent().status == 'open'
+            && (parent().hostId == uid
+              ? getAfter(/databases/$(database)/documents/parties/$(partyId)).data.status == 'closed'
+                && getAfter(/databases/$(database)/documents/parties/$(partyId)).data.memberCount == 0
+              : getAfter(/databases/$(database)/documents/parties/$(partyId)).data.status == 'open'
+                && getAfter(/databases/$(database)/documents/parties/$(partyId)).data.memberCount == parent().memberCount - 1)));
+        allow update: if signedIn() && parent().hostId == request.auth.uid && uid != request.auth.uid
+          && parent().status == 'open' && resource.data.role == 'member' && resource.data.leftAt == null
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['leftAt', 'removedBy'])
+          && request.resource.data.leftAt == request.time && request.resource.data.removedBy == request.auth.uid
+          && getAfter(/databases/$(database)/documents/parties/$(partyId)).data.lastRemovedMemberId == uid
+          && getAfter(/databases/$(database)/documents/parties/$(partyId)).data.memberCount == parent().memberCount - 1;
         allow delete: if false;
       }
     }
@@ -483,7 +681,7 @@ service cloud.firestore {
           'username', 'bio', 'region', 'updatedAt',
           'sharedAge', 'ageSharedAt', 'sharedGender',
           'games', 'currentGame', 'mode', 'playstyles',
-          'communication', 'rank', 'gameRanks'
+          'communication', 'rank', 'gameRanks', 'availability'
         ])
         && request.resource.data.updatedAt == request.time;
 

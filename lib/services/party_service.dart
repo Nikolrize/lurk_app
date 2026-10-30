@@ -34,6 +34,24 @@ class PartyService {
     final slot = _firestore.collection('party_host_slots').doc(expectedUid);
     await _firestore.runTransaction((transaction) async {
       final current = await transaction.get(slot);
+      final pointer = await transaction.get(
+        _firestore.collection('party_memberships').doc(expectedUid),
+      );
+      final joinedId = pointer.data()?['partyId'] as String?;
+      if (joinedId != null) {
+        final joinedRef = _firestore.collection('parties').doc(joinedId);
+        final member = await transaction.get(
+          joinedRef.collection('members').doc(expectedUid),
+        );
+        final joined = member.exists && member.data()?['leftAt'] == null
+            ? await transaction.get(joinedRef)
+            : null;
+        if (joined?.data()?['status'] == 'open') {
+          throw StateError(
+            'Leave your current party before creating a new one.',
+          );
+        }
+      }
       if ((current.data()?['activeCount'] ?? 0) != 0) {
         throw StateError(
           'You already host an active party. End your current party session before creating another.',
@@ -62,6 +80,92 @@ class PartyService {
     });
     return party.id;
   }
+
+  Future<void> joinParty(String id, {required String expectedUid}) async {
+    _checkAccount(expectedUid);
+    final party = _firestore.collection('parties').doc(id);
+    final member = party.collection('members').doc(expectedUid);
+    final current = _firestore.collection('party_memberships').doc(expectedUid);
+    await _firestore.runTransaction((transaction) async {
+      final snapshot = await transaction.get(party);
+      final membership = await transaction.get(member);
+      final pointer = await transaction.get(current);
+      final data = snapshot.data();
+      if (data == null || data['status'] != 'open') {
+        throw StateError('This party session has ended.');
+      }
+      if (data['hostId'] == expectedUid ||
+          (membership.exists && membership.data()?['leftAt'] == null)) {
+        return;
+      }
+      if ((data['memberCount'] as num) >= (data['maxPlayers'] as num)) {
+        throw StateError('This party is full.');
+      }
+      if (membership.data()?['removedBy'] != null) {
+        final invitation = await transaction.get(
+          party.collection('invitations').doc(expectedUid),
+        );
+        final sent = invitation.data()?['createdAt'] as Timestamp?;
+        final removed = membership.data()?['leftAt'] as Timestamp?;
+        if (sent == null || removed == null || sent.compareTo(removed) <= 0) {
+          throw StateError(
+            'You were removed from this party. Ask the host for a new invitation to rejoin.',
+          );
+        }
+      }
+      final hosted = await transaction.get(
+        _firestore.collection('party_host_slots').doc(expectedUid),
+      );
+      if ((hosted.data()?['activeCount'] as num? ?? 0) > 0) {
+        throw StateError(
+          'End your hosted party session before joining another party.',
+        );
+      }
+      final previousId = pointer.data()?['partyId'] as String?;
+      if (previousId != null && previousId != id) {
+        final previousParty = _firestore.collection('parties').doc(previousId);
+        final previousMember = await transaction.get(
+          previousParty.collection('members').doc(expectedUid),
+        );
+        final previous =
+            previousMember.exists && previousMember.data()?['leftAt'] == null
+            ? await transaction.get(previousParty)
+            : null;
+        if (previous?.data()?['status'] == 'open') {
+          throw StateError(
+            'Leave your current squad before joining another party.',
+          );
+        }
+      }
+      transaction.set(member, {
+        'role': 'member',
+        'joinedAt': FieldValue.serverTimestamp(),
+        'leftAt': null,
+      });
+      transaction.update(party, {
+        'memberCount': (data['memberCount'] as num).toInt() + 1,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+      transaction.set(current, {
+        'partyId': id,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+    });
+  }
+
+  Stream<String?> watchJoinedPartyId(String uid) => _firestore
+      .collection('party_memberships')
+      .doc(uid)
+      .snapshots()
+      .map((doc) => doc.data()?['partyId'] as String?);
+
+  Stream<List<String>> watchMemberIds(String id) => _firestore
+      .collection('parties')
+      .doc(id)
+      .collection('members')
+      .where('leftAt', isNull: true)
+      .snapshots()
+      .map((snapshot) => snapshot.docs.map((doc) => doc.id).toList());
 
   void _checkAccount(String uid) {
     if (FirebaseAuth.instance.currentUser?.uid != uid) {
@@ -104,6 +208,54 @@ class PartyService {
     });
   }
 
+  Future<void> removeMember(
+    String id,
+    String memberUid, {
+    required String expectedUid,
+  }) async {
+    _checkAccount(expectedUid);
+    if (memberUid == expectedUid) {
+      throw StateError('Use Leave Party to end your session.');
+    }
+    final party = _firestore.collection('parties').doc(id);
+    final member = party.collection('members').doc(memberUid);
+    await _firestore.runTransaction((transaction) async {
+      final snapshot = await transaction.get(party);
+      final membership = await transaction.get(member);
+      final data = snapshot.data();
+      if (data == null ||
+          data['hostId'] != expectedUid ||
+          data['status'] != 'open') {
+        throw StateError(
+          'Only the host can remove players from an open party.',
+        );
+      }
+      if (!membership.exists ||
+          membership.data()?['role'] != 'member' ||
+          membership.data()?['leftAt'] != null) {
+        throw StateError('This player is no longer in the party.');
+      }
+      transaction.update(member, {
+        'leftAt': FieldValue.serverTimestamp(),
+        'removedBy': expectedUid,
+      });
+      transaction.update(party, {
+        'memberCount': (data['memberCount'] as num).toInt() - 1,
+        'lastRemovedMemberId': memberUid,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+    });
+  }
+
+  Stream<Map<String, dynamic>?> watchMembership(String id, String uid) =>
+      _firestore
+          .collection('parties')
+          .doc(id)
+          .collection('members')
+          .doc(uid)
+          .snapshots()
+          .map((doc) => doc.data());
+
   Future<void> leaveParty(String id, {required String expectedUid}) async {
     _checkAccount(expectedUid);
     final party = _firestore.collection('parties').doc(id);
@@ -118,6 +270,10 @@ class PartyService {
       if (!membership.exists || membership.data()?['leftAt'] != null) {
         throw StateError('You are no longer in this party.');
       }
+      final current = _firestore
+          .collection('party_memberships')
+          .doc(expectedUid);
+      final pointer = await transaction.get(current);
       final isHost = data['hostId'] == expectedUid;
       final slot = _firestore.collection('party_host_slots').doc(expectedUid);
       final slotSnapshot = isHost ? await transaction.get(slot) : null;
@@ -138,6 +294,7 @@ class PartyService {
         'updatedAt': FieldValue.serverTimestamp(),
       });
       transaction.update(member, {'leftAt': FieldValue.serverTimestamp()});
+      if (pointer.data()?['partyId'] == id) transaction.delete(current);
     });
   }
 

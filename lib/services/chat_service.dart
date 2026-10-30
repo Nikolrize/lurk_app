@@ -135,19 +135,45 @@ class ChatService {
     if (partyId.isEmpty || partyId.contains('/')) {
       throw ArgumentError('Choose a valid party.');
     }
-    // Firestore rules independently verify host, visibility and open status.
+    final chat = await _db
+        .collection('chats')
+        .doc(chatId)
+        .get(const GetOptions(source: Source.server));
+    final users =
+        (chat.data()?['userIds'] as List?)?.whereType<String>().toList() ?? [];
+    if (users.length != 2 || !users.contains(uid)) {
+      throw StateError('This conversation is unavailable.');
+    }
+    final recipient = users.firstWhere((id) => id != uid);
+    final partyRef = _db.collection('parties').doc(partyId);
+    final party = await partyRef.get(const GetOptions(source: Source.server));
+    final data = party.data();
+    if (data == null || data['hostId'] != uid || data['status'] != 'open') {
+      throw StateError('Only the host can invite players to an open party.');
+    }
+    if ((data['memberCount'] as num) >= (data['maxPlayers'] as num)) {
+      throw StateError('This party is full.');
+    }
+    final member = await partyRef
+        .collection('members')
+        .doc(recipient)
+        .get(const GetOptions(source: Source.server));
+    if (member.exists && member.data()?['leftAt'] == null) {
+      throw StateError('This player is already in your party.');
+    }
     await _send(chatId, uid, 'Party invitation', {
       'type': 'party_invite',
       'partyId': partyId,
-    });
+    }, inviteRecipient: recipient);
   }
 
   Future<void> _send(
     String chatId,
     String uid,
     String text,
-    Map<String, dynamic> extra,
-  ) async {
+    Map<String, dynamic> extra, {
+    String? inviteRecipient,
+  }) async {
     final chat = _db.collection('chats').doc(chatId);
     final message = chat.collection('messages').doc();
     final batch = _db.batch();
@@ -157,6 +183,21 @@ class ChatService {
       ...extra,
       'createdAt': FieldValue.serverTimestamp(),
     });
+    if (inviteRecipient != null) {
+      batch.set(
+        _db
+            .collection('parties')
+            .doc(extra['partyId'] as String)
+            .collection('invitations')
+            .doc(inviteRecipient),
+        {
+          'hostId': uid,
+          'chatId': chatId,
+          'messageId': message.id,
+          'createdAt': FieldValue.serverTimestamp(),
+        },
+      );
+    }
     batch.update(chat, {
       'lastMessageId': message.id,
       'lastMessagePreview': text,

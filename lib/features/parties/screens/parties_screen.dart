@@ -35,7 +35,7 @@ class PartiesScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final currentParty = ref.watch(currentHostedPartyProvider);
+    final currentParty = ref.watch(currentPartyProvider);
     return SafeArea(
       child: LayoutBuilder(
         builder: (context, constraints) {
@@ -94,8 +94,10 @@ class PartiesScreen extends ConsumerWidget {
                       loading: () => const SizedBox.shrink(),
                       error: (error, _) => PartyLoadError(
                         error: error,
-                        onRetry: () =>
-                            ref.invalidate(currentHostedPartyProvider),
+                        onRetry: () {
+                          ref.invalidate(currentHostedPartyProvider);
+                          ref.invalidate(joinedPartyIdProvider);
+                        },
                       ),
                       data: (party) => party == null
                           ? const SizedBox.shrink()

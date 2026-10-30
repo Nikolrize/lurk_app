@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -16,6 +17,18 @@ import 'package:lurk_app/providers/profile_provider.dart';
 
 class LobbyPartyService extends Fake implements PartyService {
   int leaves = 0;
+  int removals = 0;
+  String? removedUid;
+  @override
+  Future<void> removeMember(
+    String id,
+    String memberUid, {
+    required String expectedUid,
+  }) async {
+    removals++;
+    removedUid = memberUid;
+  }
+
   @override
   Future<void> leaveParty(String id, {required String expectedUid}) async {
     leaves++;
@@ -86,6 +99,12 @@ void main() {
       expect(find.text('3 / 5 players · Private party'), findsOneWidget);
       expect(find.text('Nicole · Platinum'), findsOneWidget);
       expect(find.byTooltip('Party host'), findsOneWidget);
+      final controlPosition = tester.getTopLeft(find.text('Leave Party'));
+      await tester.drag(find.byType(ListView).first, const Offset(0, -350));
+      await tester.pumpAndSettle();
+      expect(tester.getTopLeft(find.text('Leave Party')), controlPosition);
+      expect(find.text('Mic: OFF').hitTestable(), findsOneWidget);
+      expect(find.text('Chat').hitTestable(), findsOneWidget);
       await tester.scrollUntilVisible(
         find.text('Leave Party'),
         200,
@@ -151,6 +170,10 @@ void main() {
       expect(find.text('Real host'), findsOneWidget);
       expect(find.text('Not rated'), findsOneWidget);
       expect(find.byType(NavigationBar), findsOneWidget);
+      expect(
+        tester.getBottomLeft(find.text('Leave Party')).dy,
+        lessThan(tester.getTopLeft(find.byType(NavigationBar)).dy),
+      );
       await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
       expect(find.text('Create Party'), findsOneWidget);
@@ -200,4 +223,105 @@ void main() {
       expect(service.leaves, 1);
     },
   );
+
+  testWidgets('Host removes a live member only after confirmation', (
+    tester,
+  ) async {
+    final service = LobbyPartyService();
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          partyByIdProvider('party').overrideWith((ref) => Stream.value(party)),
+          partyMemberIdsProvider(
+            'party',
+          ).overrideWith((ref) => Stream.value(['host', 'alex'])),
+          partyServiceProvider.overrideWithValue(service),
+          playerProfileProvider.overrideWith(
+            (ref, uid) => Stream.value(
+              PlayerProfile(
+                uid: uid,
+                username: uid == 'host' ? 'Nicole' : 'Alex',
+                bio: '',
+                region: 'Asia',
+                createdAt: null,
+                updatedAt: null,
+              ),
+            ),
+          ),
+        ],
+        child: MaterialApp(
+          theme: AppTheme.dark,
+          home: Scaffold(
+            body: PartyLobbyScreen(
+              party: party,
+              viewerUid: 'host',
+              onBack: () {},
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Options for Nicole'));
+    await tester.pumpAndSettle();
+    expect(find.text('Remove player'), findsNothing);
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.byTooltip('Options for Alex'));
+    await tester.tap(find.byTooltip('Options for Alex'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Remove player'));
+    await tester.pumpAndSettle();
+    expect(find.text('Remove player?'), findsOneWidget);
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
+    expect(service.removals, 0);
+    await tester.tap(find.byTooltip('Options for Alex'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Remove player'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Remove'));
+    await tester.pumpAndSettle();
+    expect(service.removals, 1);
+    expect(service.removedUid, 'alex');
+  });
+  testWidgets('A removed player loses lobby controls immediately', (
+    tester,
+  ) async {
+    final membership = StreamController<Map<String, dynamic>?>();
+    addTearDown(membership.close);
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          partyByIdProvider('party').overrideWith((ref) => Stream.value(party)),
+          myPartyMembershipProvider(
+            'party',
+          ).overrideWith((ref) => membership.stream),
+        ],
+        child: MaterialApp(
+          theme: AppTheme.dark,
+          home: Scaffold(
+            body: PartyLobbyScreen(
+              party: party,
+              viewerUid: 'alex',
+              members: const [],
+              onBack: () {},
+            ),
+          ),
+        ),
+      ),
+    );
+    membership.add({'role': 'member', 'leftAt': null});
+    await tester.pumpAndSettle();
+    expect(find.text('Leave Party'), findsOneWidget);
+    membership.add({
+      'role': 'member',
+      'leftAt': DateTime.now(),
+      'removedBy': 'host',
+    });
+    await tester.pumpAndSettle();
+    expect(find.text('You were removed from this party.'), findsOneWidget);
+    expect(find.text('Leave Party'), findsNothing);
+    expect(find.text('Back to Parties'), findsOneWidget);
+  });
 }

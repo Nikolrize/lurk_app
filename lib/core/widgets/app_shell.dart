@@ -1,3 +1,5 @@
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../providers/party_provider.dart';
 import '../../features/parties/models/party.dart';
 import '../../features/parties/screens/party_lobby_screen.dart';
 import 'dart:ui';
@@ -11,16 +13,16 @@ import '../../features/find/screens/find_screen.dart';
 
 import 'package:lurk_app/features/profile/screens/my_profile_screen.dart';
 
-class AppShell extends StatefulWidget {
+class AppShell extends ConsumerStatefulWidget {
   const AppShell({super.key, required this.uid});
 
   final String uid;
 
   @override
-  State<AppShell> createState() => _AppShellState();
+  ConsumerState<AppShell> createState() => _AppShellState();
 }
 
-class _AppShellState extends State<AppShell> {
+class _AppShellState extends ConsumerState<AppShell> {
   int _selectedIndex = 0;
   String? _findGame;
   Party? _lobbyParty;
@@ -29,6 +31,14 @@ class _AppShellState extends State<AppShell> {
 
   @override
   Widget build(BuildContext context) {
+    ref.listen(lobbyNavigationProvider, (previous, next) {
+      if (next != null) {
+        setState(() {
+          _lobbyParty = next.party;
+          _selectedIndex = 2;
+        });
+      }
+    });
     return PopScope(
       canPop: _selectedIndex != 2 || _lobbyParty == null,
       onPopInvokedWithResult: (didPop, result) {

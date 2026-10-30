@@ -13,7 +13,7 @@ final availablePartiesProvider = StreamProvider.autoDispose<List<Party>>((ref) {
   return ref.watch(partyServiceProvider).watchDiscoverableParties();
 }, retry: (retryCount, error) => null);
 
-// Current host-owned party. Joined-party membership will be added with joining.
+// Host-owned parties remain available alongside the current joined squad.
 final currentHostedPartyProvider = StreamProvider.autoDispose<Party?>((ref) {
   final auth = ref.watch(authStateProvider);
   if (auth.hasError) return Stream.error(auth.error!);
@@ -32,3 +32,55 @@ final partyByIdProvider = StreamProvider.autoDispose.family<Party?, String>((
   if (auth.asData?.value == null) return Stream.value(null);
   return ref.watch(partyServiceProvider).watchParty(id);
 }, retry: (retryCount, error) => null);
+
+final joinedPartyIdProvider = StreamProvider.autoDispose<String?>((ref) {
+  final uid = ref.watch(authStateProvider).asData?.value?.uid;
+  if (uid == null) return Stream.value(null);
+  return ref.watch(partyServiceProvider).watchJoinedPartyId(uid);
+}, retry: (count, error) => null);
+
+final currentPartyProvider = Provider<AsyncValue<Party?>>((ref) {
+  final hosted = ref.watch(currentHostedPartyProvider);
+  final joined = ref.watch(joinedPartyIdProvider);
+  if (joined.hasError) return AsyncError(joined.error!, joined.stackTrace!);
+  final id = joined.asData?.value;
+  if (id == null) return hosted;
+  final membership = ref.watch(myPartyMembershipProvider(id));
+  if (membership.asData != null &&
+      (membership.asData!.value == null ||
+          membership.asData!.value!['leftAt'] != null)) {
+    return hosted;
+  }
+  final party = ref.watch(partyByIdProvider(id));
+  if (party.asData != null &&
+      (party.asData!.value == null || party.asData!.value!.status != 'open')) {
+    return hosted;
+  }
+  return party;
+});
+
+final partyMemberIdsProvider = StreamProvider.autoDispose
+    .family<List<String>, String>((ref, id) {
+      final uid = ref.watch(authStateProvider).asData?.value?.uid;
+      if (uid == null) return const Stream<List<String>>.empty();
+      return ref.watch(partyServiceProvider).watchMemberIds(id);
+    }, retry: (count, error) => null);
+
+class LobbyNavigation extends Notifier<({Party party, int serial})?> {
+  @override
+  ({Party party, int serial})? build() => null;
+  void open(Party party) =>
+      state = (party: party, serial: (state?.serial ?? 0) + 1);
+}
+
+final lobbyNavigationProvider =
+    NotifierProvider<LobbyNavigation, ({Party party, int serial})?>(
+      LobbyNavigation.new,
+    );
+
+final myPartyMembershipProvider = StreamProvider.autoDispose
+    .family<Map<String, dynamic>?, String>((ref, id) {
+      final uid = ref.watch(authStateProvider).asData?.value?.uid;
+      if (uid == null) return const Stream<Map<String, dynamic>?>.empty();
+      return ref.watch(partyServiceProvider).watchMembership(id, uid);
+    }, retry: (count, error) => null);
