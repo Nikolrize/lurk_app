@@ -50,6 +50,72 @@ service cloud.firestore {
       );
     }
 
+    //rank number same as game's catalogue position
+    function rankNumber(game, rankId) {
+      let valorant = {
+        'iron': 0,
+        'bronze': 1,
+        'silver': 2,
+        'gold': 3,
+        'platinum': 4,
+        'diamond': 5,
+        'ascendant': 6,
+        'immortal': 7,
+        'radiant': 8
+      };
+
+      let mobileLegends = {
+        'warrior': 0,
+        'elite': 1,
+        'master': 2,
+        'grandmaster': 3,
+        'epic': 4,
+        'legend': 5,
+        'mythic': 6,
+        'mythical_honor': 7,
+        'mythical_glory': 8,
+        'mythical_immortal': 9
+      };
+
+      return rankId == null ? null: (
+          game == 'valorant' ? valorant.get(rankId, null) : (
+              game == 'mobile_legends' ? mobileLegends.get(rankId, null) : null
+            )
+        );
+    }
+
+    //gameRanks - optional public map
+    // only selected, supported ranked games have entries
+    //each entry must contain valid rank ID
+    function validStoredGameRanks(data) {
+      let ranks = data.get('gameRanks', {});
+      let games = data.get('games', []);
+      let game = data.get('currentGame', null);
+      let chosenRank = ranks is map && game is string
+        ? ranks.get(game, null)
+        : null;
+
+      return ranks is map
+        && ranks.keys().size() <= 2
+        && ranks.keys().hasOnly(['valorant', 'mobile_legends'])
+        && ranks.keys().hasOnly(games)
+        && (
+          !('valorant' in ranks)
+          || ranks.valorant in [
+            'iron', 'bronze', 'silver', 'gold', 'platinum',
+            'diamond', 'ascendant', 'immortal', 'radiant'
+          ]
+        )
+        && (
+          !('mobile_legends' in ranks)
+          || ranks.mobile_legends in [
+            'warrior', 'elite', 'master', 'grandmaster',
+            'epic', 'legend', 'mythic', 'mythical_honor',
+            'mythical_glory', 'mythical_immortal'
+          ]
+        )
+        && data.get('rank', null) == rankNumber(game, chosenRank);
+    }
 
     function validGamingPreferences(data) {
       let games = data.get('games', []);
@@ -83,16 +149,28 @@ service cloud.firestore {
             'mic_required', 'voice_optional', 'chat_only'
           ]
         )
+        //accepts either existing profile using old format 
+        //or using new map
         && (
-          rank == null
+          (
+            'gameRanks' in data
+            && validStoredGameRanks(data)
+          )
           || (
-            game == 'valorant'
-            && rank is int
-            && rank >= 0
-            && rank <= 7
+            !('gameRanks' in data)
+            && (
+              rank == null
+              || (
+                game == 'valorant'
+                && rank is int
+                && rank >= 0
+                && rank <= 7
+              )
+            )
           )
         );
     }
+
     function validPublicProfile(data) {
       return data.keys().hasAll([
           'username', 'bio', 'region', 'createdAt', 'updatedAt'
@@ -101,7 +179,7 @@ service cloud.firestore {
           'username', 'bio', 'region', 'createdAt', 'updatedAt',
           'sharedAge', 'ageSharedAt', 'sharedGender',
           'games', 'currentGame', 'mode', 'playstyles',
-          'communication', 'rank'
+          'communication', 'rank', 'gameRanks'
         ])
         && data.username is string
         && (
@@ -164,7 +242,7 @@ service cloud.firestore {
           'username', 'bio', 'region', 'updatedAt',
           'sharedAge', 'ageSharedAt', 'sharedGender',
           'games', 'currentGame', 'mode', 'playstyles',
-          'communication', 'rank'
+          'communication', 'rank', 'gameRanks'
         ])
         && request.resource.data.updatedAt == request.time;
 

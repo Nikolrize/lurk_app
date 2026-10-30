@@ -4,6 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lurk_app/models/gaming_preferences.dart';
 import 'package:lurk_app/providers/profile_provider.dart';
 
+import 'package:lurk_app/core/data/game_catalog.dart';
+
 class GamingPreferencesCard extends ConsumerWidget {
   const GamingPreferencesCard({
     super.key,
@@ -36,7 +38,6 @@ class GamingPreferencesCard extends ConsumerWidget {
 
             final mode = GamingPreferences.modeLabels[preferences.mode];
             final communication = GamingPreferences.communicationLabels[preferences.communication];
-            final rank = preferences.rank;
 
             return Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -67,12 +68,15 @@ class GamingPreferencesCard extends ConsumerWidget {
                   const SizedBox(height: 12),
                   Text('Communication: $communication'),
                 ],
-                if (preferences.currentGame == 'valorant' && rank != null && rank >=0 && rank < GamingPreferences.valorantRanks.length) ... [
-                  const SizedBox(height: 12),
-                  Text(
-                    'Valorant rank:${GamingPreferences.valorantRanks[rank]}',
-                  ),
-                ],
+                //display every saved rank 
+                for (final gameId in preferences.games)
+                  if (preferences.rankLabelFor(gameId) != null) ...[
+                    const SizedBox(height: 12),
+                    Text(
+                      '${GameCatalog.games[gameId]!.name} rank: '
+                      '${preferences.rankLabelFor(gameId)}',
+                    ),
+                  ],
               ],
             );
           }

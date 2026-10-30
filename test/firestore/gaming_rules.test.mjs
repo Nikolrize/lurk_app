@@ -112,6 +112,92 @@ test('gaming preferences ownership and validation', async () => {
       bio: 'Updated bio',
       updatedAt: serverTimestamp(),
     }));
+
+    //save two games' ranks while MLBB main game
+    await assertSucceeds(updateDoc(aliceProfile, {
+      games: ['valorant', 'mobile_legends', 'fortnite'],
+      currentGame: 'mobile_legends',
+      gameRanks: {
+        valorant: 'gold',
+        mobile_legends: 'epic',
+      },
+      rank: 4,
+      updatedAt: serverTimestamp(),
+    }));
+
+    let saved = await getDoc(aliceProfile);
+    assert.equal(saved.data().gameRanks.valorant, 'gold');
+    assert.equal(saved.data().gameRanks.mobile_legends, 'epic');
+
+    //switching the main game preserves both ranks
+    await assertSucceeds(updateDoc(aliceProfile, {
+      currentGame: 'valorant',
+      rank: 3,
+      updatedAt: serverTimestamp(),
+    }));
+
+    saved = await getDoc(aliceProfile);
+    assert.equal(saved.data().gameRanks.mobile_legends, 'epic');
+
+    //rank must agree with the main game's rank ID
+    await assertFails(updateDoc(aliceProfile, {
+      rank: 4,
+      updatedAt: serverTimestamp(),
+    }));
+
+    //rank from another game is invalid
+    await assertFails(updateDoc(aliceProfile, {
+      gameRanks: {
+        valorant: 'epic',
+        mobile_legends: 'epic',
+      },
+      updatedAt: serverTimestamp(),
+    }));
+
+    //fortnite no rank entry
+    await assertFails(updateDoc(aliceProfile, {
+      gameRanks: {
+        valorant: 'gold',
+        fortnite: 'gold',
+      },
+      updatedAt: serverTimestamp(),
+    }));
+
+    //removing a game also requires removing its rank entry
+    await assertFails(updateDoc(aliceProfile, {
+      games: ['valorant'],
+      updatedAt: serverTimestamp(),
+    }));
+
+    //other accounts cannot update the new rank map
+    await assertFails(updateDoc(doc(bob, 'players/alice'), {
+      gameRanks: {
+        valorant: 'gold',
+        mobile_legends: 'legend',
+      },
+      updatedAt: serverTimestamp(),
+    }));
+
+    // testin radiant
+    await assertSucceeds(updateDoc(aliceProfile, {
+      gameRanks: {
+        valorant: 'radiant',
+        mobile_legends: 'epic',
+      },
+      rank: 8,
+      updatedAt: serverTimestamp(),
+    }));
+
+    //fornite as main game
+    await assertSucceeds(updateDoc(aliceProfile, {
+      currentGame: 'fortnite',
+      rank: null,
+      updatedAt: serverTimestamp(),
+    }));
+
+    saved = await getDoc(aliceProfile);
+    assert.equal(saved.data().gameRanks.valorant, 'radiant');
+    assert.equal(saved.data().gameRanks.mobile_legends, 'epic');
   } finally {
     await environment.cleanup();
   }
