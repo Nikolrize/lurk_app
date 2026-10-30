@@ -81,7 +81,7 @@ class _FilterPreferencesScreenState extends State<FilterPreferencesScreen> {
     _preferredTimes = {};
     _weekday = null;
     _maxPartySize = null;
-    _ranks = const RangeValues(0, 7);
+    _ranks = const RangeValues(0, 0);
     _rating = 0;
     _onlyAvailable = false;
   });
