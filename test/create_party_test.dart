@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:lurk_app/features/parties/models/party_draft.dart';
+import 'package:lurk_app/features/parties/models/party.dart';
 import 'package:lurk_app/features/parties/screens/create_party_screen.dart';
 import 'package:lurk_app/providers/auth_provider.dart';
 import 'package:lurk_app/providers/party_provider.dart';
@@ -26,6 +27,18 @@ class TestPartyService extends Fake implements PartyService {
     captured = draft;
     uid = expectedUid;
     return result.future;
+  }
+}
+
+class EditPartyService extends Fake implements PartyService {
+  PartyDraft? captured;
+  @override
+  Future<void> updateParty(
+    String id,
+    PartyDraft draft, {
+    required String expectedUid,
+  }) async {
+    captured = draft;
   }
 }
 
@@ -122,7 +135,7 @@ void main() {
       expect(service.uid, 'host-uid');
       expect(service.captured?.playstyles, {'chill', 'fun'});
       expect(service.captured?.title, 'Friday squad');
-      expect(find.text('Creating…'), findsOneWidget);
+      expect(find.text('Saving…'), findsOneWidget);
       service.result.complete('new-party');
       await tester.pumpAndSettle();
       expect(find.text('Open form'), findsOneWidget);
@@ -153,7 +166,7 @@ void main() {
     await tester.pump();
     await tester.pump();
     await tester.scrollUntilVisible(
-      find.textContaining('Unable to create the party'),
+      find.textContaining('Unable to save the party'),
       200,
       scrollable: find
           .descendant(
@@ -162,7 +175,7 @@ void main() {
           )
           .first,
     );
-    expect(find.textContaining('Unable to create the party'), findsOneWidget);
+    expect(find.textContaining('Unable to save the party'), findsOneWidget);
     await tester.drag(find.byType(ListView), const Offset(0, 1500));
     await tester.pumpAndSettle();
     expect(find.text('Keep this name'), findsOneWidget);
@@ -175,4 +188,54 @@ void main() {
       isNotNull,
     );
   });
+
+  testWidgets(
+    'Edit form prefills saved values and updates instead of creating',
+    (tester) async {
+      final service = EditPartyService();
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            authStateProvider.overrideWith((ref) => Stream.value(TestUser())),
+            partyServiceProvider.overrideWithValue(service),
+          ],
+          child: MaterialApp(
+            home: CreatePartyScreen(
+              party: const Party(
+                id: 'saved',
+                hostId: 'host-uid',
+                gameId: 'valorant',
+                title: 'Existing squad',
+                gameName: 'Valorant',
+                playStyle: 'Competitive',
+                mode: 'Competitive',
+                region: 'Asia',
+                communication: 'Mic required',
+                currentPlayers: 2,
+                maxPlayers: 5,
+                minRank: 2,
+                maxRank: 5,
+                playstyles: ['Chill', 'Fun'],
+                minimumRating: 4,
+                description: 'Saved description',
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Edit Party'), findsOneWidget);
+      expect(find.text('Existing squad'), findsOneWidget);
+
+      await tester.enterText(find.byType(TextFormField).first, 'Updated squad');
+      await tester.tap(find.text('Save Changes'));
+      await tester.pumpAndSettle();
+      expect(service.captured?.title, 'Updated squad');
+      expect(service.captured?.region, 'asia');
+      expect(service.captured?.playstyles, {'chill', 'fun'});
+      expect(service.captured?.minRank, 2);
+      expect(service.captured?.description, 'Saved description');
+      expect(tester.takeException(), isNull);
+    },
+  );
 }

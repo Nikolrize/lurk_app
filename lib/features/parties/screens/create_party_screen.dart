@@ -5,6 +5,7 @@ import '../../../providers/auth_provider.dart';
 import '../../../providers/party_provider.dart';
 import '../../find/models/filter_preferences.dart';
 import '../models/party_draft.dart';
+import '../models/party.dart';
 
 Future<void> openCreateParty(BuildContext context) async {
   final created = await Navigator.of(
@@ -17,7 +18,8 @@ Future<void> openCreateParty(BuildContext context) async {
 }
 
 class CreatePartyScreen extends ConsumerStatefulWidget {
-  const CreatePartyScreen({super.key});
+  const CreatePartyScreen({super.key, this.party});
+  final Party? party;
   @override
   ConsumerState<CreatePartyScreen> createState() => _CreatePartyScreenState();
 }
@@ -41,6 +43,36 @@ class _CreatePartyScreenState extends ConsumerState<CreatePartyScreen> {
   final Set<String> _styles = {'chill'};
   bool _saving = false;
   String? _error;
+  @override
+  void initState() {
+    super.initState();
+    final party = widget.party;
+    if (party == null) return;
+    String keyFor(Map<String, String> options, String? value) => options.entries
+        .firstWhere(
+          (entry) => entry.key == value || entry.value == value,
+          orElse: () => options.entries.first,
+        )
+        .key;
+    _name.text = party.title;
+    _description.text = party.description;
+    _game = party.gameId;
+    _region = keyFor(PartyDraft.regions, party.region);
+    _mode = keyFor(PartyDraft.modes, party.mode);
+    _communication = keyFor(PartyDraft.communications, party.communication);
+    _visibility = party.visibility;
+    _size = party.maxPlayers;
+    _rating = party.minimumRating;
+    final ranks = FilterPreferences.ranksForGame(_game);
+    _ranks = RangeValues(
+      (party.minRank ?? 0).toDouble(),
+      (party.maxRank ?? (ranks.length - 1).clamp(0, 100)).toDouble(),
+    );
+    _styles
+      ..clear()
+      ..addAll(party.playstyles.map((v) => keyFor(PartyDraft.styles, v)));
+  }
+
   @override
   void dispose() {
     _name.dispose();
@@ -83,27 +115,35 @@ class _CreatePartyScreenState extends ConsumerState<CreatePartyScreen> {
         communication: _communication,
         description: _description.text,
       );
-      final id = await ref
-          .read(partyServiceProvider)
-          .createParty(draft, expectedUid: uid);
+      final service = ref.read(partyServiceProvider);
+      final existing = widget.party;
+      final String id;
+      if (existing == null) {
+        id = await service.createParty(draft, expectedUid: uid);
+      } else {
+        await service.updateParty(existing.id, draft, expectedUid: uid);
+        id = existing.id;
+      }
       if (mounted) Navigator.pop(context, id);
     } on FirebaseException catch (error) {
       if (!mounted) return;
       setState(
         () => _error = switch (error.code) {
           'permission-denied' =>
-            'Unable to create the party. Check your sign-in and party permissions.',
+            'Unable to save the party. Check your sign-in and party permissions.',
           'unavailable' =>
             'Cannot reach the server. Check your connection and try again.',
-          _ => 'Party creation failed. Please try again.',
+          _ => 'Unable to save the party. Please try again.',
         },
       );
     } catch (error) {
       if (!mounted) return;
       setState(
-        () => _error = error is ArgumentError || error is StateError
+        () => _error = error is StateError
+            ? error.message.toString()
+            : error is ArgumentError
             ? error.toString()
-            : 'Party creation failed. Please try again.',
+            : 'Unable to save the party. Please try again.',
       );
     } finally {
       if (mounted) setState(() => _saving = false);
@@ -174,7 +214,7 @@ class _CreatePartyScreenState extends ConsumerState<CreatePartyScreen> {
       canPop: !_saving,
       child: Scaffold(
         appBar: AppBar(
-          title: const Text('Create Party'),
+          title: Text(widget.party == null ? 'Create Party' : 'Edit Party'),
           backgroundColor: Theme.of(context).scaffoldBackgroundColor,
           surfaceTintColor: Colors.transparent,
         ),
@@ -353,10 +393,12 @@ class _CreatePartyScreenState extends ConsumerState<CreatePartyScreen> {
                           child: CircularProgressIndicator(strokeWidth: 2),
                         ),
                         SizedBox(width: 12),
-                        Text('Creating…'),
+                        Text('Saving…'),
                       ],
                     )
-                  : const Text('Create Party'),
+                  : Text(
+                      widget.party == null ? 'Create Party' : 'Save Changes',
+                    ),
             ),
           ),
         ),

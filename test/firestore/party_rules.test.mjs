@@ -39,17 +39,32 @@ test('party creation is validated, atomic and private discovery stays protected'
      const batch=writeBatch(db);
      batch.set(doc(db,`parties/${id}`),data);
      batch.set(doc(db,`parties/${id}/members/${uid}`),membership);
+     batch.set(doc(db,`party_host_slots/${uid}`),{activeCount:1,lastPartyId:id,updatedAt:serverTimestamp()});
      return batch.commit();
    };
+   const close=async id=>{
+     const batch=writeBatch(alice);
+     batch.update(doc(alice,'parties/'+id),{status:'closed',memberCount:0,updatedAt:serverTimestamp()});
+     batch.update(doc(alice,'parties/'+id+'/members/alice'),{leftAt:serverTimestamp()});
+     batch.set(doc(alice,'party_host_slots/alice'),{activeCount:0,lastPartyId:id,updatedAt:serverTimestamp()});
+     await assertSucceeds(batch.commit());
+   };
    await assertSucceeds(create(alice,'created-public'));
+   await assertFails(create(alice,'second-open-party'));
+   await assertFails(updateDoc(doc(alice,'party_host_slots/alice'),{activeCount:0,updatedAt:serverTimestamp()}));
+   await assertFails(getDoc(doc(bob,'party_host_slots/alice')));
+   await close('created-public');
    await assertSucceeds(create(alice,'radiant',party({minRank:8,maxRank:8})));
+   await close('radiant');
    await assertSucceeds(create(alice,'mlbb',party({gameId:'mobile_legends',minRank:0,maxRank:9,region:'africa'})));
+   await close('mlbb');
    await assertFails(create(alice,'rank-too-high',party({minRank:0,maxRank:9})));
    await assertFails(create(alice,'mlbb-too-high',party({gameId:'mobile_legends',minRank:0,maxRank:10})));
    await assertSucceeds(create(alice,'created-private',party({visibility:'private'})));
    await assertSucceeds(getDoc(doc(alice,'parties/created-private/members/alice')));
    await assertFails(getDoc(doc(bob,'parties/created-private')));
    await assertFails(getDoc(doc(bob,'parties/created-private/members/alice')));
+   await close('created-private');
    await assertFails(setDoc(doc(alice,'parties/orphan-party'),party()));
    await assertFails(setDoc(doc(alice,'parties/orphan-member/members/alice'),member()));
    await assertFails(setDoc(doc(alice,'parties/public/members/alice'),member()));
@@ -65,6 +80,8 @@ test('party creation is validated, atomic and private discovery stays protected'
      {gameId:'fortnite',minRank:1,maxRank:2}, {description:'x'.repeat(501)},
      {extra:'unauthorized'}, {createdAt:new Date(0)},
    ].entries()) await assertFails(create(alice,`invalid-${index}`,party(patch)));
+   const concurrent=await Promise.allSettled([create(alice,'race-one'),create(alice,'race-two')]);
+   if(concurrent.filter(r=>r.status==='fulfilled').length!==1) throw Error('Concurrent creation must allow exactly one party');
    await env.withSecurityRulesDisabled(async context=>{
      const missing = await getDoc(doc(context.firestore(),'parties/invalid-3'));
      if(missing.exists()) throw Error('Failed batch created an orphan party');

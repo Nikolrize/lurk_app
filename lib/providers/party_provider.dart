@@ -22,3 +22,13 @@ final currentHostedPartyProvider = StreamProvider.autoDispose<Party?>((ref) {
   if (uid == null) return Stream.value(null);
   return ref.watch(partyServiceProvider).watchLatestHostedParty(uid);
 }, retry: (retryCount, error) => null);
+
+final partyByIdProvider = StreamProvider.autoDispose.family<Party?, String>((
+  ref,
+  id,
+) {
+  final auth = ref.watch(authStateProvider);
+  if (auth.isLoading) return const Stream<Party?>.empty();
+  if (auth.asData?.value == null) return Stream.value(null);
+  return ref.watch(partyServiceProvider).watchParty(id);
+}, retry: (retryCount, error) => null);

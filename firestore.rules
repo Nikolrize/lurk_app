@@ -200,7 +200,7 @@ service cloud.firestore {
           'username', 'bio', 'region', 'createdAt', 'updatedAt',
           'sharedAge', 'ageSharedAt', 'sharedGender',
           'games', 'currentGame', 'mode', 'playstyles',
-          'communication', 'rank', 'gameRanks', 'gameRanks'
+          'communication', 'rank', 'gameRanks'
         ])
         && data.username is string
         && (
@@ -327,7 +327,7 @@ service cloud.firestore {
       }
     }
 
-    function validNewParty(data) {
+    function validPartyDetails(data) {
       return data.keys().hasAll([
           'title', 'hostId', 'gameId', 'region', 'mode', 'visibility',
           'maxPlayers', 'memberCount', 'minRank', 'maxRank', 'playstyles',
@@ -348,7 +348,6 @@ service cloud.firestore {
         && data.mode in ['competitive', 'casual']
         && data.visibility in ['public', 'private']
         && data.maxPlayers is int && data.maxPlayers >= 2 && data.maxPlayers <= 10
-        && data.memberCount == 1 && data.status == 'open'
         && data.minimumRating is number && data.minimumRating >= 0 && data.minimumRating <= 5
         && data.playstyles is list && data.playstyles.size() >= 1 && data.playstyles.size() <= 3
         && data.playstyles.hasOnly(['chill', 'serious', 'fun'])
@@ -360,6 +359,12 @@ service cloud.firestore {
           || (data.minRank is int && data.maxRank is int
               && data.minRank >= 0 && data.maxRank < catalogueRankCount(data.gameId) && data.minRank <= data.maxRank)
         )
+        ;
+    }
+
+    function validNewParty(data) {
+      return validPartyDetails(data)
+        && data.memberCount == 1 && data.status == 'open'
         && data.createdAt == request.time && data.updatedAt == request.time
         && data.startedAt == null && data.completedAt == null;
     }
@@ -370,27 +375,97 @@ service cloud.firestore {
         && data.role == 'host' && data.joinedAt == request.time && data.leftAt == null;
     }
 
+    // One counter per host serializes creation across devices.
+    // Existing hosts may initially have >1; closing each session reduces it.
+    match /party_host_slots/{uid} {
+      allow get: if owns(uid);
+      allow list, delete: if false;
+      allow create, update: if owns(uid)
+        && request.resource.data.keys().hasAll(['activeCount', 'lastPartyId', 'updatedAt'])
+        && request.resource.data.keys().hasOnly(['activeCount', 'lastPartyId', 'updatedAt'])
+        && request.resource.data.activeCount is int
+        && request.resource.data.activeCount >= 0
+        && request.resource.data.lastPartyId is string
+        && request.resource.data.updatedAt == request.time
+        && (
+          (request.resource.data.activeCount == 1
+            && (resource == null || resource.data.activeCount == 0)
+            && !exists(/databases/$(database)/documents/parties/$(request.resource.data.lastPartyId))
+            && getAfter(/databases/$(database)/documents/parties/$(request.resource.data.lastPartyId)).data.hostId == uid
+            && getAfter(/databases/$(database)/documents/parties/$(request.resource.data.lastPartyId)).data.status == 'open')
+          || (resource != null && resource.data.activeCount > 0
+            && request.resource.data.activeCount == resource.data.activeCount - 1
+            && get(/databases/$(database)/documents/parties/$(request.resource.data.lastPartyId)).data.hostId == uid
+            && get(/databases/$(database)/documents/parties/$(request.resource.data.lastPartyId)).data.status == 'open'
+            && getAfter(/databases/$(database)/documents/parties/$(request.resource.data.lastPartyId)).data.status == 'closed')
+        );
+    }
+
     match /parties/{partyId} {
       allow read: if signedIn() && (
         (resource.data.visibility == 'public' && resource.data.status == 'open')
         || resource.data.hostId == request.auth.uid
+        || activeMember(request.auth.uid)
       );
       // The host membership must be included in the same atomic write.
       allow create: if signedIn() && validNewParty(request.resource.data)
+        && (!exists(/databases/$(database)/documents/party_host_slots/$(request.auth.uid))
+          || get(/databases/$(database)/documents/party_host_slots/$(request.auth.uid)).data.activeCount == 0)
+        && getAfter(/databases/$(database)/documents/party_host_slots/$(request.auth.uid)).data.activeCount == 1
+        && getAfter(/databases/$(database)/documents/party_host_slots/$(request.auth.uid)).data.lastPartyId == partyId
         && validHostMembership(getAfter(
           /databases/$(database)/documents/parties/$(partyId)/members/$(request.auth.uid)
         ).data);
-      allow update, delete: if false;
+      function activeMember(uid) {
+        return exists(/databases/$(database)/documents/parties/$(partyId)/members/$(uid))
+          && get(/databases/$(database)/documents/parties/$(partyId)/members/$(uid)).data.leftAt == null;
+      }
+      function leftSelf() {
+        return activeMember(request.auth.uid)
+          && getAfter(/databases/$(database)/documents/parties/$(partyId)/members/$(request.auth.uid)).data.leftAt == request.time;
+      }
+      allow update: if signedIn() && resource.data.status == 'open'
+        && request.resource.data.updatedAt == request.time
+        && (
+          (resource.data.hostId == request.auth.uid
+            && validPartyDetails(request.resource.data)
+            && request.resource.data.maxPlayers >= resource.data.memberCount
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+              'title', 'gameId', 'region', 'mode', 'visibility', 'maxPlayers',
+              'minRank', 'maxRank', 'playstyles', 'communication',
+              'minimumRating', 'description', 'updatedAt']))
+          || (leftSelf()
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'memberCount', 'updatedAt'])
+            && (resource.data.hostId == request.auth.uid
+              ? request.resource.data.status == 'closed' && request.resource.data.memberCount == 0
+                && getAfter(/databases/$(database)/documents/party_host_slots/$(request.auth.uid)).data.activeCount
+                  == get(/databases/$(database)/documents/party_host_slots/$(request.auth.uid)).data.activeCount - 1
+                && getAfter(/databases/$(database)/documents/party_host_slots/$(request.auth.uid)).data.lastPartyId == partyId
+              : request.resource.data.status == 'open'
+                && resource.data.memberCount > 1
+                && request.resource.data.memberCount == resource.data.memberCount - 1))
+        );
+      allow delete: if false;
 
       match /members/{uid} {
         allow read: if signedIn() && get(
           /databases/$(database)/documents/parties/$(partyId)
-        ).data.hostId == request.auth.uid;
+        ).data.hostId == request.auth.uid || (owns(uid) && resource != null);
         allow create: if owns(uid)
           && !exists(/databases/$(database)/documents/parties/$(partyId))
           && getAfter(/databases/$(database)/documents/parties/$(partyId)).data.hostId == uid
           && validHostMembership(request.resource.data);
-        allow update, delete: if false;
+        allow update: if owns(uid) && resource.data.leftAt == null
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['leftAt'])
+          && request.resource.data.leftAt == request.time
+          && get(/databases/$(database)/documents/parties/$(partyId)).data.status == 'open'
+          && (get(/databases/$(database)/documents/parties/$(partyId)).data.hostId == uid
+            ? getAfter(/databases/$(database)/documents/parties/$(partyId)).data.status == 'closed'
+              && getAfter(/databases/$(database)/documents/parties/$(partyId)).data.memberCount == 0
+            : getAfter(/databases/$(database)/documents/parties/$(partyId)).data.status == 'open'
+              && getAfter(/databases/$(database)/documents/parties/$(partyId)).data.memberCount
+                == get(/databases/$(database)/documents/parties/$(partyId)).data.memberCount - 1);
+        allow delete: if false;
       }
     }
     match /players/{uid} {

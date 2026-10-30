@@ -3,12 +3,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../providers/profile_provider.dart';
 import '../../profile/screens/player_profile_screen.dart';
 import '../models/lobby_member.dart';
+import '../../../providers/party_provider.dart';
+import 'create_party_screen.dart';
 import '../models/party.dart';
 import '../widgets/lobby_member_card.dart';
 
 /// Tab content: AppShell owns the Scaffold and persistent bottom navigation.
-/// Supply a roster and action callbacks when lobby services are ready.
-class PartyLobbyScreen extends ConsumerWidget {
+/// Party details stay in sync with Firestore; social actions are supplied separately.
+class PartyLobbyScreen extends ConsumerStatefulWidget {
   const PartyLobbyScreen({
     super.key,
     required this.party,
@@ -17,7 +19,6 @@ class PartyLobbyScreen extends ConsumerWidget {
     this.viewerUid,
     this.onInvite,
     this.onChat,
-    this.onLeave,
     this.onToggleMic,
     this.micEnabled = false,
   });
@@ -25,8 +26,31 @@ class PartyLobbyScreen extends ConsumerWidget {
   final VoidCallback onBack;
   final List<LobbyMember>? members;
   final String? viewerUid;
-  final VoidCallback? onInvite, onChat, onLeave, onToggleMic;
+  final VoidCallback? onInvite, onChat, onToggleMic;
   final bool micEnabled;
+
+  @override
+  ConsumerState<PartyLobbyScreen> createState() => _PartyLobbyScreenState();
+}
+
+class _PartyLobbyScreenState extends ConsumerState<PartyLobbyScreen> {
+  bool _leaving = false;
+  Party get party =>
+      ref.read(partyByIdProvider(widget.party.id)).asData?.value ??
+      widget.party;
+  String? get viewerUid => widget.viewerUid;
+  List<LobbyMember>? get members => widget.members;
+  bool get micEnabled => widget.micEnabled;
+  VoidCallback get onBack => widget.onBack;
+  VoidCallback? get onInvite => widget.onInvite;
+  VoidCallback? get onChat => widget.onChat;
+  VoidCallback? get onToggleMic => widget.onToggleMic;
+
+  Future<void> _edit(BuildContext context) async {
+    await Navigator.of(context).push<String>(
+      MaterialPageRoute(builder: (_) => CreatePartyScreen(party: party)),
+    );
+  }
 
   void _notice(BuildContext context, String message) {
     ScaffoldMessenger.of(
@@ -74,18 +98,22 @@ class PartyLobbyScreen extends ConsumerWidget {
   }
 
   Future<void> _leave(BuildContext context) async {
-    if (onLeave == null) {
-      _notice(
-        context,
-        'Leaving parties is not available yet. You are still in this party.',
-      );
+    if (_leaving) return;
+    if (viewerUid == null) {
+      _notice(context, 'Sign in to leave this party.');
       return;
     }
     final leave = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Leave party?'),
-        content: const Text('You will leave this squad.'),
+        title: Text(
+          viewerUid == party.hostId ? 'End party session?' : 'Leave party?',
+        ),
+        content: Text(
+          viewerUid == party.hostId
+              ? 'You are the host. If you leave, the party session will end for everyone. This cannot be undone.'
+              : 'You will leave this squad.',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -93,16 +121,55 @@ class PartyLobbyScreen extends ConsumerWidget {
           ),
           FilledButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('Leave'),
+            child: Text(
+              viewerUid == party.hostId ? 'End Session & Leave' : 'Leave',
+            ),
           ),
         ],
       ),
     );
-    if (leave == true && context.mounted) onLeave!();
+    if (leave != true || !context.mounted || _leaving) return;
+    setState(() => _leaving = true);
+    try {
+      await ref
+          .read(partyServiceProvider)
+          .leaveParty(party.id, expectedUid: viewerUid!);
+      if (context.mounted) onBack();
+    } catch (_) {
+      if (context.mounted) {
+        _notice(context, 'Unable to leave the party. Please try again.');
+      }
+    } finally {
+      if (mounted) setState(() => _leaving = false);
+    }
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
+    final liveParty = ref.watch(partyByIdProvider(widget.party.id));
+    if (liveParty.hasError) {
+      return SafeArea(
+        child: Center(
+          child: TextButton(
+            onPressed: onBack,
+            child: const Text('Unable to load party. Back to Parties'),
+          ),
+        ),
+      );
+    }
+    if (liveParty.asData != null &&
+        (liveParty.asData!.value == null ||
+            liveParty.asData!.value!.status != 'open') &&
+        !_leaving) {
+      return SafeArea(
+        child: Center(
+          child: TextButton(
+            onPressed: onBack,
+            child: const Text('This party has closed. Back to Parties'),
+          ),
+        ),
+      );
+    }
     final text = Theme.of(context).textTheme;
     final colors = Theme.of(context).colorScheme;
     final bottomInset = MediaQuery.paddingOf(context).bottom;
@@ -132,13 +199,24 @@ class PartyLobbyScreen extends ConsumerWidget {
                 icon: const Icon(Icons.more_horiz),
                 onSelected: (value) {
                   if (value == 'details') {
-                    _details(context);
+                    if (viewerUid == party.hostId) {
+                      _edit(context);
+                    } else {
+                      _details(context);
+                    }
                   } else {
                     _leave(context);
                   }
                 },
-                itemBuilder: (_) => const [
-                  PopupMenuItem(value: 'details', child: Text('Party details')),
+                itemBuilder: (_) => [
+                  PopupMenuItem(
+                    value: 'details',
+                    child: Text(
+                      viewerUid == party.hostId
+                          ? 'Edit party'
+                          : 'Party details',
+                    ),
+                  ),
                   PopupMenuItem(value: 'leave', child: Text('Leave party')),
                 ],
               ),
@@ -238,8 +316,8 @@ class PartyLobbyScreen extends ConsumerWidget {
           ),
           const SizedBox(height: 16),
           FilledButton(
-            onPressed: () => _leave(context),
-            child: const Text('Leave Party'),
+            onPressed: _leaving ? null : () => _leave(context),
+            child: Text(_leaving ? 'Leaving…' : 'Leave Party'),
           ),
         ],
       ),
