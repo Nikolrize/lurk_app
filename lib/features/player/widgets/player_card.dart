@@ -37,29 +37,6 @@ class PlayerCard extends StatelessWidget {
                     ),
                   ),
                 ],
-                const SizedBox(height: 6),
-                Row(
-                  children: [
-                    Icon(
-                      Icons.circle,
-                      size: 8,
-                      color: player.isActive == true
-                          ? colors.secondary
-                          : colors.onSurfaceVariant,
-                    ),
-                    const SizedBox(width: 6),
-                    Text(
-                      switch (player.isActive) {
-                        true => 'Active now',
-                        false => 'Offline',
-                        null => 'Status unavailable',
-                      },
-                      style: text.bodySmall?.copyWith(
-                        color: colors.onSurfaceVariant,
-                      ),
-                    ),
-                  ],
-                ),
               ],
             ),
           ),

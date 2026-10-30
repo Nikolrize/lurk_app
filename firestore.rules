@@ -96,6 +96,89 @@ service cloud.firestore {
         && data.updatedAt is timestamp;
     }
 
+    // Direct messaging. Membership and message history are immutable to clients.
+    match /chats/{chatId} {
+      function member(data) {
+        return signedIn() && request.auth.uid in data.userIds;
+      }
+      function validChat(data) {
+        return data.keys().hasOnly(['type', 'userIds', 'createdAt', 'updatedAt',
+            'lastMessageId', 'lastMessagePreview', 'lastSenderId'])
+          && data.type == 'direct'
+          && data.userIds is list && data.userIds.size() == 2
+          && data.userIds[0] is string && data.userIds[1] is string
+          && data.userIds[0] != data.userIds[1]
+          && data.createdAt is timestamp && data.updatedAt is timestamp
+          && data.lastMessageId is string && data.lastMessagePreview is string
+          && data.lastSenderId is string;
+      }
+      // A missing-document get is needed to atomically open an existing/new chat.
+      allow get: if signedIn() && (resource == null || member(resource.data));
+      allow list: if member(resource.data);
+      allow create: if member(request.resource.data)
+        && validChat(request.resource.data)
+        && exists(/databases/$(database)/documents/players/$(request.resource.data.userIds[0]))
+        && exists(/databases/$(database)/documents/players/$(request.resource.data.userIds[1]))
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.updatedAt == request.time
+        && request.resource.data.lastMessageId == ''
+        && request.resource.data.lastMessagePreview == ''
+        && request.resource.data.lastSenderId == '';
+      allow update: if member(resource.data)
+        && validChat(request.resource.data)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'lastMessageId', 'lastMessagePreview', 'lastSenderId', 'updatedAt'])
+        && request.resource.data.updatedAt == request.time
+        && request.resource.data.lastSenderId == request.auth.uid
+        && request.resource.data.lastMessageId != ''
+        && !exists(/databases/$(database)/documents/chats/$(chatId)/messages/$(request.resource.data.lastMessageId))
+        && getAfter(/databases/$(database)/documents/chats/$(chatId)/messages/$(request.resource.data.lastMessageId)).data.senderId == request.auth.uid
+        && getAfter(/databases/$(database)/documents/chats/$(chatId)/messages/$(request.resource.data.lastMessageId)).data.text == request.resource.data.lastMessagePreview
+        && getAfter(/databases/$(database)/documents/chats/$(chatId)/messages/$(request.resource.data.lastMessageId)).data.createdAt == request.time;
+      allow delete: if false;
+
+      match /settings/{uid} {
+        allow read: if owns(uid) && member(get(/databases/$(database)/documents/chats/$(chatId)).data);
+        allow create, update: if owns(uid)
+          && member(get(/databases/$(database)/documents/chats/$(chatId)).data)
+          && request.resource.data.keys().hasOnly(['clearedAt'])
+          && request.resource.data.clearedAt == request.time;
+        allow delete: if false;
+      }
+
+      match /messages/{messageId} {
+        function validMessageKind(data) {
+          let kind = data.get('type', 'text');
+          return (kind == 'text'
+              && data.keys().hasOnly(['senderId', 'text', 'createdAt', 'type']))
+            || (kind == 'party_invite'
+              && data.keys().hasOnly(['senderId', 'text', 'createdAt', 'type', 'partyId'])
+              && data.partyId is string
+              && data.partyId.size() > 0 && data.partyId.size() <= 1500
+              && data.partyId.matches('[^/]+')
+              && data.text == 'Party invitation'
+              && get(/databases/$(database)/documents/parties/$(data.partyId)).data.hostId == request.auth.uid
+              && get(/databases/$(database)/documents/parties/$(data.partyId)).data.visibility == 'public'
+              && get(/databases/$(database)/documents/parties/$(data.partyId)).data.status == 'open');
+        }
+        function parent() {
+          return get(/databases/$(database)/documents/chats/$(chatId)).data;
+        }
+        allow read: if member(parent());
+        allow create: if member(parent())
+          && validMessageKind(request.resource.data)
+          && request.resource.data.senderId == request.auth.uid
+          && request.resource.data.text is string
+          && request.resource.data.text.size() > 0
+          && request.resource.data.text.size() <= 2000
+          && request.resource.data.text.matches('[\\s\\S]*[^\\s][\\s\\S]*')
+          && request.resource.data.createdAt == request.time
+          && getAfter(/databases/$(database)/documents/chats/$(chatId)).data.lastMessageId == messageId
+          && getAfter(/databases/$(database)/documents/chats/$(chatId)).data.updatedAt == request.time;
+        allow update, delete: if false;
+      }
+    }
+
     // Initial party integration: discovery reads only. Writes remain blocked.
     match /parties/{partyId} {
       allow read: if signedIn()

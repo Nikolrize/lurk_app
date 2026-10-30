@@ -1,4 +1,5 @@
 import 'dart:ui';
+import '../../features/chat/screens/chats_screen.dart';
 import '../theme/app_colors.dart';
 import '../../features/parties/screens/parties_screen.dart';
 import 'package:flutter/material.dart';
@@ -32,9 +33,7 @@ class _AppShellState extends State<AppShell> {
           HomeScreen(onFindParties: () => _selectTab(1)),
           const FindSreen(),
           PartiesScreen(onQuickMatch: () => _selectTab(1)),
-          const SafeArea(
-            child: Center(child: Text('Your messages will appear here')),
-          ),
+          const ChatsScreen(),
           MyProfileScreen(uid: widget.uid),
         ],
       ),
