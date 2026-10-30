@@ -85,8 +85,7 @@ class Player {
       id: uid,
       name: string('username') ?? '',
       bio: string('bio') ?? '',
-      // Preserve Dylan's country/region value; don't infer a game-server region.
-      region: string('region'),
+      region: string('region') == null ? null : label(string('region')!),
       currentGame:
           const {
             'valorant': 'Valorant',
