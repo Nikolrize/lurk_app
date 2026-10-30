@@ -7,6 +7,8 @@ import '../models/gaming_preferences.dart';
 
 import 'package:lurk_app/core/data/gaming_regions.dart';
 
+import 'package:lurk_app/features/player/models/player_availability.dart';
+
 class ProfileService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
@@ -264,6 +266,46 @@ class ProfileService {
 
     return _db.collection('players').doc(uid).update({
       ...preferences.toMap(),
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+  }
+
+  // loading
+  Stream<PlayerAvailability> watchAvailability(String uid) {
+    return _db.collection('players').doc(uid).snapshots().map((document) {
+      final data = document.data();
+
+      if (data == null) {
+        throw StateError('Player profile not found.');
+      }
+
+      final rawAvailability = data['availability'];
+
+      if (rawAvailability == null) {
+        return const PlayerAvailability();
+      }
+
+      return PlayerAvailability.fromMap(
+        Map<String, dynamic>.from(rawAvailability as Map),
+      );
+    });
+  }
+
+  //saving
+  Future<void> saveMyAvailability({
+    required String expectedUid,
+    required PlayerAvailability availability,
+  }) {
+    final uid = _currentUid;
+
+    if (uid != expectedUid) {
+      throw StateError('The account changed. Reopen availability.');
+    }
+
+    availability.validate();
+
+    return _db.collection('players').doc(uid).update({
+      'availability': availability.toMap(),
       'updatedAt': FieldValue.serverTimestamp(),
     });
   }

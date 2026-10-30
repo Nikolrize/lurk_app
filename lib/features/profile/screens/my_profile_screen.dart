@@ -10,6 +10,7 @@ import 'gaming_preferences_screen.dart';
 import '../widgets/gaming_preferences_card.dart';
 
 import 'package:lurk_app/features/availability/screens/availability_screen.dart';
+import 'package:lurk_app/features/availability/widgets/availability_summary_card.dart';
 
 class MyProfileScreen extends ConsumerStatefulWidget {
   const MyProfileScreen({
@@ -285,6 +286,20 @@ class _MyProfileScreenState extends ConsumerState<MyProfileScreen> {
                           onEdit: _isBusy
                               ? null
                               : widget.onGamingPreferences ?? _openGamingPreferences,
+                        ),
+                        const SizedBox(height: 24),
+                        Text(
+                          'Availability',
+                          style: text.titleLarge?.copyWith(
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        AvailabilitySummaryCard(
+                          uid: widget.uid,
+                          onEdit: _isBusy
+                              ? null
+                              : widget.onAvailability ?? _openAvailability,
                         ),
                         const SizedBox(height: 28),
 

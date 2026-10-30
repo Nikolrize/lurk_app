@@ -5,6 +5,7 @@ import 'package:lurk_app/providers/profile_provider.dart';
 
 import '../widgets/gaming_preferences_card.dart';
 
+import 'package:lurk_app/features/availability/widgets/availability_summary_card.dart';
 
 class PlayerProfileScreen extends ConsumerWidget {
   const PlayerProfileScreen({super.key, required this.uid});
@@ -146,6 +147,15 @@ class PlayerProfileScreen extends ConsumerWidget {
                     ),
                     const SizedBox(height: 12),
                     GamingPreferencesCard(uid: uid),
+                    const SizedBox(height: 24),
+                    Text(
+                      'Availability',
+                      style: text.titleLarge?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    AvailabilitySummaryCard(uid: uid),
                   ],
                 ),
               ),

@@ -8,6 +8,8 @@ import '../widgets/availability_day_card.dart';
 
 import 'package:firebase_core/firebase_core.dart';
 
+import '../widgets/availability_period_chip.dart';
+
 //loads saved information
 class AvailabilityScreen extends ConsumerWidget {
   const AvailabilityScreen({super.key, required this.uid});
@@ -190,6 +192,10 @@ class _AvailabilityFormState extends ConsumerState<_AvailabilityForm> {
                   children: [
                     for (final period in PlayerAvailability.gamingTimes)
                       FilterChip(
+                        avatar:Icon(
+                          AvailabilityPeriodChip.iconFor(period),
+                          size: 18,
+                        ),
                         label: Text(period),
                         selected: _preferredTimes.contains(period),
                         onSelected: (selected) {
