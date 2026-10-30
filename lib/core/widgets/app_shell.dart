@@ -1,6 +1,7 @@
 import '../../features/parties/models/party.dart';
 import '../../features/parties/screens/party_lobby_screen.dart';
 import 'dart:ui';
+import '../../features/chat/screens/chats_screen.dart';
 import '../theme/app_colors.dart';
 import '../../features/parties/screens/parties_screen.dart';
 import 'package:flutter/material.dart';
@@ -66,9 +67,7 @@ class _AppShellState extends State<AppShell> {
                     viewerUid: widget.uid,
                     onBack: () => setState(() => _lobbyParty = null),
                   ),
-            const SafeArea(
-              child: Center(child: Text('Your messages will appear here')),
-            ),
+            const ChatsScreen(),
             MyProfileScreen(uid: widget.uid),
           ],
         ),

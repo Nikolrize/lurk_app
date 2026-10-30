@@ -74,7 +74,7 @@ void main() {
         ),
       ),
     );
-    expect(find.text('Status unavailable'), findsOneWidget);
+    expect(find.text('Status unavailable'), findsNothing);
     expect(find.text('Offline'), findsNothing);
     expect(find.textContaining('Playing'), findsNothing);
   });
