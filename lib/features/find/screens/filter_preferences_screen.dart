@@ -1,6 +1,7 @@
 import '../../player/models/player_availability.dart';
 import 'package:flutter/material.dart';
 import '../models/filter_preferences.dart';
+import 'package:lurk_app/core/data/gaming_regions.dart';
 
 class FilterPreferencesScreen extends StatefulWidget {
   const FilterPreferencesScreen({
@@ -8,7 +9,7 @@ class FilterPreferencesScreen extends StatefulWidget {
     required this.initial,
     required this.games,
     required this.forPlayers,
-    this.regions = const ['Asia', 'Europe', 'North America', 'Oceania'],
+    this.regions = GamingRegions.values,
   });
   final FilterPreferences initial;
   final List<String> games;

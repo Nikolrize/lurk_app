@@ -12,6 +12,8 @@ import '../../player/widgets/player_card.dart';
 
 import '../../parties/widgets/party_card.dart';
 
+import 'package:lurk_app/core/data/gaming_regions.dart';
+
 class FindSreen extends ConsumerStatefulWidget {
   const FindSreen({super.key});
 
@@ -56,7 +58,7 @@ class _FindSreenState extends ConsumerState<FindSreen> {
                     .toSet()
                     .toList()
                   ..sort())
-              : const ['Asia', 'Europe', 'North America', 'Oceania'],
+              : GamingRegions.values,
         ),
       ),
     );
