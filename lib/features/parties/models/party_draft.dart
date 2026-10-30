@@ -1,3 +1,7 @@
+import '../../../core/data/game_catalog.dart';
+import '../../../core/data/gaming_regions.dart';
+import '../../../models/gaming_preferences.dart';
+
 class PartyDraft {
   const PartyDraft({
     required this.title,
@@ -13,24 +17,16 @@ class PartyDraft {
     this.maxRank,
     this.description = '',
   });
-  static const games = {
-    'valorant': 'Valorant',
-    'mobile_legends': 'Mobile Legends',
-    'fortnite': 'Fortnite',
+  static Map<String, String> get games => {
+    for (final game in GameCatalog.games.values) game.id: game.name,
   };
-  static const regions = {
-    'asia': 'Asia',
-    'europe': 'Europe',
-    'north_america': 'North America',
-    'oceania': 'Oceania',
+  static Map<String, String> get regions => {
+    for (final region in GamingRegions.values)
+      region.toLowerCase().replaceAll(' ', '_'): region,
   };
-  static const modes = {'competitive': 'Competitive', 'casual': 'Casual'};
-  static const styles = {'chill': 'Chill', 'serious': 'Serious', 'fun': 'Fun'};
-  static const communications = {
-    'mic_required': 'Mic required',
-    'voice_optional': 'Voice optional',
-    'chat_only': 'Chat only',
-  };
+  static const modes = GamingPreferences.modeLabels;
+  static const styles = GamingPreferences.styleLabels;
+  static const communications = GamingPreferences.communicationLabels;
   final String title,
       gameId,
       region,
@@ -67,15 +63,14 @@ class PartyDraft {
     if (description.trim().length > 500) {
       throw ArgumentError('Description must not exceed 500 characters.');
     }
-    if (gameId != 'valorant' && (minRank != null || maxRank != null)) {
-      throw ArgumentError(
-        'Rank settings are currently available for Valorant only.',
-      );
-    }
+    final ranks = GameCatalog.find(gameId)?.ranks ?? const <String, String>{};
     if ((minRank == null) != (maxRank == null) ||
         (minRank != null &&
-            (minRank! < 0 || maxRank! > 7 || minRank! > maxRank!))) {
-      throw ArgumentError('Choose a valid rank range.');
+            (ranks.isEmpty ||
+                minRank! < 0 ||
+                maxRank! >= ranks.length ||
+                minRank! > maxRank!))) {
+      throw ArgumentError('Choose a valid rank range for the selected game.');
     }
   }
 

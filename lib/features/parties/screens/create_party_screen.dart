@@ -26,11 +26,18 @@ class _CreatePartyScreenState extends ConsumerState<CreatePartyScreen> {
   final _formKey = GlobalKey<FormState>();
   final _name = TextEditingController();
   final _description = TextEditingController();
-  String _game = 'valorant', _region = 'asia', _mode = 'competitive';
+  String _game = PartyDraft.games.keys.first;
+  String _region = PartyDraft.regions.keys.first;
+  String _mode = PartyDraft.modes.keys.first;
   String _visibility = 'public', _communication = 'mic_required';
   int _size = 5;
   double _rating = 0;
-  RangeValues _ranks = const RangeValues(0, 7);
+  RangeValues _ranks = RangeValues(
+    0,
+    (FilterPreferences.ranksForGame(PartyDraft.games.keys.first).length - 1)
+        .clamp(0, double.infinity)
+        .toDouble(),
+  );
   final Set<String> _styles = {'chill'};
   bool _saving = false;
   String? _error;
@@ -66,8 +73,12 @@ class _CreatePartyScreenState extends ConsumerState<CreatePartyScreen> {
         mode: _mode,
         visibility: _visibility,
         minimumRating: _rating,
-        minRank: _game == 'valorant' ? _ranks.start.round() : null,
-        maxRank: _game == 'valorant' ? _ranks.end.round() : null,
+        minRank: FilterPreferences.ranksForGame(_game).isNotEmpty
+            ? _ranks.start.round()
+            : null,
+        maxRank: FilterPreferences.ranksForGame(_game).isNotEmpty
+            ? _ranks.end.round()
+            : null,
         playstyles: Set.unmodifiable(_styles),
         communication: _communication,
         description: _description.text,
@@ -157,7 +168,7 @@ class _CreatePartyScreenState extends ConsumerState<CreatePartyScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final ranks = FilterPreferences.ranks;
+    final ranks = FilterPreferences.ranksForGame(_game);
     final authState = ref.watch(authStateProvider);
     return PopScope(
       canPop: !_saving,
@@ -190,7 +201,14 @@ class _CreatePartyScreenState extends ConsumerState<CreatePartyScreen> {
                 ),
                 const SizedBox(height: 16),
                 _pair(
-                  _dropdown('Game', _game, PartyDraft.games, (v) => _game = v),
+                  _dropdown('Game', _game, PartyDraft.games, (v) {
+                    _game = v;
+                    final names = FilterPreferences.ranksForGame(v);
+                    _ranks = RangeValues(
+                      0,
+                      (names.length - 1).clamp(0, double.infinity).toDouble(),
+                    );
+                  }),
                   _dropdown('Max size', _size, {
                     for (var n = 2; n <= 10; n++) n: '$n players',
                   }, (v) => _size = v),
@@ -225,7 +243,7 @@ class _CreatePartyScreenState extends ConsumerState<CreatePartyScreen> {
                   ),
                   const SizedBox(height: 16),
                 ],
-                if (_game == 'valorant')
+                if (ranks.isNotEmpty)
                   _field(
                     'Rank',
                     Column(
@@ -237,8 +255,8 @@ class _CreatePartyScreenState extends ConsumerState<CreatePartyScreen> {
                         RangeSlider(
                           values: _ranks,
                           min: 0,
-                          max: 7,
-                          divisions: 7,
+                          max: (ranks.length - 1).toDouble(),
+                          divisions: ranks.length > 1 ? ranks.length - 1 : null,
                           labels: RangeLabels(
                             ranks[_ranks.start.round()],
                             ranks[_ranks.end.round()],
@@ -250,7 +268,7 @@ class _CreatePartyScreenState extends ConsumerState<CreatePartyScreen> {
                   )
                 else
                   Text(
-                    'Rank is unrestricted for this game. Game-specific tiers will be added later.',
+                    'This game has no rank requirements.',
                     style: Theme.of(context).textTheme.bodySmall,
                   ),
                 const SizedBox(height: 16),

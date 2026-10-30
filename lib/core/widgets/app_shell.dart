@@ -21,6 +21,7 @@ class AppShell extends StatefulWidget {
 
 class _AppShellState extends State<AppShell> {
   int _selectedIndex = 0;
+  String? _findGame;
   Party? _lobbyParty;
 
   void _selectTab(int index) => setState(() => _selectedIndex = index);
@@ -39,8 +40,17 @@ class _AppShellState extends State<AppShell> {
         body: IndexedStack(
           index: _selectedIndex,
           children: [
-            HomeScreen(onFindParties: () => _selectTab(1)),
-            const FindSreen(),
+            HomeScreen(
+              onFindParties: () => setState(() {
+                _findGame = null;
+                _selectedIndex = 1;
+              }),
+              onFindGame: (game) => setState(() {
+                _findGame = game;
+                _selectedIndex = 1;
+              }),
+            ),
+            FindSreen(key: ValueKey(_findGame), initialGame: _findGame),
             _lobbyParty == null
                 ? PartiesScreen(
                     onQuickMatch: () => _selectTab(1),

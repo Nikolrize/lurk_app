@@ -29,6 +29,22 @@ service cloud.firestore {
       return signedIn() && request.auth.uid == uid;
     }
 
+    function unblocked(users) {
+      return !exists(/databases/$(database)/documents/player_blocks/$(users[0])/users/$(users[1]))
+        && !exists(/databases/$(database)/documents/player_blocks/$(users[1])/users/$(users[0]));
+    }
+
+    match /player_blocks/{uid}/users/{otherUid} {
+      allow get: if signedIn() && request.auth.uid in [uid, otherUid];
+      allow list: if owns(uid);
+      allow create: if owns(uid) && uid != otherUid
+        && request.resource.data.keys().hasOnly(['createdAt'])
+        && request.resource.data.createdAt == request.time
+        && exists(/databases/$(database)/documents/players/$(otherUid));
+      allow delete: if owns(uid);
+      allow update: if false;
+    }
+
     function validSharing(data) {
       let age = data.get('sharedAge', null);
       let sharedAt = data.get('ageSharedAt', null);
@@ -50,6 +66,77 @@ service cloud.firestore {
       );
     }
 
+
+    // Keep these server-side bounds aligned with GameCatalog.
+    function catalogueRankCount(game) {
+      return {'valorant': 9, 'mobile_legends': 10, 'fortnite': 0}.get(game, 0);
+    }
+    //rank number same as game's catalogue position
+    function rankNumber(game, rankId) {
+      let valorant = {
+        'iron': 0,
+        'bronze': 1,
+        'silver': 2,
+        'gold': 3,
+        'platinum': 4,
+        'diamond': 5,
+        'ascendant': 6,
+        'immortal': 7,
+        'radiant': 8
+      };
+
+      let mobileLegends = {
+        'warrior': 0,
+        'elite': 1,
+        'master': 2,
+        'grandmaster': 3,
+        'epic': 4,
+        'legend': 5,
+        'mythic': 6,
+        'mythical_honor': 7,
+        'mythical_glory': 8,
+        'mythical_immortal': 9
+      };
+
+      return rankId == null ? null: (
+          game == 'valorant' ? valorant.get(rankId, null) : (
+              game == 'mobile_legends' ? mobileLegends.get(rankId, null) : null
+            )
+        );
+    }
+
+    //gameRanks - optional public map
+    // only selected, supported ranked games have entries
+    //each entry must contain valid rank ID
+    function validStoredGameRanks(data) {
+      let ranks = data.get('gameRanks', {});
+      let games = data.get('games', []);
+      let game = data.get('currentGame', null);
+      let chosenRank = ranks is map && game is string
+        ? ranks.get(game, null)
+        : null;
+
+      return ranks is map
+        && ranks.keys().size() <= 2
+        && ranks.keys().hasOnly(['valorant', 'mobile_legends'])
+        && ranks.keys().hasOnly(games)
+        && (
+          !('valorant' in ranks)
+          || ranks.valorant in [
+            'iron', 'bronze', 'silver', 'gold', 'platinum',
+            'diamond', 'ascendant', 'immortal', 'radiant'
+          ]
+        )
+        && (
+          !('mobile_legends' in ranks)
+          || ranks.mobile_legends in [
+            'warrior', 'elite', 'master', 'grandmaster',
+            'epic', 'legend', 'mythic', 'mythical_honor',
+            'mythical_glory', 'mythical_immortal'
+          ]
+        )
+        && data.get('rank', null) == rankNumber(game, chosenRank);
+    }
 
     function validGamingPreferences(data) {
       let games = data.get('games', []);
@@ -83,16 +170,28 @@ service cloud.firestore {
             'mic_required', 'voice_optional', 'chat_only'
           ]
         )
+        //accepts either existing profile using old format 
+        //or using new map
         && (
-          rank == null
+          (
+            'gameRanks' in data
+            && validStoredGameRanks(data)
+          )
           || (
-            game == 'valorant'
-            && rank is int
-            && rank >= 0
-            && rank <= 7
+            !('gameRanks' in data)
+            && (
+              rank == null
+              || (
+                game == 'valorant'
+                && rank is int
+                && rank >= 0
+                && rank <= 7
+              )
+            )
           )
         );
     }
+
     function validPublicProfile(data) {
       return data.keys().hasAll([
           'username', 'bio', 'region', 'createdAt', 'updatedAt'
@@ -101,7 +200,7 @@ service cloud.firestore {
           'username', 'bio', 'region', 'createdAt', 'updatedAt',
           'sharedAge', 'ageSharedAt', 'sharedGender',
           'games', 'currentGame', 'mode', 'playstyles',
-          'communication', 'rank'
+          'communication', 'rank', 'gameRanks', 'gameRanks'
         ])
         && data.username is string
         && (
@@ -163,6 +262,7 @@ service cloud.firestore {
       allow list: if member(resource.data);
       allow create: if member(request.resource.data)
         && validChat(request.resource.data)
+        && unblocked(request.resource.data.userIds)
         && exists(/databases/$(database)/documents/players/$(request.resource.data.userIds[0]))
         && exists(/databases/$(database)/documents/players/$(request.resource.data.userIds[1]))
         && request.resource.data.createdAt == request.time
@@ -171,6 +271,7 @@ service cloud.firestore {
         && request.resource.data.lastMessagePreview == ''
         && request.resource.data.lastSenderId == '';
       allow update: if member(resource.data)
+        && unblocked(resource.data.userIds)
         && validChat(request.resource.data)
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
           'lastMessageId', 'lastMessagePreview', 'lastSenderId', 'updatedAt'])
@@ -182,6 +283,15 @@ service cloud.firestore {
         && getAfter(/databases/$(database)/documents/chats/$(chatId)/messages/$(request.resource.data.lastMessageId)).data.text == request.resource.data.lastMessagePreview
         && getAfter(/databases/$(database)/documents/chats/$(chatId)/messages/$(request.resource.data.lastMessageId)).data.createdAt == request.time;
       allow delete: if false;
+
+      match /settings/{uid} {
+        allow read: if owns(uid) && member(get(/databases/$(database)/documents/chats/$(chatId)).data);
+        allow create, update: if owns(uid)
+          && member(get(/databases/$(database)/documents/chats/$(chatId)).data)
+          && request.resource.data.keys().hasOnly(['clearedAt'])
+          && request.resource.data.clearedAt == request.time;
+        allow delete: if false;
+      }
 
       match /messages/{messageId} {
         function validMessageKind(data) {
@@ -203,6 +313,7 @@ service cloud.firestore {
         }
         allow read: if member(parent());
         allow create: if member(parent())
+          && unblocked(parent().userIds)
           && validMessageKind(request.resource.data)
           && request.resource.data.senderId == request.auth.uid
           && request.resource.data.text is string
@@ -233,7 +344,7 @@ service cloud.firestore {
         && data.title is string && data.title.size() >= 1 && data.title.size() <= 60
         && data.title.matches('.*\\S.*')
         && data.gameId in ['valorant', 'mobile_legends', 'fortnite']
-        && data.region in ['asia', 'europe', 'north_america', 'oceania']
+        && data.region in ['asia', 'europe', 'north_america', 'south_america', 'africa', 'oceania']
         && data.mode in ['competitive', 'casual']
         && data.visibility in ['public', 'private']
         && data.maxPlayers is int && data.maxPlayers >= 2 && data.maxPlayers <= 10
@@ -246,8 +357,8 @@ service cloud.firestore {
         && data.description is string && data.description.size() <= 500
         && (
           (data.minRank == null && data.maxRank == null)
-          || (data.gameId == 'valorant' && data.minRank is int && data.maxRank is int
-              && data.minRank >= 0 && data.maxRank <= 7 && data.minRank <= data.maxRank)
+          || (data.minRank is int && data.maxRank is int
+              && data.minRank >= 0 && data.maxRank < catalogueRankCount(data.gameId) && data.minRank <= data.maxRank)
         )
         && data.createdAt == request.time && data.updatedAt == request.time
         && data.startedAt == null && data.completedAt == null;
@@ -297,7 +408,7 @@ service cloud.firestore {
           'username', 'bio', 'region', 'updatedAt',
           'sharedAge', 'ageSharedAt', 'sharedGender',
           'games', 'currentGame', 'mode', 'playstyles',
-          'communication', 'rank'
+          'communication', 'rank', 'gameRanks'
         ])
         && request.resource.data.updatedAt == request.time;
 

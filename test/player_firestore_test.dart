@@ -102,7 +102,7 @@ void main() {
       stream.add([
         Player.fromFirestoreData('uid', {
           'username': 'Yessir',
-          'region': 'Malaysia',
+          'region': 'Asia',
         }),
       ]);
       await tester.pump();
@@ -112,8 +112,8 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.text('Any region'));
       await tester.pumpAndSettle();
-      expect(find.text('Malaysia').last, findsOneWidget);
-      await tester.tap(find.text('Malaysia').last);
+      expect(find.text('Asia').last, findsOneWidget);
+      await tester.tap(find.text('Asia').last);
       await tester.pumpAndSettle();
       await tester.tap(find.text('Show Results'));
       await tester.pumpAndSettle();

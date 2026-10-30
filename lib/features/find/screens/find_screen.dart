@@ -18,8 +18,9 @@ import 'package:lurk_app/core/data/gaming_regions.dart';
 import 'package:lurk_app/core/data/game_catalog.dart';
 
 class FindSreen extends ConsumerStatefulWidget {
-  const FindSreen({super.key, this.onCreateParty});
+  const FindSreen({super.key, this.onCreateParty, this.initialGame});
   final VoidCallback? onCreateParty;
+  final String? initialGame;
 
   @override
   ConsumerState<FindSreen> createState() => _FindSreenState();
@@ -31,6 +32,12 @@ class _FindSreenState extends ConsumerState<FindSreen> {
   String _query = '';
   FilterPreferences _partyFilters = const FilterPreferences();
   FilterPreferences _playerFilters = const FilterPreferences();
+
+  @override
+  void initState() {
+    super.initState();
+    _partyFilters = FilterPreferences(game: widget.initialGame);
+  }
 
   @override
   void dispose() {
@@ -56,14 +63,7 @@ class _FindSreenState extends ConsumerState<FindSreen> {
           initial: forPlayers ? _playerFilters : _partyFilters,
           games: games,
           forPlayers: forPlayers,
-          regions: forPlayers
-              ? ((ref.read(discoverablePlayersProvider).asData?.value ?? [])
-                    .map((p) => p.region)
-                    .whereType<String>()
-                    .toSet()
-                    .toList()
-                  ..sort())
-              : GamingRegions.values,
+          regions: GamingRegions.values,
         ),
       ),
     );

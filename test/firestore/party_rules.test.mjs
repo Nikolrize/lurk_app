@@ -42,6 +42,10 @@ test('party creation is validated, atomic and private discovery stays protected'
      return batch.commit();
    };
    await assertSucceeds(create(alice,'created-public'));
+   await assertSucceeds(create(alice,'radiant',party({minRank:8,maxRank:8})));
+   await assertSucceeds(create(alice,'mlbb',party({gameId:'mobile_legends',minRank:0,maxRank:9,region:'africa'})));
+   await assertFails(create(alice,'rank-too-high',party({minRank:0,maxRank:9})));
+   await assertFails(create(alice,'mlbb-too-high',party({gameId:'mobile_legends',minRank:0,maxRank:10})));
    await assertSucceeds(create(alice,'created-private',party({visibility:'private'})));
    await assertSucceeds(getDoc(doc(alice,'parties/created-private/members/alice')));
    await assertFails(getDoc(doc(bob,'parties/created-private')));

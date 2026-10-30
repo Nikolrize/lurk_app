@@ -1,3 +1,4 @@
+import '../../../core/data/game_catalog.dart';
 import 'player_availability.dart';
 
 class Player {
@@ -87,12 +88,7 @@ class Player {
       bio: string('bio') ?? '',
       region: string('region') == null ? null : label(string('region')!),
       currentGame:
-          const {
-            'valorant': 'Valorant',
-            'mobile_legends': 'Mobile Legends',
-            'fortnite': 'Fortnite',
-          }[game] ??
-          (game == null ? null : label(game)),
+          GameCatalog.find(game)?.name ?? (game == null ? null : label(game)),
       isActive: data['isActive'] is bool ? data['isActive'] as bool : null,
       mode: string('mode') == null ? null : label(string('mode')!),
       rank: data['rank'] is num ? (data['rank'] as num).toInt() : null,

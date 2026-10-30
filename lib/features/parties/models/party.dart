@@ -1,3 +1,4 @@
+import '../../../core/data/game_catalog.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 class Party {
@@ -74,11 +75,7 @@ class Party {
       gameId: gameId,
       title: string('title') ?? 'Untitled party',
       gameName:
-          const {
-            'valorant': 'Valorant',
-            'mobile_legends': 'Mobile Legends',
-            'fortnite': 'Fortnite',
-          }[gameId] ??
+          GameCatalog.find(gameId)?.name ??
           string('gameName') ??
           label(gameId) ??
           'Unknown game',
