@@ -41,4 +41,20 @@ class GameCatalog {
       name: 'Fortnite',
     ),
   };
+
+  //finds game using either database ID or name
+  static GameDefinition? find(String? value) {
+  if (value == null) return null;
+
+  final search = value.trim().toLowerCase();
+
+  for (final game in games.values) {
+    if (game.id.toLowerCase() == search ||
+        game.name.toLowerCase() == search) {
+      return game;
+    }
+  }
+
+  return null;
+}
 }

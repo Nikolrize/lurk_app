@@ -1,3 +1,5 @@
+import 'package:lurk_app/core/data/game_catalog.dart';
+
 import '../../player/models/player_availability.dart';
 
 class FilterPreferences {
@@ -6,7 +8,7 @@ class FilterPreferences {
     this.region,
     this.mode,
     this.minRank = 0,
-    this.maxRank = 7,
+    this.maxRank, //optional
     this.playstyles = const {},
     this.communication,
     this.minimumRating = 0,
@@ -16,30 +18,47 @@ class FilterPreferences {
     this.maxPartySize,
     this.onlyAvailable = false,
   });
-  static const ranks = [
-    'Iron',
-    'Bronze',
-    'Silver',
-    'Gold',
-    'Platinum',
-    'Diamond',
-    'Ascendant',
-    'Immortal',
-  ];
-  final String? game, region, mode, communication;
+
+  final String? game;
+  final String? region;
+  final String? mode;
+  final String? communication;
+
+  final int minRank;
+  final int? maxRank;
+
   final Set<String> playstyles;
+  final double minimumRating;
   final bool availableNowOnly;
   final Set<String> preferredTimes;
   final WeeklyGamingSlot? scheduleWindow;
-  final int minRank, maxRank;
   final int? maxPartySize;
-  final double minimumRating;
   final bool onlyAvailable;
+
+  static List<String> ranksForGame(String? game) {
+    final definition = GameCatalog.find(game);
+
+    if (definition == null) return const [];
+
+    return definition.ranks.values.toList(growable: false);
+  }
+
+  List<String> get rankNames => ranksForGame(game);
+
+  int get effectiveMaxRank => maxRank ?? rankNames.length - 1;
+
+  bool get hasRankFilter {
+    final names = rankNames;
+
+    return names.isNotEmpty &&
+        (minRank != 0 || effectiveMaxRank != names.length - 1);
+  }
+
   int get count => [
     game != null,
     region != null,
     mode != null,
-    minRank != 0 || maxRank != 7,
+    hasRankFilter,
     playstyles.isNotEmpty,
     communication != null,
     minimumRating > 0,
@@ -48,7 +67,48 @@ class FilterPreferences {
     scheduleWindow != null,
     maxPartySize != null,
     onlyAvailable,
-  ].where((v) => v).length;
+  ].where((enabled) => enabled).length;
+
+  bool _matchesGame(String? gameName) {
+    if (game == null) return true;
+    if (game == gameName) return true;
+
+    final selected = GameCatalog.find(game);
+    final candidate = GameCatalog.find(gameName);
+
+    return selected != null &&
+        candidate != null &&
+        selected.id == candidate.id;
+  }
+
+  bool _matchesRank({
+    required int? rank,
+    required int? minAllowedRank,
+    required int? maxAllowedRank,
+  }) {
+    if (!hasRankFilter) return true;
+
+    final upper = effectiveMaxRank;
+    final last = rankNames.length - 1;
+
+    if (minRank < 0 || upper > last || upper < minRank) {
+      return false;
+    }
+
+    //party rank ranges match when to the two ranges overlap
+    if (minAllowedRank != null && maxAllowedRank != null) {
+      if (minAllowedRank < 0 ||
+          maxAllowedRank > last ||
+          minAllowedRank > maxAllowedRank) {
+        return false;
+      }
+
+      return minAllowedRank <= upper && maxAllowedRank >= minRank;
+    }
+
+    //indv players must have rank inside selected range
+    return rank != null && rank >= minRank && rank <= upper;
+  }
 
   bool matches({
     required String? gameName,
@@ -65,19 +125,22 @@ class FilterPreferences {
     required bool hasAvailability,
     int? partySize,
   }) {
-    return (game == null || game == gameName) &&
+    return _matchesGame(gameName) &&
         (region == null || region == regionName) &&
         (mode == null || mode == gameMode) &&
-        ((minRank == 0 && maxRank == 7) ||
-            ((minAllowedRank != null && maxAllowedRank != null)
-                ? minAllowedRank <= maxRank && maxAllowedRank >= minRank
-                : (rank != null && rank >= minRank && rank <= maxRank))) &&
+        _matchesRank(
+          rank: rank,
+          minAllowedRank: minAllowedRank,
+          maxAllowedRank: maxAllowedRank,
+        ) &&
         (playstyles.isEmpty ||
             playstyles.contains(style) ||
             styleOptions.any(playstyles.contains)) &&
         (communication == null || communication == comms) &&
-        (minimumRating == 0 || (rating != null && rating >= minimumRating)) &&
-        (!availableNowOnly || playerAvailability?.availableNow == true) &&
+        (minimumRating == 0 ||
+            (rating != null && rating >= minimumRating)) &&
+        (!availableNowOnly ||
+            playerAvailability?.availableNow == true) &&
         (preferredTimes.isEmpty ||
             (playerAvailability != null &&
                 preferredTimes.any(

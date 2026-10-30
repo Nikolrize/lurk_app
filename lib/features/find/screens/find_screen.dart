@@ -14,6 +14,8 @@ import '../../parties/widgets/party_card.dart';
 
 import 'package:lurk_app/core/data/gaming_regions.dart';
 
+import 'package:lurk_app/core/data/game_catalog.dart';
+
 class FindSreen extends ConsumerStatefulWidget {
   const FindSreen({super.key});
 
@@ -38,6 +40,7 @@ class _FindSreenState extends ConsumerState<FindSreen> {
     FocusManager.instance.primaryFocus?.unfocus();
     final forPlayers = _showPlayers;
     final games = {
+      ...GameCatalog.games.values.map((game) => game.name),
       ...(ref.read(availablePartiesProvider).asData?.value ?? []).map(
         (p) => p.gameName,
       ),
