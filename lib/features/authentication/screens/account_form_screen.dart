@@ -2,7 +2,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../providers/auth_provider.dart';
+import 'package:lurk_app/providers/auth_provider.dart';
 
 enum AccountAction { signUp, resetPassword }
 

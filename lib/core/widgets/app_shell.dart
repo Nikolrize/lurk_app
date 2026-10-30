@@ -6,7 +6,7 @@ import 'package:flutter/material.dart';
 import '../../features/home/screens/home_screen.dart';
 import '../../features/find/screens/find_screen.dart';
 
-import '../../features/profile/my_profile_screen.dart';
+import 'package:lurk_app/features/profile/screens/my_profile_screen.dart';
 
 class AppShell extends StatefulWidget {
   const AppShell({super.key, required this.uid});

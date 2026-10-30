@@ -12,6 +12,13 @@ rules_version = '2';
 // document IDs are firebase auth UIDs
 // unmactched paths are denied
 
+
+// optional public sharing
+// sharedAge: nullable integer, 0 - 150 
+// ageSharedAt: nullable timestamp, required with a shared age
+//sharedGender : nullable male/female/other
+//full birth date remains in player_private
+
 service cloud.firestore {
   match /databases/{database}/documents {
     function signedIn() {
@@ -22,12 +29,34 @@ service cloud.firestore {
       return signedIn() && request.auth.uid == uid;
     }
 
+    function validSharing(data) {
+      let age = data.get('sharedAge', null);
+      let sharedAt = data.get('ageSharedAt', null);
+      let gender = data.get('sharedGender', null);
+
+      return (
+        (age == null && sharedAt == null)
+        || (
+          age is int
+          && age >= 0
+          && age <= 150
+          && sharedAt is timestamp
+          && sharedAt <= request.time
+        )
+      )
+      && (
+        gender == null
+        || gender in ['male', 'female', 'other']
+      );
+    }
+
     function validPublicProfile(data) {
       return data.keys().hasAll([
           'username', 'bio', 'region', 'createdAt', 'updatedAt'
         ])
         && data.keys().hasOnly([
-          'username', 'bio', 'region', 'createdAt', 'updatedAt'
+          'username', 'bio', 'region', 'createdAt', 'updatedAt',
+          'sharedAge', 'ageSharedAt', 'sharedGender'
         ])
         && data.username is string
         && (
@@ -40,7 +69,8 @@ service cloud.firestore {
         && data.region is string
         && data.region.size() <= 60
         && data.createdAt is timestamp
-        && data.updatedAt is timestamp;
+        && data.updatedAt is timestamp
+        && validSharing(data);
     }
 
     function validPrivateInfo(data) {
@@ -66,6 +96,13 @@ service cloud.firestore {
         && data.updatedAt is timestamp;
     }
 
+    // Initial party integration: discovery reads only. Writes remain blocked.
+    match /parties/{partyId} {
+      allow read: if signedIn()
+        && resource.data.visibility == 'public'
+        && resource.data.status == 'open';
+      allow write: if false;
+    }
     match /players/{uid} {
       allow read: if signedIn();
 
@@ -77,7 +114,10 @@ service cloud.firestore {
       allow update: if owns(uid)
         && validPublicProfile(request.resource.data)
         && request.resource.data.diff(resource.data).affectedKeys()
-          .hasOnly(['username', 'bio', 'region', 'updatedAt'])
+          .hasOnly([
+            'username', 'bio', 'region', 'updatedAt',
+            'sharedAge', 'ageSharedAt', 'sharedGender'
+          ])
         && request.resource.data.updatedAt == request.time;
 
       allow delete: if false;

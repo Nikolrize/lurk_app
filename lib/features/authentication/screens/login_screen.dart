@@ -4,8 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 
-import '../../providers/auth_provider.dart';
-import 'account_form_screen.dart';
+import 'package:lurk_app/providers/auth_provider.dart';
+import 'package:lurk_app/features/authentication/screens/account_form_screen.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
