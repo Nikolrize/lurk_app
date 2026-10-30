@@ -8,6 +8,7 @@ class GamingPreferences {
     this.playstyles = const [],
     this.communication,
     this.rank,
+    this.gameRanks = const {},
   });
 
   static final Map<String, String> gameLabels =
@@ -50,23 +51,59 @@ class GamingPreferences {
   final List<String> playstyles;
   final String? communication;
   final int? rank;
+  final Map<String, String> gameRanks;
 
   factory GamingPreferences.fromMap(Map<String, dynamic> data) {
     final currentGame = data['currentGame'] as String?;
     final rawGames = data['games'] as List?;
+    final rawGameRanks = data['gameRanks'];
 
-    return GamingPreferences(
-      games: List<String>.unmodifiable(
-        rawGames?.cast<String>() ?? (currentGame == null ? <String>[] : [currentGame]),
-      ),
-      currentGame: currentGame,
-      mode: data['mode'] as String?,
-      playstyles: List<String>.unmodifiable(
-        (data['playstyles'] as List?)?.cast<String>() ?? <String>[],
-      ),
-      communication: data['communication'] as String?,
-      rank: data['rank'] as int?,
-    );
+    final savedRanks = <String, String>{};
+
+    if (rawGameRanks != null) {
+      savedRanks.addAll(
+        Map<String, String>.from(rawGameRanks as Map),
+      );
+    } else {
+      //older profiles stored only one numeric val rank
+      final legacyRank = data['rank'];
+
+      if (currentGame == 'valorant' && legacyRank is int) {
+        final rankIds =
+            GameCatalog.games['valorant']!.ranks.keys.toList();
+
+        if (legacyRank >= 0 && legacyRank < rankIds.length) {
+          savedRanks['valorant'] = rankIds[legacyRank];
+        }
+      }
+    }
+
+  return GamingPreferences(
+    games: List<String>.unmodifiable(
+      rawGames?.cast<String>() ??
+          (currentGame == null ? <String>[] : [currentGame]),
+    ),
+    currentGame: currentGame,
+    mode: data['mode'] as String?,
+    playstyles: List<String>.unmodifiable(
+      (data['playstyles'] as List?)?.cast<String>() ?? <String>[],
+    ),
+    communication: data['communication'] as String?,
+    rank: data['rank'] as int?,
+    gameRanks: Map<String, String>.unmodifiable(savedRanks),
+  );
+}
+
+  //translates saved rank ID into readable text
+  String? rankLabelFor(String gameId) {
+    final game = GameCatalog.games[gameId];
+    final rankId = gameRanks[gameId];
+
+    if (game == null || rankId == null) {
+      return null;
+    }
+
+    return game.ranks[rankId];
   }
 
   void validate() {
@@ -90,21 +127,33 @@ class GamingPreferences {
       throw ArgumentError('Invalid communication preference.');
     }
 
-    if (rank != null && 
-      (currentGame != 'valorant' || rank! < 0 || rank! >= valorantRanks.length)
-    ) {
-      throw ArgumentError('Invalid rank for the selected game.');
+    //checks map pair for ranks
+    for (final entry in gameRanks.entries) {
+      final game = GameCatalog.games[entry.key];
+
+      if (!games.contains(entry.key) ||
+          game == null ||
+          !game.supportsRanks ||
+          !game.ranks.containsKey(entry.value)) {
+        throw ArgumentError('Invalid rank for ${entry.key}.');
+      }
     }
   }
 
   Map<String, dynamic> toMap() {
+    final mainGame = GameCatalog.games[currentGame];
+    final mainRankId = gameRanks[currentGame];
+
+    final rankIndex = mainGame == null || mainRankId == null ? -1 : mainGame.ranks.keys.toList().indexOf(mainRankId); //indexOf - find rank position in game list
+
     return {
-      'games' : List<String>.of(games),
+      'games': List<String>.of(games),
       'currentGame': currentGame,
       'mode': mode,
       'playstyles': List<String>.of(playstyles),
       'communication': communication,
-      'rank': rank,
+      'gameRanks': Map<String, String>.of(gameRanks),
+      'rank': rankIndex < 0 ? null : rankIndex,
     };
   }
 }

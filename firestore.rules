@@ -50,6 +50,72 @@ service cloud.firestore {
       );
     }
 
+    //rank number same as game's catalogue position
+    function rankNumber(game, rankId) {
+      let valorant = {
+        'iron': 0,
+        'bronze': 1,
+        'silver': 2,
+        'gold': 3,
+        'platinum': 4,
+        'diamond': 5,
+        'ascendant': 6,
+        'immortal': 7,
+        'radiant': 8
+      };
+
+      let mobileLegends = {
+        'warrior': 0,
+        'elite': 1,
+        'master': 2,
+        'grandmaster': 3,
+        'epic': 4,
+        'legend': 5,
+        'mythic': 6,
+        'mythical_honor': 7,
+        'mythical_glory': 8,
+        'mythical_immortal': 9
+      };
+
+      return rankId == null ? null: (
+          game == 'valorant' ? valorant.get(rankId, null) : (
+              game == 'mobile_legends' ? mobileLegends.get(rankId, null) : null
+            )
+        );
+    }
+
+    //gameRanks - optional public map
+    // only selected, supported ranked games have entries
+    //each entry must contain valid rank ID
+    function validStoredGameRanks(data) {
+      let ranks = data.get('gameRanks', {});
+      let games = data.get('games', []);
+      let game = data.get('currentGame', null);
+      let chosenRank = ranks is map && game is string
+        ? ranks.get(game, null)
+        : null;
+
+      return ranks is map
+        && ranks.keys().size() <= 2
+        && ranks.keys().hasOnly(['valorant', 'mobile_legends'])
+        && ranks.keys().hasOnly(games)
+        && (
+          !('valorant' in ranks)
+          || ranks.valorant in [
+            'iron', 'bronze', 'silver', 'gold', 'platinum',
+            'diamond', 'ascendant', 'immortal', 'radiant'
+          ]
+        )
+        && (
+          !('mobile_legends' in ranks)
+          || ranks.mobile_legends in [
+            'warrior', 'elite', 'master', 'grandmaster',
+            'epic', 'legend', 'mythic', 'mythical_honor',
+            'mythical_glory', 'mythical_immortal'
+          ]
+        )
+        && data.get('rank', null) == rankNumber(game, chosenRank);
+    }
 
     function validGamingPreferences(data) {
       let games = data.get('games', []);
@@ -83,16 +149,102 @@ service cloud.firestore {
             'mic_required', 'voice_optional', 'chat_only'
           ]
         )
+        //accepts either existing profile using old format 
+        //or using new map
         && (
-          rank == null
+          (
+            'gameRanks' in data
+            && validStoredGameRanks(data)
+          )
           || (
-            game == 'valorant'
-            && rank is int
-            && rank >= 0
-            && rank <= 7
+            !('gameRanks' in data)
+            && (
+              rank == null
+              || (
+                game == 'valorant'
+                && rank is int
+                && rank >= 0
+                && rank <= 7
+              )
+            )
           )
         );
     }
+
+  //availability: optional public map
+  //timezone: malaysia for this ver
+  //preferred periods: unique permitted labels, max 4
+  //weekly schedule: max 7 slots, ordered by unique weekday
+  //times: mins after midnight; overnight sessions are allowed
+  function validAvailabilitySlot(slot) {
+    return slot is map
+      && slot.keys().hasAll([
+        'weekday', 'startMinute', 'endMinute'
+      ])
+      && slot.keys().hasOnly([
+        'weekday', 'startMinute', 'endMinute'
+      ])
+      && slot.weekday is int
+      && slot.weekday >= 1
+      && slot.weekday <= 7
+      && slot.startMinute is int
+      && slot.startMinute >= 0
+      && slot.startMinute < 1440
+      && slot.endMinute is int
+      && slot.endMinute >= 0
+      && slot.endMinute <= 1440
+      && slot.startMinute != slot.endMinute;
+  }
+
+  function validAvailabilitySlotAt(slots, index) {
+    return slots.size() <= index
+      || (
+        validAvailabilitySlot(slots[index])
+        && (
+          index == 0
+          || slots[index - 1].weekday < slots[index].weekday
+        )
+      );
+  }
+
+  function validAvailability(data) {
+    let availability = data.get('availability', {});
+    let periods = availability is map
+      ? availability.get('preferredTimes', [])
+      : [];
+    let slots = availability is map
+      ? availability.get('weeklySchedule', [])
+      : [];
+
+    return !('availability' in data)
+      || (
+        availability is map
+        && availability.keys().hasAll([
+          'availableNow', 'preferredTimes', 'weeklySchedule', 'timeZone'
+        ])
+        && availability.keys().hasOnly([
+          'availableNow', 'preferredTimes', 'weeklySchedule', 'timeZone'
+        ])
+        && availability.availableNow is bool
+        && availability.timeZone == 'Asia/Kuala_Lumpur'
+        && periods is list
+        && periods.size() <= 4
+        && periods.toSet().size() == periods.size()
+        && periods.hasOnly([
+          'Morning', 'Afternoon', 'Evening', 'Night'
+        ])
+        && slots is list
+        && slots.size() <= 7
+        && validAvailabilitySlotAt(slots, 0)
+        && validAvailabilitySlotAt(slots, 1)
+        && validAvailabilitySlotAt(slots, 2)
+        && validAvailabilitySlotAt(slots, 3)
+        && validAvailabilitySlotAt(slots, 4)
+        && validAvailabilitySlotAt(slots, 5)
+        && validAvailabilitySlotAt(slots, 6)
+      );
+  }
+
     function validPublicProfile(data) {
       return data.keys().hasAll([
           'username', 'bio', 'region', 'createdAt', 'updatedAt'
@@ -101,7 +253,7 @@ service cloud.firestore {
           'username', 'bio', 'region', 'createdAt', 'updatedAt',
           'sharedAge', 'ageSharedAt', 'sharedGender',
           'games', 'currentGame', 'mode', 'playstyles',
-          'communication', 'rank'
+          'communication', 'rank', 'gameRanks', 'availability'
         ])
         && data.username is string
         && (
@@ -116,7 +268,8 @@ service cloud.firestore {
         && data.createdAt is timestamp
         && data.updatedAt is timestamp
         && validSharing(data)
-        && validGamingPreferences(data);
+        && validGamingPreferences(data)
+        && validAvailability(data);
     }
 
     function validPrivateInfo(data) {
@@ -247,7 +400,7 @@ service cloud.firestore {
           'username', 'bio', 'region', 'updatedAt',
           'sharedAge', 'ageSharedAt', 'sharedGender',
           'games', 'currentGame', 'mode', 'playstyles',
-          'communication', 'rank'
+          'communication', 'rank', 'gameRanks', 'availability'
         ])
         && request.resource.data.updatedAt == request.time;
 
