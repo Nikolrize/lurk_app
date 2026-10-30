@@ -1,3 +1,4 @@
+import 'blocked_players_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -48,15 +49,16 @@ class _MyProfileScreenState extends ConsumerState<MyProfileScreen> {
     final saved = await Navigator.of(context).push<bool>(
       MaterialPageRoute(
         builder: (_) => GamingPreferencesScreen(uid: widget.uid),
-      ),     
+      ),
     );
 
     if (!mounted || saved != true) return;
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Gaming preferences updated')),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('Gaming preferences updated')));
   }
+
   Future<void> _editProfile() async {
     if (_isBusy) return;
 
@@ -303,7 +305,9 @@ class _MyProfileScreenState extends ConsumerState<MyProfileScreen> {
                                   (
                                     icon: Icons.sports_esports_outlined,
                                     title: 'Gaming Preferences',
-                                    onTap: widget.onGamingPreferences ?? _openGamingPreferences,
+                                    onTap:
+                                        widget.onGamingPreferences ??
+                                        _openGamingPreferences,
                                   ),
                                   (
                                     icon: Icons.schedule_outlined,
@@ -328,7 +332,15 @@ class _MyProfileScreenState extends ConsumerState<MyProfileScreen> {
                                   (
                                     icon: Icons.block_outlined,
                                     title: 'Blocked Players',
-                                    onTap: widget.onBlockedPlayers,
+                                    onTap:
+                                        widget.onBlockedPlayers ??
+                                        () => Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (_) =>
+                                                const BlockedPlayersScreen(),
+                                          ),
+                                        ),
                                   ),
                                   (
                                     icon: Icons.settings_outlined,

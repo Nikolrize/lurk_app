@@ -1,3 +1,5 @@
+import '../../profile/screens/player_profile_screen.dart';
+import '../../../services/player_safety_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_colors.dart';
@@ -23,6 +25,15 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   bool _searching = false;
   String _query = '';
   Future<void> _menuAction(String action) async {
+    if (action == 'profile') {
+      await Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => PlayerProfileScreen(uid: widget.otherUid),
+        ),
+      );
+      return;
+    }
     if (action == 'search') {
       setState(() {
         _searching = true;
@@ -113,7 +124,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     ];
     final key = (id: widget.chatId, limit: _limit);
     final messages = ref.watch(messagesProvider(key));
-    final canSend = uid != null && !_sending;
+    final blocks = ref.watch(blockedPlayersProvider);
+    final blocked = blocks.asData?.value.contains(widget.otherUid) ?? false;
+    final canSend = uid != null && !_sending && blocks.hasValue && !blocked;
     final border = OutlineInputBorder(
       borderRadius: BorderRadius.circular(28),
       borderSide: const BorderSide(color: AppColors.outline),
@@ -159,6 +172,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                     enabled: !_sending && uid != null,
                     onSelected: (action) => _menuAction(action),
                     itemBuilder: (_) => [
+                      const PopupMenuItem(
+                        value: 'profile',
+                        child: Text('View player profile'),
+                      ),
                       const PopupMenuItem(
                         value: 'search',
                         child: Text('Search messages'),
@@ -341,7 +358,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                       maxLength: 2000,
                       textCapitalization: TextCapitalization.sentences,
                       decoration: InputDecoration(
-                        hintText: 'Type a message…',
+                        hintText: blocked
+                            ? 'Unblock this player to message'
+                            : 'Type a message…',
                         counterText: '',
                         border: border,
                         enabledBorder: border,
