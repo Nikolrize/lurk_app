@@ -1,3 +1,4 @@
+import '../../parties/screens/create_party_screen.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../providers/party_provider.dart';
 import '../../parties/widgets/party_load_error.dart';
@@ -13,7 +14,8 @@ import '../../player/widgets/player_card.dart';
 import '../../parties/widgets/party_card.dart';
 
 class FindSreen extends ConsumerStatefulWidget {
-  const FindSreen({super.key});
+  const FindSreen({super.key, this.onCreateParty});
+  final VoidCallback? onCreateParty;
 
   @override
   ConsumerState<FindSreen> createState() => _FindSreenState();
@@ -127,11 +129,36 @@ class _FindSreenState extends ConsumerState<FindSreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text(
-              'Find',
-              style: Theme.of(
-                context,
-              ).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.w700),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'Find',
+                    style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                FilledButton.icon(
+                  style: FilledButton.styleFrom(
+                    minimumSize: const Size(0, 34),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 6,
+                    ),
+                    textStyle: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
+                    visualDensity: VisualDensity.compact,
+                  ),
+                  onPressed:
+                      widget.onCreateParty ?? () => openCreateParty(context),
+                  icon: const Icon(Icons.add, size: 16),
+                  label: const Text('Create'),
+                ),
+              ],
             ),
             const SizedBox(height: 16),
             DefaultTabController(

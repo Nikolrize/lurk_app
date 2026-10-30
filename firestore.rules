@@ -96,12 +96,145 @@ service cloud.firestore {
         && data.updatedAt is timestamp;
     }
 
-    // Initial party integration: discovery reads only. Writes remain blocked.
+    // Direct messaging. Membership and message history are immutable to clients.
+    match /chats/{chatId} {
+      function member(data) {
+        return signedIn() && request.auth.uid in data.userIds;
+      }
+      function validChat(data) {
+        return data.keys().hasOnly(['type', 'userIds', 'createdAt', 'updatedAt',
+            'lastMessageId', 'lastMessagePreview', 'lastSenderId'])
+          && data.type == 'direct'
+          && data.userIds is list && data.userIds.size() == 2
+          && data.userIds[0] is string && data.userIds[1] is string
+          && data.userIds[0] != data.userIds[1]
+          && data.createdAt is timestamp && data.updatedAt is timestamp
+          && data.lastMessageId is string && data.lastMessagePreview is string
+          && data.lastSenderId is string;
+      }
+      // A missing-document get is needed to atomically open an existing/new chat.
+      allow get: if signedIn() && (resource == null || member(resource.data));
+      allow list: if member(resource.data);
+      allow create: if member(request.resource.data)
+        && validChat(request.resource.data)
+        && exists(/databases/$(database)/documents/players/$(request.resource.data.userIds[0]))
+        && exists(/databases/$(database)/documents/players/$(request.resource.data.userIds[1]))
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.updatedAt == request.time
+        && request.resource.data.lastMessageId == ''
+        && request.resource.data.lastMessagePreview == ''
+        && request.resource.data.lastSenderId == '';
+      allow update: if member(resource.data)
+        && validChat(request.resource.data)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'lastMessageId', 'lastMessagePreview', 'lastSenderId', 'updatedAt'])
+        && request.resource.data.updatedAt == request.time
+        && request.resource.data.lastSenderId == request.auth.uid
+        && request.resource.data.lastMessageId != ''
+        && !exists(/databases/$(database)/documents/chats/$(chatId)/messages/$(request.resource.data.lastMessageId))
+        && getAfter(/databases/$(database)/documents/chats/$(chatId)/messages/$(request.resource.data.lastMessageId)).data.senderId == request.auth.uid
+        && getAfter(/databases/$(database)/documents/chats/$(chatId)/messages/$(request.resource.data.lastMessageId)).data.text == request.resource.data.lastMessagePreview
+        && getAfter(/databases/$(database)/documents/chats/$(chatId)/messages/$(request.resource.data.lastMessageId)).data.createdAt == request.time;
+      allow delete: if false;
+
+      match /messages/{messageId} {
+        function validMessageKind(data) {
+          let kind = data.get('type', 'text');
+          return (kind == 'text'
+              && data.keys().hasOnly(['senderId', 'text', 'createdAt', 'type']))
+            || (kind == 'party_invite'
+              && data.keys().hasOnly(['senderId', 'text', 'createdAt', 'type', 'partyId'])
+              && data.partyId is string
+              && data.partyId.size() > 0 && data.partyId.size() <= 1500
+              && data.partyId.matches('[^/]+')
+              && data.text == 'Party invitation'
+              && get(/databases/$(database)/documents/parties/$(data.partyId)).data.hostId == request.auth.uid
+              && get(/databases/$(database)/documents/parties/$(data.partyId)).data.visibility == 'public'
+              && get(/databases/$(database)/documents/parties/$(data.partyId)).data.status == 'open');
+        }
+        function parent() {
+          return get(/databases/$(database)/documents/chats/$(chatId)).data;
+        }
+        allow read: if member(parent());
+        allow create: if member(parent())
+          && validMessageKind(request.resource.data)
+          && request.resource.data.senderId == request.auth.uid
+          && request.resource.data.text is string
+          && request.resource.data.text.size() > 0
+          && request.resource.data.text.size() <= 2000
+          && request.resource.data.text.matches('[\\s\\S]*[^\\s][\\s\\S]*')
+          && request.resource.data.createdAt == request.time
+          && getAfter(/databases/$(database)/documents/chats/$(chatId)).data.lastMessageId == messageId
+          && getAfter(/databases/$(database)/documents/chats/$(chatId)).data.updatedAt == request.time;
+        allow update, delete: if false;
+      }
+    }
+
+    function validNewParty(data) {
+      return data.keys().hasAll([
+          'title', 'hostId', 'gameId', 'region', 'mode', 'visibility',
+          'maxPlayers', 'memberCount', 'minRank', 'maxRank', 'playstyles',
+          'communication', 'minimumRating', 'description', 'status',
+          'createdAt', 'updatedAt', 'startedAt', 'completedAt'
+        ])
+        && data.keys().hasOnly([
+          'title', 'hostId', 'gameId', 'region', 'mode', 'visibility',
+          'maxPlayers', 'memberCount', 'minRank', 'maxRank', 'playstyles',
+          'communication', 'minimumRating', 'description', 'status',
+          'createdAt', 'updatedAt', 'startedAt', 'completedAt'
+        ])
+        && data.hostId == request.auth.uid
+        && data.title is string && data.title.size() >= 1 && data.title.size() <= 60
+        && data.title.matches('.*\\S.*')
+        && data.gameId in ['valorant', 'mobile_legends', 'fortnite']
+        && data.region in ['asia', 'europe', 'north_america', 'oceania']
+        && data.mode in ['competitive', 'casual']
+        && data.visibility in ['public', 'private']
+        && data.maxPlayers is int && data.maxPlayers >= 2 && data.maxPlayers <= 10
+        && data.memberCount == 1 && data.status == 'open'
+        && data.minimumRating is number && data.minimumRating >= 0 && data.minimumRating <= 5
+        && data.playstyles is list && data.playstyles.size() >= 1 && data.playstyles.size() <= 3
+        && data.playstyles.hasOnly(['chill', 'serious', 'fun'])
+        && data.playstyles.toSet().size() == data.playstyles.size()
+        && data.communication in ['mic_required', 'voice_optional', 'chat_only']
+        && data.description is string && data.description.size() <= 500
+        && (
+          (data.minRank == null && data.maxRank == null)
+          || (data.gameId == 'valorant' && data.minRank is int && data.maxRank is int
+              && data.minRank >= 0 && data.maxRank <= 7 && data.minRank <= data.maxRank)
+        )
+        && data.createdAt == request.time && data.updatedAt == request.time
+        && data.startedAt == null && data.completedAt == null;
+    }
+
+    function validHostMembership(data) {
+      return data.keys().hasAll(['role', 'joinedAt', 'leftAt'])
+        && data.keys().hasOnly(['role', 'joinedAt', 'leftAt'])
+        && data.role == 'host' && data.joinedAt == request.time && data.leftAt == null;
+    }
+
     match /parties/{partyId} {
-      allow read: if signedIn()
-        && resource.data.visibility == 'public'
-        && resource.data.status == 'open';
-      allow write: if false;
+      allow read: if signedIn() && (
+        (resource.data.visibility == 'public' && resource.data.status == 'open')
+        || resource.data.hostId == request.auth.uid
+      );
+      // The host membership must be included in the same atomic write.
+      allow create: if signedIn() && validNewParty(request.resource.data)
+        && validHostMembership(getAfter(
+          /databases/$(database)/documents/parties/$(partyId)/members/$(request.auth.uid)
+        ).data);
+      allow update, delete: if false;
+
+      match /members/{uid} {
+        allow read: if signedIn() && get(
+          /databases/$(database)/documents/parties/$(partyId)
+        ).data.hostId == request.auth.uid;
+        allow create: if owns(uid)
+          && !exists(/databases/$(database)/documents/parties/$(partyId))
+          && getAfter(/databases/$(database)/documents/parties/$(partyId)).data.hostId == uid
+          && validHostMembership(request.resource.data);
+        allow update, delete: if false;
+      }
     }
     match /players/{uid} {
       allow read: if signedIn();
