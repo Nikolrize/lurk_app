@@ -309,4 +309,31 @@ class ProfileService {
       'updatedAt': FieldValue.serverTimestamp(),
     });
   }
+
+  //firestore save profile pic
+  Future<void> saveMyPhotoPath({
+    required String expectedUid,
+    required String photoPath,
+  }) {
+    final uid = _currentUid;
+
+    if (uid != expectedUid) {
+      throw StateError('Your account changed. Reopen your profile.');
+    }
+
+    final parts = photoPath.split('/');
+
+    if (parts.length != 2 ||
+        parts.first != uid ||
+        !RegExp(
+          r'^[a-f0-9-]{36}\.(jpg|png|webp)$',
+        ).hasMatch(parts.last)) {
+      throw ArgumentError('Invalid profile photo path.');
+    }
+
+    return _db.collection('players').doc(uid).update({
+      'photoPath': photoPath,
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+  }
 }

@@ -11,6 +11,12 @@ import '../../../services/player_safety_service.dart';
 import 'report_player_screen.dart';
 import '../../ratings/widgets/player_rating_summary.dart';
 
+import 'package:lurk_app/core/widgets/player_status_badge.dart';
+
+import 'package:lurk_app/core/widgets/player_avatar.dart';
+
+import 'package:lurk_app/core/widgets/player_verification_badge.dart';
+
 class PlayerProfileScreen extends ConsumerStatefulWidget {
   const PlayerProfileScreen({super.key, required this.uid});
   final String uid;
@@ -148,7 +154,7 @@ class _PlayerProfileScreenState extends ConsumerState<PlayerProfileScreen> {
               child: ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 700),
                 child: ListView(
-                  padding: const EdgeInsets.all(24),
+                  padding: const EdgeInsets.fromLTRB(16, 20, 16, 24),
                   children: [
                     Container(
                       height: 120,
@@ -171,21 +177,27 @@ class _PlayerProfileScreenState extends ConsumerState<PlayerProfileScreen> {
                     const SizedBox(height: 16),
                     Row(
                       children: [
-                        const CircleAvatar(
-                          radius: 36,
-                          child: Icon(Icons.person_outline, size: 36),
-                        ),
+                        PlayerAvatar(photoPath: player.photoPath, radius: 36),
                         const SizedBox(width: 16),
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(
-                                player.username.isEmpty
-                                    ? 'Player'
-                                    : player.username,
-                                style: text.headlineSmall,
+                              Wrap(
+                                spacing: 6,
+                                runSpacing: 4,
+                                crossAxisAlignment: WrapCrossAlignment.center,
+                                children: [
+                                  Text(
+                                    player.username.isEmpty
+                                        ? 'New player'
+                                        : player.username,
+                                    style: text.headlineSmall,
+                                  ),
+                                  PlayerVerificationBadge(uid: widget.uid),
+                                ],
                               ),
+                              PlayerStatusBadge(uid: widget.uid),
                               Text(
                                 [
                                   if (player.sharedAge != null)

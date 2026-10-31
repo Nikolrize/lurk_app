@@ -6,6 +6,8 @@ import 'notification_service.dart';
 class FirebaseService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
 
+  Future<void> Function()? beforeSignOut;
+
   // returns currently signed-in user, or null of signed out
   User? get currentUser => _auth.currentUser;
 
@@ -65,9 +67,10 @@ class FirebaseService {
     return _auth.sendPasswordResetEmail(email: email.trim());
   }
 
-  //sign out
+  // Both cleanup operations need the user to remain authenticated.
   Future<void> signOut() async {
     await NotificationService.instance.unregister();
+    await beforeSignOut?.call();
     await _auth.signOut();
   }
 }

@@ -1,3 +1,4 @@
+import 'core/config/voice_config.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
@@ -10,10 +11,23 @@ import 'firebase_options.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'services/notification_service.dart';
 
+//supabase
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  VoiceConfig.current = await VoiceConfig.load();
 
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+
+  await Supabase.initialize(
+    url: 'https://vrbibdwpuzszsqsgvthk.supabase.co',
+    publishableKey: 'sb_publishable_e_dHYpo8ZLdNRmmTflA69w_zEoIOiuO',
+    accessToken: () async {
+      return FirebaseAuth.instance.currentUser?.getIdToken();
+    },
+  );
 
   if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
     await GoogleSignIn.instance.initialize();

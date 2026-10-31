@@ -204,6 +204,82 @@ test('gaming preferences ownership and validation', async () => {
     saved = await getDoc(aliceProfile);
     assert.equal(saved.data().gameRanks.valorant, 'radiant');
     assert.equal(saved.data().gameRanks.mobile_legends, 'epic');
+
+    // All ten selections and six independent ranks may coexist.
+    const expanded = {
+      games: ['valorant', 'mobile_legends', 'fortnite', 'apex_legends', 'cs2',
+        'honor_of_kings', 'league_of_legends', 'minecraft', 'roblox', 'peak'],
+      currentGame: 'cs2', rank: 17,
+      gameRanks: {valorant: 'radiant', mobile_legends: 'mythical_immortal',
+        apex_legends: 'apex_predator', cs2: 'global_elite',
+        honor_of_kings: 'legend', league_of_legends: 'challenger'},
+      updatedAt: serverTimestamp(),
+    };
+    // Regression: games must remain editable on a complete profile, including
+    // all seven scheduled days, a photo, and optional public personal details.
+    const fullAvailability = {
+      availableNow: true,
+      preferredTimes: ['Morning', 'Afternoon', 'Evening', 'Night'],
+      weeklySchedule: Array.from({length: 7}, (_, i) => ({
+        weekday: i + 1, startMinute: 1080, endMinute: 1380,
+      })),
+      timeZone: 'Asia/Kuala_Lumpur',
+    };
+    await assertSucceeds(updateDoc(aliceProfile, {
+      availability: fullAvailability,
+      updatedAt: serverTimestamp(),
+    }));
+    await assertSucceeds(updateDoc(aliceProfile, {
+      photoPath: 'alice/550e8400-e29b-41d4-a716-446655440000.jpg',
+      updatedAt: serverTimestamp(),
+    }));
+    await assertSucceeds(updateDoc(aliceProfile, {
+      sharedAge: 25, ageSharedAt: serverTimestamp(), sharedGender: 'male',
+      updatedAt: serverTimestamp(),
+    }));
+    await assertSucceeds(updateDoc(aliceProfile, expanded));
+    await assertSucceeds(updateDoc(aliceProfile, {
+      bio: 'Still editable with all games and a full schedule',
+      updatedAt: serverTimestamp(),
+    }));
+    await assertSucceeds(updateDoc(aliceProfile, {
+      availability: {...fullAvailability, availableNow: false},
+      updatedAt: serverTimestamp(),
+    }));
+    await assertFails(updateDoc(aliceProfile, {
+      availability: {...fullAvailability, weeklySchedule: [
+        {weekday: 8, startMinute: 0, endMinute: 60},
+      ]},
+      updatedAt: serverTimestamp(),
+    }));
+    await assertFails(updateDoc(aliceProfile, {
+      photoPath: 'bob/550e8400-e29b-41d4-a716-446655440000.jpg',
+      updatedAt: serverTimestamp(),
+    }));
+    for (const [gameId, rank] of [
+      ['apex_legends', 7], ['honor_of_kings', 9], ['league_of_legends', 9],
+    ]) {
+      await assertSucceeds(updateDoc(aliceProfile, {
+        currentGame: gameId, rank, updatedAt: serverTimestamp(),
+      }));
+    }
+    for (const gameId of ['minecraft', 'roblox', 'peak']) {
+      await assertSucceeds(updateDoc(aliceProfile, {
+        currentGame: gameId, rank: null, updatedAt: serverTimestamp(),
+      }));
+      await assertFails(updateDoc(aliceProfile, {rank: 0, updatedAt: serverTimestamp()}));
+    }
+    await assertFails(updateDoc(aliceProfile, {
+      gameRanks: {...expanded.gameRanks, apex_legends: 'challenger'},
+      updatedAt: serverTimestamp(),
+    }));
+    await assertFails(updateDoc(aliceProfile, {
+      gameRanks: {...expanded.gameRanks, minecraft: 'diamond'},
+      updatedAt: serverTimestamp(),
+    }));
+    await assertFails(updateDoc(aliceProfile, {
+      games: [...expanded.games, 'not_a_game'], updatedAt: serverTimestamp(),
+    }));
   } finally {
     await environment.cleanup();
   }

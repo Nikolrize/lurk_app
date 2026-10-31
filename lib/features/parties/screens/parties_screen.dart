@@ -1,3 +1,4 @@
+import '../widgets/quick_match_card.dart';
 import 'party_history_screen.dart';
 import '../models/party.dart';
 import 'party_lobby_screen.dart';
@@ -9,35 +10,9 @@ import 'package:flutter/material.dart';
 import '../../../core/widgets/action_card.dart';
 
 class PartiesScreen extends ConsumerWidget {
-  const PartiesScreen({
-    super.key,
-    this.onQuickMatch,
-    this.onOpenLobby,
-    this.onHistory,
-  });
+  const PartiesScreen({super.key, this.onOpenLobby, this.onHistory});
   final ValueChanged<Party>? onOpenLobby;
-  final VoidCallback? onQuickMatch, onHistory;
-
-  void _preview(BuildContext context, String title, String message) {
-    showModalBottomSheet<void>(
-      context: context,
-      showDragHandle: true,
-      builder: (context) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(title, style: Theme.of(context).textTheme.headlineSmall),
-              const SizedBox(height: 12),
-              Text(message),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
+  final VoidCallback? onHistory;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -64,18 +39,7 @@ class PartiesScreen extends ConsumerWidget {
                           ?.copyWith(fontWeight: FontWeight.w700),
                     ),
                     const SizedBox(height: 16),
-                    ActionCard(
-                      icon: Icons.bolt_rounded,
-                      title: 'Quick Match',
-                      subtitle: 'Join a party or find players now',
-                      onTap:
-                          onQuickMatch ??
-                          () => _preview(
-                            context,
-                            'Quick Match',
-                            'Matchmaking is not connected yet.',
-                          ),
-                    ),
+                    const QuickMatchCard(),
                     const SizedBox(height: 14),
                     ActionCard(
                       icon: Icons.add_rounded,

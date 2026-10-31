@@ -11,6 +11,8 @@ import '../widgets/chat_widgets.dart';
 import '../widgets/chat_error.dart';
 import '../widgets/chat_message_bubble.dart';
 
+import 'package:lurk_app/core/widgets/player_status_badge.dart';
+
 class ChatScreen extends ConsumerStatefulWidget {
   const ChatScreen({super.key, required this.chatId, required this.otherUid});
   final String chatId, otherUid;
@@ -231,6 +233,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
                           overflow: TextOverflow.ellipsis,
                           style: Theme.of(context).textTheme.titleMedium,
                         ),
+                        PlayerStatusBadge(uid: widget.otherUid),
                       ],
                     ),
                   ),

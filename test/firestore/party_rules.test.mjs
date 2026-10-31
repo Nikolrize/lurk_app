@@ -58,6 +58,18 @@ test('party creation is validated, atomic and private discovery stays protected'
    await close('radiant');
    await assertSucceeds(create(alice,'mlbb',party({gameId:'mobile_legends',minRank:0,maxRank:9,region:'africa'})));
    await close('mlbb');
+   for (const [gameId, topRank] of [
+     ['apex_legends',7], ['cs2',17], ['honor_of_kings',9], ['league_of_legends',9],
+   ]) {
+     await assertSucceeds(create(alice,gameId,party({gameId,minRank:0,maxRank:topRank})));
+     await close(gameId);
+     await assertFails(create(alice,gameId+'-too-high',party({gameId,minRank:0,maxRank:topRank+1})));
+   }
+   for (const gameId of ['minecraft','roblox','peak']) {
+     await assertSucceeds(create(alice,gameId,party({gameId,minRank:null,maxRank:null})));
+     await close(gameId);
+     await assertFails(create(alice,gameId+'-rank',party({gameId,minRank:0,maxRank:1})));
+   }
    await assertFails(create(alice,'rank-too-high',party({minRank:0,maxRank:9})));
    await assertFails(create(alice,'mlbb-too-high',party({gameId:'mobile_legends',minRank:0,maxRank:10})));
    await assertSucceeds(create(alice,'created-private',party({visibility:'private'})));

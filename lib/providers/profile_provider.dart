@@ -8,8 +8,15 @@ import '../models/gaming_preferences.dart';
 
 import 'package:lurk_app/features/player/models/player_availability.dart';
 
+import '../services/profile_image_service.dart';
+
+
 final profileServiceProvider = Provider<ProfileService>((ref) {
   return ProfileService();
+});
+
+final profileImageServiceProvider = Provider<ProfileImageService>((ref) {
+  return ProfileImageService();
 });
 
 final profileInitializationProvider = FutureProvider.autoDispose

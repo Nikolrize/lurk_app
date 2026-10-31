@@ -1,0 +1,102 @@
+import {readFileSync} from 'node:fs';
+import assert from 'node:assert/strict';
+import test from 'node:test';
+import {initializeTestEnvironment,assertSucceeds,assertFails} from '@firebase/rules-unit-testing';
+import {doc,collection,getDoc,getDocs,query,where,limit,setDoc,updateDoc,deleteDoc,writeBatch,serverTimestamp,Timestamp} from 'firebase/firestore';
+
+test('verification privacy, admin review, atomic status and resubmission', async()=>{
+ const env=await initializeTestEnvironment({projectId:'demo-lurk-verification',firestore:{host:'127.0.0.1',port:8080,rules:readFileSync(new URL('../../firestore.rules',import.meta.url),'utf8')}});
+ try{
+  await env.clearFirestore();
+  await env.withSecurityRulesDisabled(async context=>{
+   const db=context.firestore();
+   await setDoc(doc(db,'verification_admins/reviewer'),{enabled:true});
+   await setDoc(doc(db,'verification_admins/reviewer2'),{enabled:true});
+   await setDoc(doc(db,'verification_admins/disabled'),{enabled:false});
+  });
+  const alice=env.authenticatedContext('alice').firestore();
+  const bob=env.authenticatedContext('bob').firestore();
+  const admin=env.authenticatedContext('reviewer').firestore();
+  const admin2=env.authenticatedContext('reviewer2').firestore();
+  const disabled=env.authenticatedContext('disabled').firestore();
+  const guest=env.unauthenticatedContext().firestore();
+  const first='550e8400-e29b-41d4-a716-446655440000';
+  const second='550e8400-e29b-41d4-a716-446655440001';
+  const payload=(uid,id=first)=>({submissionId:id,fullName:'Sample Player',idType:'nric',idNumber:'DEMO-1234',dateOfBirth:Timestamp.fromDate(new Date('2000-01-01T00:00:00Z')),idPhotoPath:uid+'/'+id+'/id.jpg',confirmed:true,status:'pending',submittedAt:serverTimestamp(),reviewedAt:null,reviewedBy:null,rejectionReason:''});
+  const submit=(db,uid,id=first,patch={},summaryPatch={})=>{
+   const batch=writeBatch(db);
+   batch.set(doc(db,'verification_requests/'+uid),{...payload(uid,id),...patch});
+   batch.set(doc(db,'verification_status/'+uid),{status:'pending',updatedAt:serverTimestamp(),...summaryPatch});
+   return batch.commit();
+  };
+  const review=(db,reviewer,uid,status,reason='',extra={})=>{
+   const batch=writeBatch(db);
+   batch.update(doc(db,'verification_requests/'+uid),{status,reviewedAt:serverTimestamp(),reviewedBy:reviewer,rejectionReason:reason,...extra});
+   batch.set(doc(db,'verification_status/'+uid),{status,updatedAt:serverTimestamp()});
+   return batch.commit();
+  };
+  await assertSucceeds(getDoc(doc(alice,'verification_admins/alice')));
+  await assertSucceeds(getDoc(doc(alice,'verification_requests/alice')));
+  await assertFails(getDoc(doc(alice,'verification_admins/reviewer')));
+  await assertFails(getDocs(collection(admin,'verification_admins')));
+  await assertFails(setDoc(doc(alice,'verification_admins/alice'),{enabled:true}));
+  await assertFails(updateDoc(doc(admin,'verification_admins/reviewer'),{enabled:false}));
+  await assertFails(deleteDoc(doc(admin,'verification_admins/reviewer')));
+  await assertSucceeds(submit(alice,'alice'));
+  await assertSucceeds(getDoc(doc(alice,'verification_requests/alice')));
+  await assertSucceeds(getDoc(doc(admin,'verification_requests/alice')));
+  await assertFails(getDoc(doc(bob,'verification_requests/alice')));
+  await assertFails(getDoc(doc(guest,'verification_requests/alice')));
+  await assertFails(getDoc(doc(guest,'verification_status/alice')));
+  const summary=await assertSucceeds(getDoc(doc(bob,'verification_status/alice')));
+  assert.deepEqual(Object.keys(summary.data()).sort(),['status','updatedAt']);
+  const pending=db=>query(collection(db,'verification_requests'),where('status','==','pending'),limit(100));
+  await assertSucceeds(getDocs(pending(admin)));
+  await assertFails(getDocs(pending(alice)));
+  await assertFails(getDocs(pending(disabled)));
+  await assertFails(getDocs(collection(admin,'verification_requests')));
+  await assertFails(getDocs(query(collection(admin,'verification_requests'),limit(101))));
+  await assertFails(review(alice,'alice','alice','verified'));
+  await assertFails(review(disabled,'disabled','alice','verified'));
+  await assertFails(setDoc(doc(alice,'verification_status/alice'),{status:'verified',updatedAt:serverTimestamp()}));
+  await assertFails(updateDoc(doc(admin,'verification_requests/alice'),{status:'verified',reviewedAt:serverTimestamp(),reviewedBy:'reviewer',rejectionReason:''}));
+  await assertFails(setDoc(doc(admin,'verification_status/alice'),{status:'verified',updatedAt:serverTimestamp()}));
+  await assertFails(review(admin,'reviewer','alice','verified','',{idNumber:'CHANGED'}));
+  await assertFails(review(admin,'reviewer2','alice','verified'));
+  await assertFails(review(admin,'reviewer','alice','rejected',''));
+  await assertFails(review(admin,'reviewer','alice','rejected','   '));
+  await assertFails(submit(alice,'alice',second));
+  const patches=[{fullName:'x'.repeat(101)},{fullName:'   '},{idNumber:1234},{idType:'unsupported'},{confirmed:false},{idPhotoPath:'bob/'+first+'/id.jpg'},{idPhotoPath:'x/'+first+'/nested/id.jpg'},{dateOfBirth:Timestamp.fromDate(new Date('2200-01-01'))},{submittedAt:Timestamp.fromMillis(0)},{reviewedBy:'reviewer'},{unexpected:true},{submissionId:'bad'},{idPhotoPath:'wrong'},{status:'verified'}];
+  for(let i=0;i<patches.length;i++){
+   const uid='invalid'+i;
+   const db=env.authenticatedContext(uid).firestore();
+   await assertFails(submit(db,uid,first,patches[i]));
+   assert.equal((await getDoc(doc(db,'verification_requests/'+uid))).exists(),false);
+  }
+  const isolated=env.authenticatedContext('isolated').firestore();
+  await assertFails(setDoc(doc(isolated,'verification_requests/isolated'),payload('isolated')));
+  await assertFails(setDoc(doc(isolated,'verification_status/isolated'),{status:'pending',updatedAt:serverTimestamp()}));
+  await assertFails(submit(isolated,'isolated',first,{}, {idNumber:'PRIVATE'}));
+  assert.equal((await getDoc(doc(isolated,'verification_requests/isolated'))).exists(),false);
+  await assertFails(submit(bob,'alice'));
+  await assertFails(submit(guest,'guest'));
+  await assertSucceeds(submit(admin,'reviewer'));
+  await assertFails(review(admin,'reviewer','reviewer','verified'));
+  await assertSucceeds(review(admin,'reviewer','alice','rejected','Image is unreadable.'));
+  await assertFails(submit(alice,'alice',first));
+  await assertSucceeds(submit(alice,'alice',second));
+  const resubmitted=(await getDoc(doc(alice,'verification_requests/alice'))).data();
+  assert.equal(resubmitted.reviewedBy,null);
+  assert.equal(resubmitted.reviewedAt,null);
+  assert.equal(resubmitted.rejectionReason,'');
+  await assertFails(review(admin,'reviewer','alice','verified','',{submissionId:first}));
+  await assertSucceeds(review(admin,'reviewer','alice','verified'));
+  assert.equal((await getDoc(doc(bob,'verification_status/alice'))).data().status,'verified');
+  await assertFails(review(admin2,'reviewer2','alice','rejected','Second review.'));
+  await assertFails(submit(alice,'alice',first));
+  await assertFails(deleteDoc(doc(alice,'verification_requests/alice')));
+  await assertFails(deleteDoc(doc(admin,'verification_requests/alice')));
+  await assertFails(deleteDoc(doc(alice,'verification_status/alice')));
+  await assertFails(deleteDoc(doc(admin,'verification_status/alice')));
+ }finally{await env.cleanup();}
+});
