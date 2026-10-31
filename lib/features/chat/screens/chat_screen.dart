@@ -1,3 +1,6 @@
+import 'dart:async';
+import '../../profile/screens/player_profile_screen.dart';
+import '../../../services/player_safety_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_colors.dart';
@@ -17,14 +20,81 @@ class ChatScreen extends ConsumerStatefulWidget {
   ConsumerState<ChatScreen> createState() => _ChatScreenState();
 }
 
-class _ChatScreenState extends ConsumerState<ChatScreen> {
+class _ChatScreenState extends ConsumerState<ChatScreen>
+    with WidgetsBindingObserver {
   final _composer = TextEditingController();
+  final _scroll = ScrollController();
+  String? _lastReadId;
+  bool _markingRead = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _scroll.addListener(_tryMarkRead);
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) _tryMarkRead();
+  }
+
+  void _tryMarkRead() {
+    if (!mounted ||
+        _markingRead ||
+        _searching ||
+        ModalRoute.of(context)?.isCurrent != true ||
+        (WidgetsBinding.instance.lifecycleState != null &&
+            WidgetsBinding.instance.lifecycleState !=
+                AppLifecycleState.resumed) ||
+        (_scroll.hasClients && _scroll.offset > 80)) {
+      return;
+    }
+    final uid = ref.read(authStateProvider).asData?.value?.uid;
+    final items = ref
+        .read(messagesProvider((id: widget.chatId, limit: _limit)))
+        .asData
+        ?.value;
+    if (uid == null || items == null) return;
+    final committed = items
+        .where((m) => !m.pending && m.createdAt != null)
+        .toList();
+    if (committed.isEmpty) return;
+    final latest = committed.first;
+    if (_lastReadId == latest.id) return;
+    _markingRead = true;
+    unawaited(
+      ref
+          .read(chatServiceProvider)
+          .markRead(widget.chatId, uid, latest)
+          .then((_) {
+            _lastReadId = latest.id;
+          })
+          .catchError((Object error) {
+            debugPrint('Could not update read status: $error');
+          })
+          .whenComplete(() {
+            _markingRead = false;
+            if (mounted && _lastReadId == latest.id) _tryMarkRead();
+          }),
+    );
+  }
+
   bool _sending = false;
   String? _sendError;
   int _limit = 50;
   bool _searching = false;
   String _query = '';
   Future<void> _menuAction(String action) async {
+    if (action == 'profile') {
+      await Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => PlayerProfileScreen(uid: widget.otherUid),
+        ),
+      );
+      return;
+    }
     if (action == 'search') {
       setState(() {
         _searching = true;
@@ -71,6 +141,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _scroll.dispose();
     _composer.dispose();
     super.dispose();
   }
@@ -115,7 +187,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     ];
     final key = (id: widget.chatId, limit: _limit);
     final messages = ref.watch(messagesProvider(key));
-    final canSend = uid != null && !_sending;
+    final blocks = ref.watch(blockedPlayersProvider);
+    final blocked = blocks.asData?.value.contains(widget.otherUid) ?? false;
+    final canSend = uid != null && !_sending && blocks.hasValue && !blocked;
     final border = OutlineInputBorder(
       borderRadius: BorderRadius.circular(28),
       borderSide: const BorderSide(color: AppColors.outline),
@@ -140,7 +214,14 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                     icon: const Icon(Icons.chevron_left),
                   ),
                   const SizedBox(width: 8),
-                  ChatAvatar(name: name),
+                  Tooltip(
+                    message: 'View player profile',
+                    child: InkWell(
+                      onTap: () => _menuAction('profile'),
+                      borderRadius: BorderRadius.circular(24),
+                      child: ChatAvatar(name: name),
+                    ),
+                  ),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Column(
@@ -162,6 +243,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                     enabled: !_sending && uid != null,
                     onSelected: (action) => _menuAction(action),
                     itemBuilder: (_) => [
+                      const PopupMenuItem(
+                        value: 'profile',
+                        child: Text('View player profile'),
+                      ),
                       const PopupMenuItem(
                         value: 'search',
                         child: Text('Search messages'),
@@ -238,6 +323,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                     onRetry: () => ref.invalidate(messagesProvider(key)),
                   ),
                   data: (allItems) {
+                    WidgetsBinding.instance.addPostFrameCallback(
+                      (_) => _tryMarkRead(),
+                    );
                     final items = _query.isEmpty
                         ? allItems
                         : allItems
@@ -270,6 +358,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                     return Align(
                       alignment: Alignment.topCenter,
                       child: ListView.builder(
+                        controller: _scroll,
                         reverse: true,
                         shrinkWrap: true,
                         itemCount: items.length + 1,
@@ -344,7 +433,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                       maxLength: 2000,
                       textCapitalization: TextCapitalization.sentences,
                       decoration: InputDecoration(
-                        hintText: 'Type a message…',
+                        hintText: blocked
+                            ? 'Unblock this player to message'
+                            : 'Type a message…',
                         counterText: '',
                         border: border,
                         enabledBorder: border,

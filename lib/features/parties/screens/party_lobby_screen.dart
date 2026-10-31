@@ -9,6 +9,7 @@ import '../models/lobby_member.dart';
 import '../../../providers/party_provider.dart';
 import 'create_party_screen.dart';
 import '../../chat/screens/new_message_screen.dart';
+import '../../chat/screens/party_chat_screen.dart';
 import '../models/party.dart';
 import '../widgets/lobby_member_card.dart';
 
@@ -576,9 +577,11 @@ class _PartyLobbyScreenState extends ConsumerState<PartyLobbyScreen> {
                       child: OutlinedButton.icon(
                         onPressed:
                             onChat ??
-                            () => _notice(
-                              context,
-                              'Party chat is not available yet.',
+                            () => Navigator.of(context).push(
+                              MaterialPageRoute<void>(
+                                builder: (_) =>
+                                    PartyChatScreen(partyId: party.id),
+                              ),
                             ),
                         icon: const Icon(Icons.chat_bubble_outline),
                         label: const Text('Chat'),

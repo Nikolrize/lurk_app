@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../core/widgets/notification_gate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:lurk_app/core/widgets/app_shell.dart';
@@ -9,6 +10,7 @@ import 'package:lurk_app/features/authentication/screens/login_screen.dart';
 import 'package:lurk_app/features/profile/widgets/presence_scope.dart';
 
 import 'package:lurk_app/features/verification/widgets/verification_role_gate.dart';
+
 class AuthGate extends ConsumerWidget {
   const AuthGate({super.key});
 
@@ -49,7 +51,10 @@ class AuthGate extends ConsumerWidget {
             uid: user.uid,
             child: ProfileGate(
               uid: user.uid,
-              child: AppShell(uid: user.uid),
+              child: NotificationGate(
+                uid: user.uid,
+                child: AppShell(uid: user.uid),
+              ),
             ),
           ),
         );

@@ -1,0 +1,11 @@
+{
+  "name": "lurk-laptop-notification-sender",
+  "private": true,
+  "engines": {"node": ">=22"},
+  "scripts": {
+    "start": "node index.js",
+    "dry-run": "node index.js --dry-run",
+    "test": "node --test"
+  },
+  "dependencies": {"firebase-admin": "^14.5.0"}
+}

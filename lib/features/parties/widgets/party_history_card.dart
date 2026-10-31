@@ -117,7 +117,7 @@ class PartyHistoryCard extends StatelessWidget {
                       Tooltip(
                         message: onRate == null
                             ? 'Ratings will be available soon'
-                            : 'Rate this session',
+                            : 'Rate your teammates',
                         child: OutlinedButton(
                           onPressed: onRate,
                           style: OutlinedButton.styleFrom(

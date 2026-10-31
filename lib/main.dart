@@ -7,6 +7,8 @@ import 'package:lurk_app/core/theme/app_theme.dart';
 
 import 'package:lurk_app/features/authentication/widgets/auth_gate.dart';
 import 'firebase_options.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
+import 'services/notification_service.dart';
 
 //supabase
 import 'package:firebase_auth/firebase_auth.dart';
@@ -15,9 +17,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
   await Supabase.initialize(
     url: 'https://vrbibdwpuzszsqsgvthk.supabase.co',
@@ -30,7 +30,9 @@ Future<void> main() async {
   if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
     await GoogleSignIn.instance.initialize();
   }
-
+  if (NotificationService.supported) {
+    FirebaseMessaging.onBackgroundMessage(notificationBackgroundHandler);
+  }
   runApp(const ProviderScope(child: MyApp()));
 }
 
@@ -46,6 +48,4 @@ class MyApp extends StatelessWidget {
       home: const AuthGate(),
     );
   }
-
-
 }

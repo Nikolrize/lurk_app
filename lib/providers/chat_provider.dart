@@ -3,11 +3,40 @@ import '../features/chat/models/chat.dart';
 import '../features/chat/models/chat_message.dart';
 import '../services/chat_service.dart';
 import 'auth_provider.dart';
+import '../features/chat/models/chat_receipt.dart';
 import '../features/player/models/player.dart';
 import '../features/parties/models/party.dart';
 import '../features/chat/models/chat_settings.dart';
 
+final chatReceiptProvider = StreamProvider.autoDispose
+    .family<ChatReceipt, ({String chatId, String uid})>((ref, key) {
+      if (ref.watch(authStateProvider).asData?.value == null) {
+        return Stream.value(const ChatReceipt());
+      }
+      return ref.watch(chatServiceProvider).watchReceipt(key.chatId, key.uid);
+    }, retry: (count, error) => null);
+
 final chatServiceProvider = Provider<ChatService>((ref) => ChatService());
+final unreadCountProvider = StreamProvider.autoDispose.family<int, String>((
+  ref,
+  chatId,
+) {
+  final uid = ref.watch(authStateProvider).asData?.value?.uid;
+  if (uid == null) return Stream.value(0);
+  final receipt = ref.watch(chatReceiptProvider((chatId: chatId, uid: uid)));
+  final settings = ref.watch(chatSettingsProvider(chatId));
+  if (receipt.hasError) return Stream.error(receipt.error!);
+  if (settings.hasError) return Stream.error(settings.error!);
+  if (!receipt.hasValue || !settings.hasValue) return const Stream<int>.empty();
+  final readAt = receipt.asData?.value.readThrough;
+  final clearedAt = settings.asData?.value.clearedAt;
+  final after = readAt == null
+      ? clearedAt
+      : clearedAt != null && clearedAt.isAfter(readAt)
+      ? clearedAt
+      : readAt;
+  return ref.watch(chatServiceProvider).watchUnreadCount(chatId, uid, after);
+}, retry: (count, error) => null);
 final chatSettingsProvider = StreamProvider.autoDispose
     .family<ChatSettings, String>((ref, chatId) {
       final uid = ref.watch(authStateProvider).asData?.value?.uid;

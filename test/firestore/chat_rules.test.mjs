@@ -28,6 +28,8 @@ test('direct chat privacy, sender identity, immutable history and atomic preview
     await assertSucceeds(getDoc(chat(alice)));
     await assertFails(setDoc(chat(eve), fresh));
     await assertFails(setDoc(chat(guest), fresh));
+    await assertFails(setDoc(doc(alice, 'chats/forged-names'), {...fresh, participantUsernames: {alice: 'bob', bob: 'alice'}}));
+    await assertSucceeds(setDoc(doc(alice, 'chats/named'), {...fresh, participantUsernames: {alice: 'alice', bob: 'bob'}}));
     await assertSucceeds(setDoc(chat(alice), fresh));
     await assertSucceeds(getDoc(chat(bob)));
     await assertFails(getDoc(chat(eve)));
@@ -46,6 +48,8 @@ test('direct chat privacy, sender identity, immutable history and atomic preview
     await assertFails(send(alice, 'spoof', 'bob'));
     await assertFails(send(alice, 'empty', 'alice', '   '));
     await assertFails(send(alice, 'long', 'alice', 'x'.repeat(2001)));
+    await assertFails(send(alice, 'forged-name', 'alice', 'Hello', {senderUsername: 'bob'}));
+    await assertSucceeds(send(alice, 'named-message', 'alice', 'Hello', {senderUsername: 'alice'}));
     await assertSucceeds(send(alice, 'first'));
     await assertSucceeds(send(bob, 'reply', 'bob', 'Hi Alice'));
     await assertFails(send(alice, 'disabled-photo', 'alice', 'Photo', {type: 'image'}));
@@ -85,3 +89,4 @@ test('direct chat privacy, sender identity, immutable history and atomic preview
     await assertFails(setDoc(doc(alice, 'player_status/alice'), {updatedAt: serverTimestamp()}));
   } finally { await env.cleanup(); }
 });
+

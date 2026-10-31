@@ -1,6 +1,7 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'notification_service.dart';
 
 class FirebaseService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
@@ -66,9 +67,9 @@ class FirebaseService {
     return _auth.sendPasswordResetEmail(email: email.trim());
   }
 
-  //sign out 
-  //shared logout hook 
+  // Both cleanup operations need the user to remain authenticated.
   Future<void> signOut() async {
+    await NotificationService.instance.unregister();
     await beforeSignOut?.call();
     await _auth.signOut();
   }

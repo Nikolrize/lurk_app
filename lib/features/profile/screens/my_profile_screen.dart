@@ -1,3 +1,7 @@
+import 'blocked_players_screen.dart';
+import 'notification_settings_screen.dart';
+import '../../parties/screens/party_history_screen.dart';
+import '../../ratings/widgets/player_rating_summary.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -266,6 +270,8 @@ class _MyProfileScreenState extends ConsumerState<MyProfileScreen> {
                                         uid: widget.uid,
                                         editable: true,
                                       ),
+                                      const SizedBox(height: 6),
+                                      PlayerRatingSummary(uid: widget.uid),
                                       const SizedBox(height: 8),
                                       Text(
                                         profile.region.isEmpty
@@ -372,7 +378,18 @@ class _MyProfileScreenState extends ConsumerState<MyProfileScreen> {
                                   (
                                     icon: Icons.history,
                                     title: 'Party History',
-                                    onTap: widget.onPartyHistory,
+                                    onTap:
+                                        widget.onPartyHistory ??
+                                        () => Navigator.of(context).push(
+                                          MaterialPageRoute<void>(
+                                            builder: (pageContext) => Scaffold(
+                                              body: PartyHistoryScreen(
+                                                onBack: () =>
+                                                    Navigator.pop(pageContext),
+                                              ),
+                                            ),
+                                          ),
+                                        ),
                                   ),
                                   (
                                     icon: Icons.verified_user_outlined,
@@ -387,12 +404,27 @@ class _MyProfileScreenState extends ConsumerState<MyProfileScreen> {
                                   (
                                     icon: Icons.block_outlined,
                                     title: 'Blocked Players',
-                                    onTap: widget.onBlockedPlayers,
+                                    onTap:
+                                        widget.onBlockedPlayers ??
+                                        () => Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (_) =>
+                                                const BlockedPlayersScreen(),
+                                          ),
+                                        ),
                                   ),
                                   (
                                     icon: Icons.settings_outlined,
                                     title: 'Settings',
-                                    onTap: widget.onSettings,
+                                    onTap:
+                                        widget.onSettings ??
+                                        () => Navigator.of(context).push(
+                                          MaterialPageRoute<void>(
+                                            builder: (_) =>
+                                                const NotificationSettingsScreen(),
+                                          ),
+                                        ),
                                   ),
                                 ];
 
