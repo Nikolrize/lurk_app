@@ -108,6 +108,53 @@ class _PartyLobbyScreenState extends ConsumerState<PartyLobbyScreen> {
     }
   }
 
+  Future<void> _makeHost(BuildContext context, String uid, String name) async {
+    if (_removing != null ||
+        _leaving ||
+        viewerUid != party.hostId ||
+        uid == party.hostId) {
+      return;
+    }
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Transfer host?'),
+        content: Text(
+          'Make $name the host? You will stay in the party as a squad member. They will control party details, invitations and member removal.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Make host'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted || _removing != null) return;
+    setState(() => _removing = uid);
+    try {
+      await ref
+          .read(partyServiceProvider)
+          .transferHost(party.id, uid, expectedUid: viewerUid!);
+      if (context.mounted) _notice(context, '$name is now the host.');
+    } catch (error) {
+      if (context.mounted) {
+        _notice(
+          context,
+          error is StateError
+              ? error.message.toString()
+              : 'Unable to transfer host. Please try again.',
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _removing = null);
+    }
+  }
+
   Future<void> _remove(BuildContext context, String uid, String name) async {
     if (_removing != null ||
         _leaving ||
@@ -440,6 +487,13 @@ class _PartyLobbyScreenState extends ConsumerState<PartyLobbyScreen> {
                         ),
                         isHost: member.uid == party.hostId,
                         onViewProfile: () => _profile(context, member.uid),
+                        onMakeHost:
+                            viewerUid == party.hostId &&
+                                member.uid != party.hostId &&
+                                _removing == null &&
+                                !_leaving
+                            ? () => _makeHost(context, member.uid, member.name)
+                            : null,
                         onRemove:
                             viewerUid == party.hostId &&
                                 member.uid != party.hostId
@@ -468,6 +522,13 @@ class _PartyLobbyScreenState extends ConsumerState<PartyLobbyScreen> {
                             ? micEnabled
                             : voice.remoteMics[uid],
                         onViewProfile: () => _profile(context, uid),
+                        onMakeHost:
+                            viewerUid == party.hostId &&
+                                uid != party.hostId &&
+                                _removing == null &&
+                                !_leaving
+                            ? (name) => _makeHost(context, uid, name)
+                            : null,
                         onRemove:
                             viewerUid == party.hostId &&
                                 uid != party.hostId &&
@@ -642,11 +703,13 @@ class _HostCard extends ConsumerWidget {
     this.micEnabled,
     this.isSpeaking = false,
     this.onRemove,
+    this.onMakeHost,
   });
   final bool isHost;
   final bool? micEnabled;
   final bool isSpeaking;
   final ValueChanged<String>? onRemove;
+  final ValueChanged<String>? onMakeHost;
   final String uid, partyGame;
   final VoidCallback onViewProfile;
   @override
@@ -688,6 +751,9 @@ class _HostCard extends ConsumerWidget {
         ),
         isHost: isHost,
         onViewProfile: onViewProfile,
+        onMakeHost: onMakeHost == null
+            ? null
+            : () => onMakeHost!(profile?.username ?? 'this player'),
         onRemove: onRemove == null
             ? null
             : () => onRemove!(profile?.username ?? 'this player'),

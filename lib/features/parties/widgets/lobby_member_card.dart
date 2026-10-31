@@ -8,11 +8,13 @@ class LobbyMemberCard extends StatelessWidget {
     this.isHost = false,
     required this.onViewProfile,
     this.onRemove,
+    this.onMakeHost,
   });
   final LobbyMember member;
   final bool isHost;
   final VoidCallback onViewProfile;
   final VoidCallback? onRemove;
+  final VoidCallback? onMakeHost;
 
   @override
   Widget build(BuildContext context) {
@@ -165,6 +167,8 @@ class LobbyMemberCard extends StatelessWidget {
                 onSelected: (value) {
                   if (value == 'profile') {
                     onViewProfile();
+                  } else if (value == 'host') {
+                    onMakeHost?.call();
                   } else {
                     onRemove?.call();
                   }
@@ -174,6 +178,11 @@ class LobbyMemberCard extends StatelessWidget {
                     value: 'profile',
                     child: Text('View profile'),
                   ),
+                  if (onMakeHost != null)
+                    const PopupMenuItem(
+                      value: 'host',
+                      child: Text('Make host'),
+                    ),
                   if (onRemove != null)
                     const PopupMenuItem(
                       value: 'remove',

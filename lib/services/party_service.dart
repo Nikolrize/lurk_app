@@ -241,6 +241,69 @@ class PartyService {
     });
   }
 
+  Future<void> transferHost(
+    String id,
+    String newHostUid, {
+    required String expectedUid,
+  }) async {
+    _checkAccount(expectedUid);
+    if (newHostUid == expectedUid) {
+      throw StateError('You are already the host.');
+    }
+    final party = _firestore.collection('parties').doc(id);
+    final oldMember = party.collection('members').doc(expectedUid);
+    final newMember = party.collection('members').doc(newHostUid);
+    final oldSlot = _firestore.collection('party_host_slots').doc(expectedUid);
+    await _firestore.runTransaction((transaction) async {
+      final snapshot = await transaction.get(party);
+      final oldMembership = await transaction.get(oldMember);
+      final newMembership = await transaction.get(newMember);
+      final slot = await transaction.get(oldSlot);
+      if (snapshot.data()?['hostId'] != expectedUid ||
+          snapshot.data()?['status'] != 'open') {
+        throw StateError('Only the current host can transfer this party.');
+      }
+      if (oldMembership.data()?['role'] != 'host' ||
+          oldMembership.data()?['leftAt'] != null ||
+          !newMembership.exists ||
+          newMembership.data()?['role'] != 'member' ||
+          newMembership.data()?['leftAt'] != null) {
+        throw StateError('Choose a player who is still in this party.');
+      }
+      if (slot.data()?['activeCount'] != 1) {
+        throw StateError(
+          'End any other hosted sessions before transferring this party.',
+        );
+      }
+      transaction.update(party, {
+        'hostId': newHostUid,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+      transaction.update(oldMember, {'role': 'member'});
+      transaction.update(newMember, {'role': 'host'});
+      transaction.set(oldSlot, {
+        'activeCount': 0,
+        'lastPartyId': id,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+      transaction.set(
+        _firestore.collection('party_host_slots').doc(newHostUid),
+        {
+          'activeCount': 1,
+          'lastPartyId': id,
+          'updatedAt': FieldValue.serverTimestamp(),
+        },
+      );
+      transaction.set(
+        _firestore.collection('party_memberships').doc(expectedUid),
+        {'partyId': id, 'updatedAt': FieldValue.serverTimestamp()},
+      );
+      transaction.delete(
+        _firestore.collection('party_memberships').doc(newHostUid),
+      );
+    });
+  }
+
   Future<void> removeMember(
     String id,
     String memberUid, {

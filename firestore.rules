@@ -798,7 +798,25 @@ service cloud.firestore {
 
     // One counter per host serializes creation across devices.
     // Existing hosts may initially have >1; closing each session reduces it.
+    // A host transfer preserves the session and changes ownership atomically.
+    function transferringHost(partyId) {
+      let before = get(/databases/$(database)/documents/parties/$(partyId)).data;
+      let after = getAfter(/databases/$(database)/documents/parties/$(partyId)).data;
+      return signedIn() && before.hostId == request.auth.uid && before.status == 'open'
+        && after.hostId is string && after.hostId != before.hostId
+        && after.updatedAt == request.time
+        && after.diff(before).affectedKeys().hasOnly(['hostId', 'updatedAt']);
+    }
+
     match /party_host_slots/{uid} {
+      allow create, update: if transferringHost(request.resource.data.lastPartyId)
+        && request.resource.data.keys().hasOnly(['activeCount', 'lastPartyId', 'updatedAt'])
+        && request.resource.data.updatedAt == request.time
+        && (uid == request.auth.uid
+          ? resource.data.activeCount == 1 && request.resource.data.activeCount == 0
+          : (resource == null || resource.data.activeCount == 0)
+            && request.resource.data.activeCount == 1
+            && getAfter(/databases/$(database)/documents/parties/$(request.resource.data.lastPartyId)).data.hostId == uid);
       allow get: if owns(uid);
       allow list, delete: if false;
       allow create, update: if owns(uid)
@@ -823,6 +841,14 @@ service cloud.firestore {
     }
 
     match /party_memberships/{uid} {
+      allow create, update: if owns(uid) && canReplace()
+        && transferringHost(request.resource.data.partyId)
+        && request.resource.data.keys().hasAll(['partyId', 'updatedAt'])
+        && request.resource.data.keys().hasOnly(['partyId', 'updatedAt'])
+        && request.resource.data.updatedAt == request.time;
+      allow delete: if transferringHost(resource.data.partyId)
+        && getAfter(/databases/$(database)/documents/parties/$(resource.data.partyId)).data.hostId == uid;
+
       allow get: if owns(uid);
       allow list: if false;
       function canReplace() {
@@ -926,7 +952,17 @@ service cloud.firestore {
       allow update: if signedIn() && resource.data.status == 'open'
         && request.resource.data.updatedAt == request.time
         && (
-          (resource.data.hostId == request.auth.uid
+          (transferringHost(partyId)
+            && get(/databases/$(database)/documents/parties/$(partyId)/members/$(resource.data.hostId)).data.role == 'host'
+            && get(/databases/$(database)/documents/parties/$(partyId)/members/$(request.resource.data.hostId)).data.role == 'member'
+            && getAfter(/databases/$(database)/documents/parties/$(partyId)/members/$(resource.data.hostId)).data.role == 'member'
+            && getAfter(/databases/$(database)/documents/parties/$(partyId)/members/$(request.resource.data.hostId)).data.role == 'host'
+            && getAfter(/databases/$(database)/documents/party_host_slots/$(resource.data.hostId)).data.activeCount == 0
+            && getAfter(/databases/$(database)/documents/party_host_slots/$(request.resource.data.hostId)).data.activeCount == 1
+            && getAfter(/databases/$(database)/documents/party_host_slots/$(request.resource.data.hostId)).data.lastPartyId == partyId
+            && getAfter(/databases/$(database)/documents/party_memberships/$(resource.data.hostId)).data.partyId == partyId
+            && !existsAfter(/databases/$(database)/documents/party_memberships/$(request.resource.data.hostId)))
+          || (resource.data.hostId == request.auth.uid
             && validPartyDetails(request.resource.data)
             && request.resource.data.maxPlayers >= resource.data.memberCount
             && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
@@ -1009,6 +1045,13 @@ service cloud.firestore {
           (!exists(/databases/$(database)/documents/parties/$(partyId))
             && getAfter(/databases/$(database)/documents/parties/$(partyId)).data.hostId == uid
             && validHostMembership(request.resource.data)) || joining());
+        allow update: if transferringHost(partyId)
+          && resource.data.leftAt == null
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['role'])
+          && (uid == request.auth.uid
+            ? resource.data.role == 'host' && request.resource.data.role == 'member'
+            : uid == getAfter(/databases/$(database)/documents/parties/$(partyId)).data.hostId
+              && resource.data.role == 'member' && request.resource.data.role == 'host');
         allow update: if owns(uid) && (
           (resource.data.leftAt != null && joining())
           || (resource.data.leftAt == null

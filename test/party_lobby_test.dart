@@ -48,6 +48,18 @@ class LobbyVoiceService extends PartyVoiceService {
 
 class LobbyPartyService extends Fake implements PartyService {
   int leaves = 0;
+  int transfers = 0;
+  String? newHostUid;
+  @override
+  Future<void> transferHost(
+    String id,
+    String uid, {
+    required String expectedUid,
+  }) async {
+    transfers++;
+    newHostUid = uid;
+  }
+
   int removals = 0;
   String? removedUid;
   @override
@@ -530,6 +542,23 @@ void main() {
     await tester.pumpAndSettle();
     expect(service.removals, 1);
     expect(service.removedUid, 'alex');
+    await tester.ensureVisible(find.byTooltip('Options for Alex'));
+    await tester.tap(find.byTooltip('Options for Alex'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Make host'));
+    await tester.pumpAndSettle();
+    expect(find.text('Transfer host?'), findsOneWidget);
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
+    expect(service.transfers, 0);
+    await tester.tap(find.byTooltip('Options for Alex'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Make host'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilledButton, 'Make host'));
+    await tester.pumpAndSettle();
+    expect(service.transfers, 1);
+    expect(service.newHostUid, 'alex');
   });
   testWidgets('A removed player loses lobby controls immediately', (
     tester,
