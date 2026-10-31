@@ -16,6 +16,8 @@ import 'package:lurk_app/core/widgets/player_status_badge.dart';
 
 import '../widgets/profile_photo_button.dart';
 
+import 'package:lurk_app/features/verification/screens/verification_screen.dart';
+
 class MyProfileScreen extends ConsumerStatefulWidget {
   const MyProfileScreen({
     super.key,
@@ -140,6 +142,15 @@ class _MyProfileScreenState extends ConsumerState<MyProfileScreen> {
     }
   }
 
+  void _openVerification() {
+    if (_isBusy) return;
+
+    Navigator.of(context).push<void>(
+      MaterialPageRoute(
+        builder: (_) => VerificationScreen(uid: widget.uid),
+      ),
+    );
+  }
   @override
   Widget build(BuildContext context) {
     final currentUser = ref.watch(authStateProvider).asData?.value;
@@ -356,7 +367,7 @@ class _MyProfileScreenState extends ConsumerState<MyProfileScreen> {
                                   (
                                     icon: Icons.verified_user_outlined,
                                     title: 'Verification',
-                                    onTap: widget.onVerification,
+                                    onTap: widget.onVerification ?? _openVerification,
                                   ),
                                   (
                                     icon: Icons.shield_outlined,
