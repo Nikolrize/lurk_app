@@ -11,6 +11,7 @@ class PlayerProfile {
     this.sharedAge,
     this.ageSharedAt,
     this.sharedGender,
+    this.photoPath,
   });
 
   final String uid;
@@ -24,6 +25,8 @@ class PlayerProfile {
   final int? sharedAge;
   final DateTime? ageSharedAt;
   final String? sharedGender;
+
+  final String? photoPath;
 
   factory PlayerProfile.fromDocument(
     DocumentSnapshot<Map<String, dynamic>> document,
@@ -40,6 +43,7 @@ class PlayerProfile {
       sharedAge: data['sharedAge'] as int?,
       ageSharedAt: (data['ageSharedAt'] as Timestamp?)?.toDate(),
       sharedGender: data['sharedGender'] as String?,
+      photoPath: data['photoPath'] as String?,
     );
   }
 }

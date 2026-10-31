@@ -8,14 +8,29 @@ import 'package:lurk_app/core/theme/app_theme.dart';
 import 'package:lurk_app/features/authentication/widgets/auth_gate.dart';
 import 'firebase_options.dart';
 
+//supabase
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
+
+  await Supabase.initialize(
+    url: 'https://vrbibdwpuzszsqsgvthk.supabase.co',
+    publishableKey: 'sb_publishable_e_dHYpo8ZLdNRmmTflA69w_zEoIOiuO',
+    accessToken: () async {
+      return FirebaseAuth.instance.currentUser?.getIdToken();
+    },
+  );
 
   if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
     await GoogleSignIn.instance.initialize();
   }
+
   runApp(const ProviderScope(child: MyApp()));
 }
 
@@ -31,4 +46,6 @@ class MyApp extends StatelessWidget {
       home: const AuthGate(),
     );
   }
+
+
 }
