@@ -21,12 +21,41 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
+    // Tokens are private to their account. Sending is reserved for the Admin SDK.
+    match /notification_users/{uid}/devices/{deviceId} {
+      allow read, delete: if owns(uid);
+      allow create, update: if owns(uid)
+        && request.resource.data.keys().hasOnly(['token', 'platform', 'updatedAt'])
+        && request.resource.data.token is string
+        && request.resource.data.token == deviceId
+        && deviceId.size() >= 20 && deviceId.size() <= 2048
+        && request.resource.data.platform == 'android'
+        && request.resource.data.updatedAt == request.time;
+    }
     function signedIn() {
       return request.auth != null;
     }
 
     function owns(uid) {
       return signedIn() && request.auth.uid == uid;
+    }
+
+    function unblocked(users) {
+      return !exists(/databases/$(database)/documents/player_blocks/$(users[0])/users/$(users[1]))
+        && !exists(/databases/$(database)/documents/player_blocks/$(users[1])/users/$(users[0]))
+        && !exists(/databases/$(database)/documents/player_blocks/$(users[0])/blocked/$(users[1]))
+        && !exists(/databases/$(database)/documents/player_blocks/$(users[1])/blocked/$(users[0]));
+    }
+
+    match /player_blocks/{uid}/users/{otherUid} {
+      allow get: if signedIn() && request.auth.uid in [uid, otherUid];
+      allow list: if owns(uid);
+      allow create: if owns(uid) && uid != otherUid
+        && request.resource.data.keys().hasOnly(['createdAt'])
+        && request.resource.data.createdAt == request.time
+        && exists(/databases/$(database)/documents/players/$(otherUid));
+      allow delete: if owns(uid);
+      allow update: if false;
     }
 
     function validSharing(data) {
@@ -50,6 +79,10 @@ service cloud.firestore {
       );
     }
 
+    // Keep these server-side bounds aligned with GameCatalog.
+    function catalogueRankCount(game) {
+      return {'valorant': 9, 'mobile_legends': 10, 'fortnite': 0}.get(game, 0);
+    }
     //rank number same as game's catalogue position
     function rankNumber(game, rankId) {
       let valorant = {
@@ -177,34 +210,15 @@ service cloud.firestore {
   //weekly schedule: max 7 slots, ordered by unique weekday
   //times: mins after midnight; overnight sessions are allowed
   function validAvailabilitySlot(slot) {
+    let weekday = slot.get('weekday', null);
+    let start = slot.get('startMinute', null);
+    let end = slot.get('endMinute', null);
     return slot is map
-      && slot.keys().hasAll([
-        'weekday', 'startMinute', 'endMinute'
-      ])
-      && slot.keys().hasOnly([
-        'weekday', 'startMinute', 'endMinute'
-      ])
-      && slot.weekday is int
-      && slot.weekday >= 1
-      && slot.weekday <= 7
-      && slot.startMinute is int
-      && slot.startMinute >= 0
-      && slot.startMinute < 1440
-      && slot.endMinute is int
-      && slot.endMinute >= 0
-      && slot.endMinute <= 1440
-      && slot.startMinute != slot.endMinute;
-  }
-
-  function validAvailabilitySlotAt(slots, index) {
-    return slots.size() <= index
-      || (
-        validAvailabilitySlot(slots[index])
-        && (
-          index == 0
-          || slots[index - 1].weekday < slots[index].weekday
-        )
-      );
+      && slot.keys().hasOnly(['weekday', 'startMinute', 'endMinute'])
+      && weekday is int && weekday >= 1 && weekday <= 7
+      && start is int && start >= 0 && start < 1440
+      && end is int && end >= 0 && end <= 1440
+      && start != end;
   }
 
   function validAvailability(data) {
@@ -235,13 +249,13 @@ service cloud.firestore {
         ])
         && slots is list
         && slots.size() <= 7
-        && validAvailabilitySlotAt(slots, 0)
-        && validAvailabilitySlotAt(slots, 1)
-        && validAvailabilitySlotAt(slots, 2)
-        && validAvailabilitySlotAt(slots, 3)
-        && validAvailabilitySlotAt(slots, 4)
-        && validAvailabilitySlotAt(slots, 5)
-        && validAvailabilitySlotAt(slots, 6)
+        && (slots.size() <= 0 || (slots[0] is map && validAvailabilitySlot(slots[0])))
+        && (slots.size() <= 1 || (slots[1] is map && validAvailabilitySlot(slots[1]) && slots[0].weekday < slots[1].weekday))
+        && (slots.size() <= 2 || (slots[2] is map && validAvailabilitySlot(slots[2]) && slots[1].weekday < slots[2].weekday))
+        && (slots.size() <= 3 || (slots[3] is map && validAvailabilitySlot(slots[3]) && slots[2].weekday < slots[3].weekday))
+        && (slots.size() <= 4 || (slots[4] is map && validAvailabilitySlot(slots[4]) && slots[3].weekday < slots[4].weekday))
+        && (slots.size() <= 5 || (slots[5] is map && validAvailabilitySlot(slots[5]) && slots[4].weekday < slots[5].weekday))
+        && (slots.size() <= 6 || (slots[6] is map && validAvailabilitySlot(slots[6]) && slots[5].weekday < slots[6].weekday))
       );
   }
 
@@ -295,6 +309,37 @@ service cloud.firestore {
         && data.updatedAt is timestamp;
     }
 
+    match /player_blocks/{uid}/blocked/{target} {
+      allow read: if owns(uid);
+      allow create, update: if owns(uid) && uid != target
+        && exists(/databases/$(database)/documents/players/$(target))
+        && request.resource.data.keys().hasOnly(['createdAt'])
+        && request.resource.data.createdAt == request.time;
+      allow delete: if owns(uid);
+    }
+    match /player_reports/{reportId} {
+      allow create: if signedIn()
+        && request.resource.data.keys().hasOnly([
+          'reporterId', 'reporterUsername', 'playerId', 'playerUsername',
+          'reasons', 'details', 'status', 'createdAt'])
+        && request.resource.data.reporterId == request.auth.uid
+        && request.resource.data.playerId is string
+        && request.resource.data.playerId != request.auth.uid
+        && request.resource.data.reporterUsername is string
+        && request.resource.data.playerUsername is string
+        && request.resource.data.reporterUsername == get(/databases/$(database)/documents/players/$(request.auth.uid)).data.username
+        && request.resource.data.playerUsername == get(/databases/$(database)/documents/players/$(request.resource.data.playerId)).data.username
+        && request.resource.data.reasons is list
+        && request.resource.data.reasons.size() >= 1
+        && request.resource.data.reasons.size() <= 5
+        && request.resource.data.reasons.toSet().size() == request.resource.data.reasons.size()
+        && request.resource.data.reasons.hasOnly(['Toxic behaviour', 'Harassment', 'Inappropriate language', 'Cheating', 'Other'])
+        && request.resource.data.details is string
+        && request.resource.data.details.size() <= 2000
+        && request.resource.data.status == 'pending'
+        && request.resource.data.createdAt == request.time;
+      allow read, update, delete: if false;
+    }
     // Direct messaging. Membership and message history are immutable to clients.
     match /chats/{chatId} {
       function member(data) {
@@ -302,7 +347,7 @@ service cloud.firestore {
       }
       function validChat(data) {
         return data.keys().hasOnly(['type', 'userIds', 'createdAt', 'updatedAt',
-            'lastMessageId', 'lastMessagePreview', 'lastSenderId'])
+            'lastMessageId', 'lastMessagePreview', 'lastSenderId', 'participantUsernames', 'lastSenderUsername'])
           && data.type == 'direct'
           && data.userIds is list && data.userIds.size() == 2
           && data.userIds[0] is string && data.userIds[1] is string
@@ -311,24 +356,39 @@ service cloud.firestore {
           && data.lastMessageId is string && data.lastMessagePreview is string
           && data.lastSenderId is string;
       }
+      function validNames(data) {
+        let names = data.get('participantUsernames', null);
+        return names == null || (
+          names is map
+          && names.keys().hasOnly(data.userIds)
+          && names.keys().hasAll(data.userIds)
+          && names[data.userIds[0]] == get(/databases/$(database)/documents/players/$(data.userIds[0])).data.username
+          && names[data.userIds[1]] == get(/databases/$(database)/documents/players/$(data.userIds[1])).data.username);
+      }
       // A missing-document get is needed to atomically open an existing/new chat.
       allow get: if signedIn() && (resource == null || member(resource.data));
       allow list: if member(resource.data);
       allow create: if member(request.resource.data)
+        && unblocked(request.resource.data.userIds)
         && validChat(request.resource.data)
+        && validNames(request.resource.data)
         && exists(/databases/$(database)/documents/players/$(request.resource.data.userIds[0]))
         && exists(/databases/$(database)/documents/players/$(request.resource.data.userIds[1]))
         && request.resource.data.createdAt == request.time
         && request.resource.data.updatedAt == request.time
         && request.resource.data.lastMessageId == ''
         && request.resource.data.lastMessagePreview == ''
-        && request.resource.data.lastSenderId == '';
+        && request.resource.data.lastSenderId == ''
+        && request.resource.data.get('lastSenderUsername', '') == '';
       allow update: if member(resource.data)
+        && unblocked(request.resource.data.userIds)
         && validChat(request.resource.data)
+        && validNames(request.resource.data)
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-          'lastMessageId', 'lastMessagePreview', 'lastSenderId', 'updatedAt'])
+          'lastMessageId', 'lastMessagePreview', 'lastSenderId', 'updatedAt', 'participantUsernames', 'lastSenderUsername'])
         && request.resource.data.updatedAt == request.time
         && request.resource.data.lastSenderId == request.auth.uid
+        && (!('lastSenderUsername' in request.resource.data) || request.resource.data.lastSenderUsername == get(/databases/$(database)/documents/players/$(request.auth.uid)).data.username)
         && request.resource.data.lastMessageId != ''
         && !exists(/databases/$(database)/documents/chats/$(chatId)/messages/$(request.resource.data.lastMessageId))
         && getAfter(/databases/$(database)/documents/chats/$(chatId)/messages/$(request.resource.data.lastMessageId)).data.senderId == request.auth.uid
@@ -347,26 +407,35 @@ service cloud.firestore {
 
       match /messages/{messageId} {
         function validMessageKind(data) {
+          let users = get(/databases/$(database)/documents/chats/$(chatId)).data.userIds;
+          let recipient = users[0] == request.auth.uid ? users[1] : users[0];
           let kind = data.get('type', 'text');
           return (kind == 'text'
-              && data.keys().hasOnly(['senderId', 'text', 'createdAt', 'type']))
+              && data.keys().hasOnly(['senderId', 'senderUsername', 'text', 'createdAt', 'type']))
             || (kind == 'party_invite'
-              && data.keys().hasOnly(['senderId', 'text', 'createdAt', 'type', 'partyId'])
+              && data.keys().hasOnly(['senderId', 'senderUsername', 'text', 'createdAt', 'type', 'partyId'])
               && data.partyId is string
               && data.partyId.size() > 0 && data.partyId.size() <= 1500
               && data.partyId.matches('[^/]+')
               && data.text == 'Party invitation'
               && get(/databases/$(database)/documents/parties/$(data.partyId)).data.hostId == request.auth.uid
-              && get(/databases/$(database)/documents/parties/$(data.partyId)).data.visibility == 'public'
-              && get(/databases/$(database)/documents/parties/$(data.partyId)).data.status == 'open');
+              && get(/databases/$(database)/documents/parties/$(data.partyId)).data.status == 'open'
+              && get(/databases/$(database)/documents/parties/$(data.partyId)).data.memberCount
+                < get(/databases/$(database)/documents/parties/$(data.partyId)).data.maxPlayers
+              && (get(/databases/$(database)/documents/parties/$(data.partyId)).data.visibility == 'public'
+                || (getAfter(/databases/$(database)/documents/parties/$(data.partyId)/invitations/$(recipient)).data.hostId == request.auth.uid
+                  && getAfter(/databases/$(database)/documents/parties/$(data.partyId)/invitations/$(recipient)).data.chatId == chatId
+                  && getAfter(/databases/$(database)/documents/parties/$(data.partyId)/invitations/$(recipient)).data.messageId == messageId)));
         }
         function parent() {
           return get(/databases/$(database)/documents/chats/$(chatId)).data;
         }
         allow read: if member(parent());
         allow create: if member(parent())
+          && unblocked(parent().userIds)
           && validMessageKind(request.resource.data)
           && request.resource.data.senderId == request.auth.uid
+          && (!('senderUsername' in request.resource.data) || request.resource.data.senderUsername == get(/databases/$(database)/documents/players/$(request.auth.uid)).data.username)
           && request.resource.data.text is string
           && request.resource.data.text.size() > 0
           && request.resource.data.text.size() <= 2000
@@ -378,12 +447,261 @@ service cloud.firestore {
       }
     }
 
-    // Initial party integration: discovery reads only. Writes remain blocked.
+    function validPartyDetails(data) {
+      return data.keys().hasAll([
+          'title', 'hostId', 'gameId', 'region', 'mode', 'visibility',
+          'maxPlayers', 'memberCount', 'minRank', 'maxRank', 'playstyles',
+          'communication', 'minimumRating', 'description', 'status',
+          'createdAt', 'updatedAt', 'startedAt', 'completedAt'
+        ])
+        && data.keys().hasOnly([
+          'title', 'hostId', 'gameId', 'region', 'mode', 'visibility',
+          'maxPlayers', 'memberCount', 'minRank', 'maxRank', 'playstyles',
+          'communication', 'minimumRating', 'description', 'status',
+          'createdAt', 'updatedAt', 'startedAt', 'completedAt', 'lastRemovedMemberId'
+        ])
+        && data.hostId == request.auth.uid
+        && data.title is string && data.title.size() >= 1 && data.title.size() <= 60
+        && data.title.matches('.*\\S.*')
+        && data.gameId in ['valorant', 'mobile_legends', 'fortnite']
+        && data.region in ['asia', 'europe', 'north_america', 'south_america', 'africa', 'oceania']
+        && data.mode in ['competitive', 'casual']
+        && data.visibility in ['public', 'private']
+        && data.maxPlayers is int && data.maxPlayers >= 2 && data.maxPlayers <= 10
+        && data.minimumRating is number && data.minimumRating >= 0 && data.minimumRating <= 5
+        && data.playstyles is list && data.playstyles.size() >= 1 && data.playstyles.size() <= 3
+        && data.playstyles.hasOnly(['chill', 'serious', 'fun'])
+        && data.playstyles.toSet().size() == data.playstyles.size()
+        && data.communication in ['mic_required', 'voice_optional', 'chat_only']
+        && data.description is string && data.description.size() <= 500
+        && (
+          (data.minRank == null && data.maxRank == null)
+          || (data.minRank is int && data.maxRank is int
+              && data.minRank >= 0 && data.maxRank < catalogueRankCount(data.gameId) && data.minRank <= data.maxRank)
+        )
+        ;
+    }
+
+    function validNewParty(data) {
+      return validPartyDetails(data)
+        && !('lastRemovedMemberId' in data)
+        && data.memberCount == 1 && data.status == 'open'
+        && data.createdAt == request.time && data.updatedAt == request.time
+        && data.startedAt == null && data.completedAt == null;
+    }
+
+    function validHostMembership(data) {
+      return data.keys().hasAll(['role', 'joinedAt', 'leftAt'])
+        && data.keys().hasOnly(['role', 'joinedAt', 'leftAt'])
+        && data.role == 'host' && data.joinedAt == request.time && data.leftAt == null;
+    }
+
+    // One counter per host serializes creation across devices.
+    // Existing hosts may initially have >1; closing each session reduces it.
+    match /party_host_slots/{uid} {
+      allow get: if owns(uid);
+      allow list, delete: if false;
+      allow create, update: if owns(uid)
+        && request.resource.data.keys().hasAll(['activeCount', 'lastPartyId', 'updatedAt'])
+        && request.resource.data.keys().hasOnly(['activeCount', 'lastPartyId', 'updatedAt'])
+        && request.resource.data.activeCount is int
+        && request.resource.data.activeCount >= 0
+        && request.resource.data.lastPartyId is string
+        && request.resource.data.updatedAt == request.time
+        && (
+          (request.resource.data.activeCount == 1
+            && (resource == null || resource.data.activeCount == 0)
+            && !exists(/databases/$(database)/documents/parties/$(request.resource.data.lastPartyId))
+            && getAfter(/databases/$(database)/documents/parties/$(request.resource.data.lastPartyId)).data.hostId == uid
+            && getAfter(/databases/$(database)/documents/parties/$(request.resource.data.lastPartyId)).data.status == 'open')
+          || (resource != null && resource.data.activeCount > 0
+            && request.resource.data.activeCount == resource.data.activeCount - 1
+            && get(/databases/$(database)/documents/parties/$(request.resource.data.lastPartyId)).data.hostId == uid
+            && get(/databases/$(database)/documents/parties/$(request.resource.data.lastPartyId)).data.status == 'open'
+            && getAfter(/databases/$(database)/documents/parties/$(request.resource.data.lastPartyId)).data.status == 'closed')
+        );
+    }
+
+    match /party_memberships/{uid} {
+      allow get: if owns(uid);
+      allow list: if false;
+      function canReplace() {
+        return resource == null
+          || get(/databases/$(database)/documents/parties/$(resource.data.partyId)).data.status != 'open'
+          || get(/databases/$(database)/documents/parties/$(resource.data.partyId)/members/$(uid)).data.leftAt != null;
+      }
+      allow create, update: if owns(uid) && canReplace()
+        && request.resource.data.keys().hasAll(['partyId', 'updatedAt'])
+        && request.resource.data.keys().hasOnly(['partyId', 'updatedAt'])
+        && request.resource.data.partyId is string
+        && request.resource.data.updatedAt == request.time
+        && getAfter(/databases/$(database)/documents/parties/$(request.resource.data.partyId)/members/$(uid)).data.role == 'member'
+        && getAfter(/databases/$(database)/documents/parties/$(request.resource.data.partyId)/members/$(uid)).data.leftAt == null
+        && getAfter(/databases/$(database)/documents/parties/$(request.resource.data.partyId)/members/$(uid)).data.joinedAt == request.time
+        && getAfter(/databases/$(database)/documents/parties/$(request.resource.data.partyId)).data.memberCount
+          == get(/databases/$(database)/documents/parties/$(request.resource.data.partyId)).data.memberCount + 1;
+      allow delete: if owns(uid) && (
+        get(/databases/$(database)/documents/parties/$(resource.data.partyId)).data.status != 'open'
+        || getAfter(/databases/$(database)/documents/parties/$(resource.data.partyId)/members/$(uid)).data.leftAt == request.time);
+    }
+
+    function noActiveJoinedParty(uid) {
+      let pointer = /databases/$(database)/documents/party_memberships/$(uid);
+      return !existsAfter(pointer)
+        || getAfter(/databases/$(database)/documents/parties/$(getAfter(pointer).data.partyId)).data.status != 'open'
+        || getAfter(/databases/$(database)/documents/parties/$(getAfter(pointer).data.partyId)/members/$(uid)).data.leftAt != null;
+    }
+
     match /parties/{partyId} {
-      allow read: if signedIn()
-        && resource.data.visibility == 'public'
-        && resource.data.status == 'open';
-      allow write: if false;
+      allow read: if signedIn() && (
+        (resource.data.visibility == 'public' && resource.data.status == 'open')
+        || resource.data.hostId == request.auth.uid
+        || activeMember(request.auth.uid)
+        || (resource.data.status == 'open'
+          && exists(/databases/$(database)/documents/parties/$(partyId)/invitations/$(request.auth.uid)))
+      );
+      // The host membership must be included in the same atomic write.
+      allow create: if signedIn() && validNewParty(request.resource.data)
+        && noActiveJoinedParty(request.auth.uid)
+        && (!exists(/databases/$(database)/documents/party_host_slots/$(request.auth.uid))
+          || get(/databases/$(database)/documents/party_host_slots/$(request.auth.uid)).data.activeCount == 0)
+        && getAfter(/databases/$(database)/documents/party_host_slots/$(request.auth.uid)).data.activeCount == 1
+        && getAfter(/databases/$(database)/documents/party_host_slots/$(request.auth.uid)).data.lastPartyId == partyId
+        && validHostMembership(getAfter(
+          /databases/$(database)/documents/parties/$(partyId)/members/$(request.auth.uid)
+        ).data);
+      function activeMember(uid) {
+        return exists(/databases/$(database)/documents/parties/$(partyId)/members/$(uid))
+          && get(/databases/$(database)/documents/parties/$(partyId)/members/$(uid)).data.leftAt == null;
+      }
+      function canJoin() {
+        let member = /databases/$(database)/documents/parties/$(partyId)/members/$(request.auth.uid);
+        let joined = getAfter(member).data;
+        return resource.data.status == 'open' && request.auth.uid != resource.data.hostId
+          && (!existsAfter(/databases/$(database)/documents/party_host_slots/$(request.auth.uid))
+            || getAfter(/databases/$(database)/documents/party_host_slots/$(request.auth.uid)).data.activeCount == 0)
+          && resource.data.memberCount < resource.data.maxPlayers
+          && (resource.data.visibility == 'public'
+            || exists(/databases/$(database)/documents/parties/$(partyId)/invitations/$(request.auth.uid)))
+          && (!exists(member) || (get(member).data.leftAt != null
+            && (get(member).data.get('removedBy', null) == null
+              || (exists(/databases/$(database)/documents/parties/$(partyId)/invitations/$(request.auth.uid))
+                && get(/databases/$(database)/documents/parties/$(partyId)/invitations/$(request.auth.uid)).data.createdAt > get(member).data.leftAt))))
+          && unblocked([resource.data.hostId, request.auth.uid])
+          && joined.keys().hasAll(['role', 'joinedAt', 'leftAt'])
+          && joined.keys().hasOnly(['role', 'joinedAt', 'leftAt'])
+          && joined.role == 'member' && joined.joinedAt == request.time && joined.leftAt == null
+          && getAfter(/databases/$(database)/documents/party_memberships/$(request.auth.uid)).data.partyId == partyId;
+      }
+      function leftSelf() {
+        return activeMember(request.auth.uid)
+          && getAfter(/databases/$(database)/documents/parties/$(partyId)/members/$(request.auth.uid)).data.leftAt == request.time;
+      }
+      allow update: if signedIn() && resource.data.status == 'open'
+        && request.resource.data.updatedAt == request.time
+        && (
+          (resource.data.hostId == request.auth.uid
+            && validPartyDetails(request.resource.data)
+            && request.resource.data.maxPlayers >= resource.data.memberCount
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+              'title', 'gameId', 'region', 'mode', 'visibility', 'maxPlayers',
+              'minRank', 'maxRank', 'playstyles', 'communication',
+              'minimumRating', 'description', 'updatedAt']))
+          || (resource.data.hostId == request.auth.uid
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['memberCount', 'updatedAt', 'lastRemovedMemberId'])
+            && request.resource.data.lastRemovedMemberId is string
+            && request.resource.data.lastRemovedMemberId != resource.data.hostId
+            && resource.data.memberCount > 1
+            && request.resource.data.memberCount == resource.data.memberCount - 1
+            && get(/databases/$(database)/documents/parties/$(partyId)/members/$(request.resource.data.lastRemovedMemberId)).data.role == 'member'
+            && get(/databases/$(database)/documents/parties/$(partyId)/members/$(request.resource.data.lastRemovedMemberId)).data.leftAt == null
+            && getAfter(/databases/$(database)/documents/parties/$(partyId)/members/$(request.resource.data.lastRemovedMemberId)).data.leftAt == request.time
+            && getAfter(/databases/$(database)/documents/parties/$(partyId)/members/$(request.resource.data.lastRemovedMemberId)).data.removedBy == request.auth.uid)
+          || (canJoin()
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['memberCount', 'updatedAt'])
+            && request.resource.data.memberCount == resource.data.memberCount + 1)
+          || (leftSelf()
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'memberCount', 'updatedAt'])
+            && (resource.data.hostId == request.auth.uid
+              ? request.resource.data.status == 'closed' && request.resource.data.memberCount == 0
+                && getAfter(/databases/$(database)/documents/party_host_slots/$(request.auth.uid)).data.activeCount
+                  == get(/databases/$(database)/documents/party_host_slots/$(request.auth.uid)).data.activeCount - 1
+                && getAfter(/databases/$(database)/documents/party_host_slots/$(request.auth.uid)).data.lastPartyId == partyId
+              : request.resource.data.status == 'open'
+                && resource.data.memberCount > 1
+                && request.resource.data.memberCount == resource.data.memberCount - 1))
+        );
+      allow delete: if false;
+
+      match /invitations/{uid} {
+        function partyData() {
+          return get(/databases/$(database)/documents/parties/$(partyId)).data;
+        }
+        function validInvite(data) {
+          let chat = getAfter(/databases/$(database)/documents/chats/$(data.chatId)).data;
+          let message = getAfter(/databases/$(database)/documents/chats/$(data.chatId)/messages/$(data.messageId)).data;
+          return data.keys().hasAll(['hostId', 'chatId', 'messageId', 'createdAt'])
+            && data.keys().hasOnly(['hostId', 'chatId', 'messageId', 'createdAt'])
+            && data.hostId == request.auth.uid && uid != request.auth.uid
+            && partyData().hostId == request.auth.uid && partyData().status == 'open'
+            && partyData().memberCount < partyData().maxPlayers
+            && exists(/databases/$(database)/documents/players/$(uid))
+            && (!exists(/databases/$(database)/documents/parties/$(partyId)/members/$(uid))
+              || get(/databases/$(database)/documents/parties/$(partyId)/members/$(uid)).data.leftAt != null)
+            && data.createdAt == request.time
+            && chat.type == 'direct' && chat.userIds.size() == 2
+            && uid in chat.userIds && request.auth.uid in chat.userIds
+            && message.type == 'party_invite' && message.partyId == partyId
+            && message.senderId == request.auth.uid && message.createdAt == request.time;
+        }
+        allow get: if signedIn() && (owns(uid) || partyData().hostId == request.auth.uid);
+        allow list: if signedIn() && partyData().hostId == request.auth.uid;
+        allow create, update: if signedIn() && validInvite(request.resource.data);
+        allow delete: if false;
+      }
+
+      match /members/{uid} {
+        function parent() { return get(/databases/$(database)/documents/parties/$(partyId)).data; }
+        function joining() {
+          let data = request.resource.data;
+          return uid != parent().hostId && parent().status == 'open'
+            && parent().memberCount < parent().maxPlayers
+            && (parent().visibility == 'public' || exists(/databases/$(database)/documents/parties/$(partyId)/invitations/$(uid)))
+            && data.keys().hasAll(['role', 'joinedAt', 'leftAt']) && data.keys().hasOnly(['role', 'joinedAt', 'leftAt'])
+            && data.role == 'member' && data.joinedAt == request.time && data.leftAt == null
+            && getAfter(/databases/$(database)/documents/parties/$(partyId)).data.memberCount == parent().memberCount + 1
+            && getAfter(/databases/$(database)/documents/party_memberships/$(uid)).data.partyId == partyId;
+        }
+        function canPreviewRoster() {
+          return parent().status == 'open' && (parent().visibility == 'public'
+            || activeMember(request.auth.uid)
+            || exists(/databases/$(database)/documents/parties/$(partyId)/invitations/$(request.auth.uid)));
+        }
+        allow get: if signedIn() && (owns(uid) || parent().hostId == request.auth.uid || canPreviewRoster());
+        allow list: if signedIn() && (parent().hostId == request.auth.uid || canPreviewRoster());
+        allow create: if owns(uid) && (
+          (!exists(/databases/$(database)/documents/parties/$(partyId))
+            && getAfter(/databases/$(database)/documents/parties/$(partyId)).data.hostId == uid
+            && validHostMembership(request.resource.data)) || joining());
+        allow update: if owns(uid) && (
+          (resource.data.leftAt != null && joining())
+          || (resource.data.leftAt == null
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['leftAt'])
+            && request.resource.data.leftAt == request.time
+            && parent().status == 'open'
+            && (parent().hostId == uid
+              ? getAfter(/databases/$(database)/documents/parties/$(partyId)).data.status == 'closed'
+                && getAfter(/databases/$(database)/documents/parties/$(partyId)).data.memberCount == 0
+              : getAfter(/databases/$(database)/documents/parties/$(partyId)).data.status == 'open'
+                && getAfter(/databases/$(database)/documents/parties/$(partyId)).data.memberCount == parent().memberCount - 1)));
+        allow update: if signedIn() && parent().hostId == request.auth.uid && uid != request.auth.uid
+          && parent().status == 'open' && resource.data.role == 'member' && resource.data.leftAt == null
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['leftAt', 'removedBy'])
+          && request.resource.data.leftAt == request.time && request.resource.data.removedBy == request.auth.uid
+          && getAfter(/databases/$(database)/documents/parties/$(partyId)).data.lastRemovedMemberId == uid
+          && getAfter(/databases/$(database)/documents/parties/$(partyId)).data.memberCount == parent().memberCount - 1;
+        allow delete: if false;
+      }
     }
     match /players/{uid} {
       allow read: if signedIn();
@@ -393,16 +711,22 @@ service cloud.firestore {
         && request.resource.data.createdAt == request.time
         && request.resource.data.updatedAt == request.time;
 
-      allow update: if owns(uid)
-        && validPublicProfile(request.resource.data)
-        && request.resource.data.diff(resource.data).affectedKeys()
-        .hasOnly([
+      function validProfileUpdate() {
+        let data = request.resource.data;
+        let changed = data.diff(resource.data).affectedKeys();
+        return owns(uid) && data.updatedAt == request.time && (
+          (changed.hasOnly(['availability', 'updatedAt']) && validAvailability(data))
+          || (changed.hasOnly([
           'username', 'bio', 'region', 'updatedAt',
           'sharedAge', 'ageSharedAt', 'sharedGender',
           'games', 'currentGame', 'mode', 'playstyles',
           'communication', 'rank', 'gameRanks', 'availability'
         ])
-        && request.resource.data.updatedAt == request.time;
+            && validPublicProfile(data)
+            && (!changed.hasAny(['availability']) || validAvailability(data)))
+        );
+      }
+      allow update: if validProfileUpdate();
 
       allow delete: if false;
     }

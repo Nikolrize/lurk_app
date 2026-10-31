@@ -87,7 +87,7 @@ test('gaming preferences ownership and validation', async () => {
       { mode: 'invalid' },
       { playstyles: ['invalid'] },
       { communication: 'invalid' },
-      { rank: 8 },
+      { rank: 9 },
       { rank: 'Gold' },
       { currentGame: 'fortnite', rank: 3 },
       { rating: 5 },
@@ -100,6 +100,12 @@ test('gaming preferences ownership and validation', async () => {
       }));
     }
 
+    await assertSucceeds(updateDoc(aliceProfile, { rank: 8, gameRanks: { valorant: 'radiant' }, updatedAt: serverTimestamp() }));
+    await assertSucceeds(updateDoc(aliceProfile, {
+      games: ['valorant', 'fortnite', 'mobile_legends'], currentGame: 'mobile_legends',
+      rank: 9, gameRanks: { valorant: 'radiant', mobile_legends: 'mythical_immortal' }, updatedAt: serverTimestamp(),
+    }));
+    await assertFails(updateDoc(aliceProfile, { rank: 10, updatedAt: serverTimestamp() }));
     // Changing game works when its incompatible rank is cleared.
     await assertSucceeds(updateDoc(aliceProfile, {
       currentGame: 'fortnite',

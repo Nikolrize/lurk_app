@@ -7,7 +7,13 @@ import '../widgets/chat_widgets.dart';
 import 'chat_screen.dart';
 
 class NewMessageScreen extends ConsumerStatefulWidget {
-  const NewMessageScreen({super.key});
+  const NewMessageScreen({
+    super.key,
+    this.invitePartyId,
+    this.excludedPlayerIds = const {},
+  });
+  final String? invitePartyId;
+  final Set<String> excludedPlayerIds;
   @override
   ConsumerState<NewMessageScreen> createState() => _NewMessageScreenState();
 }
@@ -22,17 +28,32 @@ class _NewMessageScreenState extends ConsumerState<NewMessageScreen> {
     setState(() => _opening = otherUid);
     try {
       final id = await ref.read(chatServiceProvider).openDirect(uid, otherUid);
+      final partyId = widget.invitePartyId;
+      if (partyId != null) {
+        await ref.read(chatServiceProvider).sendPartyInvite(id, uid, partyId);
+      }
       if (!mounted) return;
+      if (partyId != null) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Party invitation sent.')));
+      }
       Navigator.of(context).pushReplacement(
         MaterialPageRoute<void>(
           builder: (_) => ChatScreen(chatId: id, otherUid: otherUid),
         ),
       );
-    } catch (_) {
+    } catch (error) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Could not open this chat. Please try again.'),
+          SnackBar(
+            content: Text(
+              widget.invitePartyId == null
+                  ? 'Could not open this chat. Please try again.'
+                  : error is StateError
+                  ? error.message.toString()
+                  : 'Could not send the invitation. Check your connection and party access, then try again.',
+            ),
           ),
         );
       }
@@ -45,7 +66,11 @@ class _NewMessageScreenState extends ConsumerState<NewMessageScreen> {
   Widget build(BuildContext context) {
     final players = ref.watch(discoverablePlayersProvider);
     return Scaffold(
-      appBar: AppBar(title: const Text('New message')),
+      appBar: AppBar(
+        title: Text(
+          widget.invitePartyId == null ? 'New message' : 'Invite player',
+        ),
+      ),
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(24),
@@ -76,6 +101,7 @@ class _NewMessageScreenState extends ConsumerState<NewMessageScreen> {
                         .where(
                           (player) =>
                               player.id != uid &&
+                              !widget.excludedPlayerIds.contains(player.id) &&
                               player.name.toLowerCase().contains(_search),
                         )
                         .toList();
@@ -99,7 +125,11 @@ class _NewMessageScreenState extends ConsumerState<NewMessageScreen> {
                           ),
                           leading: ChatAvatar(name: name),
                           title: Text(name),
-                          subtitle: const Text('Start a chat'),
+                          subtitle: Text(
+                            widget.invitePartyId == null
+                                ? 'Start a chat'
+                                : 'Send party invitation',
+                          ),
                           trailing: _opening == player.id
                               ? const SizedBox(
                                   width: 20,
@@ -108,7 +138,11 @@ class _NewMessageScreenState extends ConsumerState<NewMessageScreen> {
                                     strokeWidth: 2,
                                   ),
                                 )
-                              : const Icon(Icons.chevron_right),
+                              : Icon(
+                                  widget.invitePartyId == null
+                                      ? Icons.chevron_right
+                                      : Icons.person_add_alt_1,
+                                ),
                           enabled: _opening == null,
                           onTap: () => _open(player.id),
                         );
