@@ -57,12 +57,19 @@ class LobbyMemberCard extends StatelessWidget {
           padding: const EdgeInsets.fromLTRB(16, 18, 4, 18),
           child: Row(
             children: [
-              CircleAvatar(
-                radius: 27,
-                backgroundColor: colors.surfaceContainerHighest,
-                child: Icon(
-                  Icons.person_outline,
-                  color: colors.onSurfaceVariant,
+              Tooltip(
+                message: 'View ${member.name} profile',
+                child: InkWell(
+                  onTap: onViewProfile,
+                  borderRadius: BorderRadius.circular(27),
+                  child: CircleAvatar(
+                    radius: 27,
+                    backgroundColor: colors.surfaceContainerHighest,
+                    child: Icon(
+                      Icons.person_outline,
+                      color: colors.onSurfaceVariant,
+                    ),
+                  ),
                 ),
               ),
               const SizedBox(width: 14),

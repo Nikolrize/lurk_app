@@ -74,12 +74,19 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         };
       });
     } on GoogleSignInException catch (error) {
+      debugPrint('Google sign-in failed (${error.code.name}): ${error.description}');
       if (!mounted) return;
 
       setState(() {
-        _errorMessage = error.code == GoogleSignInExceptionCode.canceled
-            ? null
-            : 'Google sign-in failed. Please try again';
+        _errorMessage = switch (error.code) {
+          GoogleSignInExceptionCode.canceled =>
+            'Google sign-in was canceled or could not complete. Please try again. '
+                'If this keeps happening after choosing an account, contact support.',
+          GoogleSignInExceptionCode.clientConfigurationError ||
+          GoogleSignInExceptionCode.providerConfigurationError =>
+            'Google sign-in is not configured correctly for this app. Contact support.',
+          _ => 'Google sign-in failed. Please try again.',
+        };
       });
     } catch (_) {
       if (!mounted) return;

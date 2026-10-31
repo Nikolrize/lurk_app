@@ -21,6 +21,39 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
+    match /player_reviews/{targetUid}/reviews/{reviewId} {
+      function participatedTogether(partyId) {
+        let party = get(/databases/$(database)/documents/parties/$(partyId)).data;
+        let me = get(/databases/$(database)/documents/parties/$(partyId)/members/$(request.auth.uid)).data;
+        let peer = get(/databases/$(database)/documents/parties/$(partyId)/members/$(targetUid)).data;
+        let sessionEnd = party.get('completedAt', null) is timestamp ? party.completedAt : party.updatedAt;
+        let myEnd = me.leftAt is timestamp ? me.leftAt : sessionEnd;
+        let peerEnd = peer.leftAt is timestamp ? peer.leftAt : (party.status == 'closed' ? sessionEnd : request.time);
+        return hasPartyHistory(partyId)
+          && (me.leftAt is timestamp || party.status == 'closed')
+          && me.joinedAt is timestamp && peer.joinedAt is timestamp
+          && myEnd is timestamp && peerEnd is timestamp
+          && me.joinedAt < myEnd && peer.joinedAt < peerEnd
+          && me.joinedAt < peerEnd && peer.joinedAt < myEnd;
+      }
+      allow read: if signedIn();
+      allow create: if signedIn() && request.auth.uid != targetUid
+        && request.resource.data.keys().hasOnly(['partyId', 'raterId', 'stars', 'tags', 'comment', 'createdAt'])
+        && request.resource.data.partyId is string
+        && request.resource.data.partyId.matches('[^/]+')
+        && reviewId == request.resource.data.partyId + '_' + request.auth.uid
+        && request.resource.data.raterId == request.auth.uid
+        && request.resource.data.stars is int
+        && request.resource.data.stars >= 1 && request.resource.data.stars <= 5
+        && request.resource.data.tags is list && request.resource.data.tags.size() <= 4
+        && request.resource.data.tags.toSet().size() == request.resource.data.tags.size()
+        && request.resource.data.tags.hasOnly(['Good communication', 'Team player', 'Friendly', 'Skilled'])
+        && request.resource.data.comment is string && request.resource.data.comment.size() <= 500
+        && request.resource.data.createdAt == request.time
+        && exists(/databases/$(database)/documents/players/$(targetUid))
+        && participatedTogether(request.resource.data.partyId);
+      allow update, delete: if false;
+    }
     match /notification_preferences/{uid} {
       allow read: if owns(uid);
       allow create, update: if owns(uid)
@@ -47,6 +80,147 @@ service cloud.firestore {
     function owns(uid) {
       return signedIn() && request.auth.uid == uid;
     }
+
+    //verification
+    //admin membership managed through firebase console
+    //requests contain private ID details, public status contains no ID detials
+    function isVerificationAdmin() {
+      return signedIn()
+        && exists(/databases/$(database)/documents/verification_admins/$(request.auth.uid))
+        && get(/databases/$(database)/documents/verification_admins/$(request.auth.uid)).data.get('enabled', false) == true;
+    }
+
+    function verificationText(value, minimum, maximum) {
+      return value is string
+        && value.size() >= minimum
+        && value.size() <= maximum
+        && value.matches('[\\s\\S]*[^\\s][\\s\\S]*');
+    }
+
+    match /verification_admins/{uid} {
+      allow get: if owns(uid);
+      allow list, create, update, delete: if false;
+    }
+
+    match /verification_requests/{uid} {
+      function validVerificationRequest(data) {
+        let fields = [
+          'submissionId', 'fullName', 'idType', 'idNumber',
+          'dateOfBirth', 'idPhotoPath', 'confirmed', 'status',
+          'submittedAt', 'reviewedAt', 'reviewedBy', 'rejectionReason'
+        ];
+        let photo = data.get('idPhotoPath', '');
+        let parts = photo is string ? photo.split('/') : [];
+
+        return data.keys().hasAll(fields)
+          && data.keys().hasOnly(fields)
+          && data.submissionId is string
+          && data.submissionId.matches('^[a-f0-9-]{36}$')
+          && verificationText(data.fullName, 2, 100)
+          && data.idType in ['nric', 'passport']
+          && verificationText(data.idNumber, 4, 40)
+          && data.dateOfBirth is timestamp
+          && data.dateOfBirth >= timestamp.date(1900, 1, 1)
+          && data.dateOfBirth <= request.time
+          && photo is string && photo.size() <= 200
+          && parts.size() == 3
+          && parts[0] == uid
+          && parts[1] == data.submissionId
+          && parts[2].matches('^id[.](jpg|png|webp)$')
+          && data.confirmed == true
+          && data.submittedAt is timestamp
+          && data.submittedAt <= request.time
+          && data.rejectionReason is string
+          && data.rejectionReason.size() <= 300
+          && (
+            (data.status == 'pending'
+              && data.reviewedAt == null
+              && data.reviewedBy == null
+              && data.rejectionReason == '')
+            || (data.status in ['verified', 'rejected']
+              && data.reviewedAt is timestamp
+              && data.reviewedAt >= data.submittedAt
+              && data.reviewedAt <= request.time
+              && data.reviewedBy is string
+              && data.reviewedBy.size() > 0
+              && data.reviewedBy.size() <= 128
+              && (
+                (data.status == 'verified' && data.rejectionReason == '')
+                || (data.status == 'rejected'
+                  && verificationText(data.rejectionReason, 3, 300))
+              ))
+          );
+      }
+
+      function matchingPublicStatus(status) {
+        let summary = getAfter(/databases/$(database)/documents/verification_status/$(uid)).data;
+        return summary.status == status && summary.updatedAt == request.time;
+      }
+
+      function validNewSubmission(data) {
+        return owns(uid)
+          && validVerificationRequest(data)
+          && data.status == 'pending'
+          && data.submittedAt == request.time
+          && matchingPublicStatus('pending');
+      }
+
+      function validAdminReview(data) {
+        return isVerificationAdmin()
+          && request.auth.uid != uid
+          && resource.data.status == 'pending'
+          && validVerificationRequest(data)
+          && data.diff(resource.data).affectedKeys().hasOnly([
+            'status', 'reviewedAt', 'reviewedBy', 'rejectionReason'
+          ])
+          && data.status in ['verified', 'rejected']
+          && data.reviewedBy == request.auth.uid
+          && data.reviewedAt == request.time
+          && matchingPublicStatus(data.status);
+      }
+
+      allow get: if owns(uid) || isVerificationAdmin();
+      allow list: if isVerificationAdmin()
+        && request.query.limit != null
+        && request.query.limit <= 100;
+      allow create: if validNewSubmission(request.resource.data);
+      allow update: if (
+          resource.data.status == 'rejected'
+          && request.resource.data.submissionId != resource.data.submissionId
+          && validNewSubmission(request.resource.data)
+        ) || validAdminReview(request.resource.data);
+      allow delete: if false;
+    }
+
+    match /verification_status/{uid} {
+      function validVerificationSummary(data) {
+        return data.keys().hasAll(['status', 'updatedAt'])
+          && data.keys().hasOnly(['status', 'updatedAt'])
+          && data.status in ['pending', 'verified', 'rejected']
+          && data.updatedAt is timestamp
+          && data.updatedAt == request.time;
+      }
+
+      function matchingPrivateRequest(data) {
+        let submission = getAfter(/databases/$(database)/documents/verification_requests/$(uid)).data;
+        return submission.status == data.status && (
+          (owns(uid) && data.status == 'pending'
+            && submission.submittedAt == request.time)
+          || (isVerificationAdmin() && request.auth.uid != uid
+            && data.status in ['verified', 'rejected']
+            && submission.reviewedBy == request.auth.uid
+            && submission.reviewedAt == request.time)
+        );
+      }
+
+      allow read: if signedIn();
+      allow create, update: if signedIn()
+        && validVerificationSummary(request.resource.data)
+        && matchingPrivateRequest(request.resource.data);
+      allow delete: if false;
+    }
+
+
 
     function unblocked(users) {
       return !exists(/databases/$(database)/documents/player_blocks/$(users[0])/users/$(users[1]))
@@ -87,42 +261,100 @@ service cloud.firestore {
       );
     }
 
-    // Keep these server-side bounds aligned with GameCatalog.
+    // Supported game IDs and rank positions mirror GameCatalog.
+    // Public gameRanks maps only contain selected ranked games (maximum six).
+    function catalogueGames() {
+      return [
+        'valorant', 'mobile_legends', 'fortnite', 'apex_legends', 'cs2',
+        'honor_of_kings', 'league_of_legends', 'minecraft', 'roblox', 'peak'
+      ];
+    }
+    function catalogueRankNumbers(game) {
+      // Select one map so validation stays below the rules expression limit.
+      return game == 'valorant' ? {
+          'iron': 0,
+          'bronze': 1,
+          'silver': 2,
+          'gold': 3,
+          'platinum': 4,
+          'diamond': 5,
+          'ascendant': 6,
+          'immortal': 7,
+          'radiant': 8
+        } :
+        game == 'mobile_legends' ? {
+          'warrior': 0,
+          'elite': 1,
+          'master': 2,
+          'grandmaster': 3,
+          'epic': 4,
+          'legend': 5,
+          'mythic': 6,
+          'mythical_honor': 7,
+          'mythical_glory': 8,
+          'mythical_immortal': 9
+        } :
+        game == 'apex_legends' ? {
+          'rookie': 0,
+          'bronze': 1,
+          'silver': 2,
+          'gold': 3,
+          'platinum': 4,
+          'diamond': 5,
+          'master': 6,
+          'apex_predator': 7
+        } :
+        game == 'cs2' ? {
+          'silver_1': 0,
+          'silver_2': 1,
+          'silver_3': 2,
+          'silver_4': 3,
+          'silver_elite': 4,
+          'silver_elite_master': 5,
+          'gold_nova_1': 6,
+          'gold_nova_2': 7,
+          'gold_nova_3': 8,
+          'gold_nova_master': 9,
+          'master_guardian_1': 10,
+          'master_guardian_2': 11,
+          'master_guardian_elite': 12,
+          'distinguished_master_guardian': 13,
+          'legendary_eagle': 14,
+          'legendary_eagle_master': 15,
+          'supreme_master_first_class': 16,
+          'global_elite': 17
+        } :
+        game == 'honor_of_kings' ? {
+          'bronze': 0,
+          'silver': 1,
+          'gold': 2,
+          'platinum': 3,
+          'diamond': 4,
+          'master': 5,
+          'grandmaster': 6,
+          'mythic': 7,
+          'epic': 8,
+          'legend': 9
+        } :
+        game == 'league_of_legends' ? {
+          'iron': 0,
+          'bronze': 1,
+          'silver': 2,
+          'gold': 3,
+          'platinum': 4,
+          'emerald': 5,
+          'diamond': 6,
+          'master': 7,
+          'grandmaster': 8,
+          'challenger': 9
+        } : {};
+    }
     function catalogueRankCount(game) {
-      return {'valorant': 9, 'mobile_legends': 10, 'fortnite': 0}.get(game, 0);
+      return catalogueRankNumbers(game).size();
     }
     //rank number same as game's catalogue position
     function rankNumber(game, rankId) {
-      let valorant = {
-        'iron': 0,
-        'bronze': 1,
-        'silver': 2,
-        'gold': 3,
-        'platinum': 4,
-        'diamond': 5,
-        'ascendant': 6,
-        'immortal': 7,
-        'radiant': 8
-      };
-
-      let mobileLegends = {
-        'warrior': 0,
-        'elite': 1,
-        'master': 2,
-        'grandmaster': 3,
-        'epic': 4,
-        'legend': 5,
-        'mythic': 6,
-        'mythical_honor': 7,
-        'mythical_glory': 8,
-        'mythical_immortal': 9
-      };
-
-      return rankId == null ? null: (
-          game == 'valorant' ? valorant.get(rankId, null) : (
-              game == 'mobile_legends' ? mobileLegends.get(rankId, null) : null
-            )
-        );
+      return rankId == null ? null : catalogueRankNumbers(game).get(rankId, null);
     }
 
     //gameRanks - optional public map
@@ -137,8 +369,11 @@ service cloud.firestore {
         : null;
 
       return ranks is map
-        && ranks.keys().size() <= 2
-        && ranks.keys().hasOnly(['valorant', 'mobile_legends'])
+        && ranks.keys().size() <= 6
+        && ranks.keys().hasOnly([
+          'valorant', 'mobile_legends', 'apex_legends', 'cs2',
+          'honor_of_kings', 'league_of_legends'
+        ])
         && ranks.keys().hasOnly(games)
         && (
           !('valorant' in ranks)
@@ -155,6 +390,31 @@ service cloud.firestore {
             'mythical_glory', 'mythical_immortal'
           ]
         )
+        && (!('apex_legends' in ranks)
+          || ranks.apex_legends in [
+            'rookie', 'bronze', 'silver', 'gold',
+            'platinum', 'diamond', 'master', 'apex_predator'
+          ])
+        && (!('cs2' in ranks)
+          || ranks.cs2 in [
+            'silver_1', 'silver_2', 'silver_3', 'silver_4',
+            'silver_elite', 'silver_elite_master', 'gold_nova_1', 'gold_nova_2',
+            'gold_nova_3', 'gold_nova_master', 'master_guardian_1', 'master_guardian_2',
+            'master_guardian_elite', 'distinguished_master_guardian', 'legendary_eagle', 'legendary_eagle_master',
+            'supreme_master_first_class', 'global_elite'
+          ])
+        && (!('honor_of_kings' in ranks)
+          || ranks.honor_of_kings in [
+            'bronze', 'silver', 'gold', 'platinum',
+            'diamond', 'master', 'grandmaster', 'mythic',
+            'epic', 'legend'
+          ])
+        && (!('league_of_legends' in ranks)
+          || ranks.league_of_legends in [
+            'iron', 'bronze', 'silver', 'gold',
+            'platinum', 'emerald', 'diamond', 'master',
+            'grandmaster', 'challenger'
+          ])
         && data.get('rank', null) == rankNumber(game, chosenRank);
     }
 
@@ -167,11 +427,9 @@ service cloud.firestore {
       let rank = data.get('rank', null);
 
       return games is list
-        && games.size() <= 3
+        && games.size() <= 10
         && games.toSet().size() == games.size()
-        && games.hasOnly([
-          'valorant', 'mobile_legends', 'fortnite'
-        ])
+        && games.hasOnly(catalogueGames())
         && (
           (game == null && games.size() == 0)
           || (game is string && game in games)
@@ -267,7 +525,21 @@ service cloud.firestore {
       );
   }
 
-    function validPublicProfile(data) {
+  // Optional Supabase path, scoped to the signed-in player.
+  function validPhotoPath(data) {
+    let path = data.get('photoPath', null);
+
+    return path == null || (
+      path is string
+      && path.size() <= 200
+      && path.split('/').size() == 2
+      && path.split('/')[0] == request.auth.uid
+      && path.split('/')[1].matches(
+        '[a-f0-9-]{36}[.](jpg|png|webp)'
+      )
+    );
+  }
+    function validPublicProfileFields(data) {
       return data.keys().hasAll([
           'username', 'bio', 'region', 'createdAt', 'updatedAt'
         ])
@@ -275,7 +547,8 @@ service cloud.firestore {
           'username', 'bio', 'region', 'createdAt', 'updatedAt',
           'sharedAge', 'ageSharedAt', 'sharedGender',
           'games', 'currentGame', 'mode', 'playstyles',
-          'communication', 'rank', 'gameRanks', 'availability'
+          'communication', 'rank', 'gameRanks', 'availability',
+          'photoPath'
         ])
         && data.username is string
         && (
@@ -289,9 +562,14 @@ service cloud.firestore {
         && data.region.size() <= 60
         && data.createdAt is timestamp
         && data.updatedAt is timestamp
-        && validSharing(data)
+        && validSharing(data);
+    }
+
+    function validPublicProfile(data) {
+      return validPublicProfileFields(data)
         && validGamingPreferences(data)
-        && validAvailability(data);
+        && validAvailability(data)
+        && validPhotoPath(data);
     }
 
     function validPrivateInfo(data) {
@@ -485,7 +763,7 @@ service cloud.firestore {
         && data.hostId == request.auth.uid
         && data.title is string && data.title.size() >= 1 && data.title.size() <= 60
         && data.title.matches('.*\\S.*')
-        && data.gameId in ['valorant', 'mobile_legends', 'fortnite']
+        && data.gameId in catalogueGames()
         && data.region in ['asia', 'europe', 'north_america', 'south_america', 'africa', 'oceania']
         && data.mode in ['competitive', 'casual']
         && data.visibility in ['public', 'private']
@@ -603,6 +881,24 @@ service cloud.firestore {
       function activeMember(uid) {
         return exists(/databases/$(database)/documents/parties/$(partyId)/members/$(uid))
           && get(/databases/$(database)/documents/parties/$(partyId)/members/$(uid)).data.leftAt == null;
+      }
+      // Party chat is separate from direct messages and requires live membership.
+      match /messages/{messageId} {
+        function chatAccess() {
+          return signedIn() && activeMember(request.auth.uid)
+            && get(/databases/$(database)/documents/parties/$(partyId)).data.status == 'open';
+        }
+        allow read: if chatAccess();
+        allow create: if chatAccess()
+          && request.resource.data.keys().hasOnly(['senderId', 'senderUsername', 'type', 'text', 'createdAt'])
+          && request.resource.data.senderId == request.auth.uid
+          && request.resource.data.senderUsername == get(/databases/$(database)/documents/players/$(request.auth.uid)).data.username
+          && request.resource.data.type == 'text'
+          && request.resource.data.text is string
+          && request.resource.data.text.size() > 0 && request.resource.data.text.size() <= 2000
+          && request.resource.data.text.matches('[\\s\\S]*[^\\s][\\s\\S]*')
+          && request.resource.data.createdAt == request.time;
+        allow update, delete: if false;
       }
       function canJoin() {
         let member = /databases/$(database)/documents/parties/$(partyId)/members/$(request.auth.uid);
@@ -760,16 +1056,28 @@ service cloud.firestore {
       function validProfileUpdate() {
         let data = request.resource.data;
         let changed = data.diff(resource.data).affectedKeys();
+        let profileFields = ['username', 'bio', 'region', 'updatedAt',
+          'sharedAge', 'ageSharedAt', 'sharedGender'];
+        let gamingFields = ['games', 'currentGame', 'mode', 'playstyles',
+          'communication', 'rank', 'gameRanks', 'updatedAt'];
+
+        // Choose one validator for the section being saved. Unchanged sections
+        // cannot be altered by these writes and do not need revalidation.
         return owns(uid) && data.updatedAt == request.time && (
-          (changed.hasOnly(['availability', 'updatedAt']) && validAvailability(data))
-          || (changed.hasOnly([
-          'username', 'bio', 'region', 'updatedAt',
-          'sharedAge', 'ageSharedAt', 'sharedGender',
-          'games', 'currentGame', 'mode', 'playstyles',
-          'communication', 'rank', 'gameRanks', 'availability'
-        ])
-            && validPublicProfile(data)
-            && (!changed.hasAny(['availability']) || validAvailability(data)))
+          changed.hasOnly(profileFields) ? validPublicProfileFields(data) : (
+            changed.hasOnly(gamingFields) ? validGamingPreferences(data) : (
+              changed.hasOnly(['availability', 'updatedAt']) ? validAvailability(data) : (
+                changed.hasOnly(['photoPath', 'updatedAt']) ? validPhotoPath(data) : (
+                  changed.hasOnly([
+                    'username', 'bio', 'region', 'updatedAt',
+                    'sharedAge', 'ageSharedAt', 'sharedGender',
+                    'games', 'currentGame', 'mode', 'playstyles',
+                    'communication', 'rank', 'gameRanks', 'availability', 'photoPath'
+                  ]) && validPublicProfile(data)
+                )
+              )
+            )
+          )
         );
       }
       allow update: if validProfileUpdate();

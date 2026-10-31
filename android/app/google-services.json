@@ -14,6 +14,14 @@
       },
       "oauth_client": [
         {
+          "client_id": "411881549954-hfd0g126fcunl8hlcosla14g9kqh5t80.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.lurk_app",
+            "certificate_hash": "8b9778c19729364505fe8a31afa78af1e3451159"
+          }
+        },
+        {
           "client_id": "411881549954-ph8kn5pv46hifp0fecvjtevv7trp78ig.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {

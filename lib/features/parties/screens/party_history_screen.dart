@@ -5,6 +5,7 @@ import '../../../providers/party_history_provider.dart';
 import '../models/party_history_entry.dart';
 import '../widgets/party_history_card.dart';
 import '../widgets/party_load_error.dart';
+import '../../ratings/screens/rate_party_teammates_screen.dart';
 
 class PartyHistoryScreen extends ConsumerStatefulWidget {
   const PartyHistoryScreen({super.key, required this.onBack, this.onRate});
@@ -162,7 +163,14 @@ class _PartyHistoryScreenState extends ConsumerState<PartyHistoryScreen> {
                       return PartyHistoryCard(
                         entry: entry,
                         onRate: widget.onRate == null
-                            ? null
+                            ? () => Navigator.of(context).push(
+                                MaterialPageRoute<void>(
+                                  builder: (_) => RatePartyTeammatesScreen(
+                                    partyId: entry.record.partyId,
+                                    partyTitle: entry.title,
+                                  ),
+                                ),
+                              )
                             : () => widget.onRate!(entry),
                       );
                     },
