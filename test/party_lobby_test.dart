@@ -212,7 +212,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(
         find.text(
-          'Voice chat is not configured. Run with config/voice.local.json.',
+          'Voice chat is not configured. Set VOICE_TOKEN_URL in config/voice.local.json and restart the app.',
         ),
         findsOneWidget,
       );
@@ -365,6 +365,16 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
+    voice.add(
+      const VoiceState(partyId: 'party', connecting: true, serverWaking: true),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 50));
+    expect(find.textContaining('It may be waking up'), findsOneWidget);
+    voice.add(const VoiceState(partyId: 'party', connecting: true));
+    await tester.pump();
+    expect(find.text('Connecting to voice…'), findsOneWidget);
+    expect(find.textContaining('It may be waking up'), findsNothing);
     voice.add(
       const VoiceState(
         partyId: 'party',

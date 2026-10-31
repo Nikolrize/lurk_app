@@ -1,32 +1,41 @@
-# Party voice (free local development)
+# Party voice
 
-Agora carries audio; Firestore stores parties, not audio. This Android-first implementation uses a local token server, so Firebase can remain on Spark. It does not deploy a paid cloud service.
+Agora carries audio; Firestore stores party membership. The token server is hosted on Render Free, so the app can connect from any internet connection and Firebase can remain on Spark.
 
-## Start
+## Normal app launch
 
-1. Keep `tools/voice-server/.env` private. Set `AGORA_APP_CERTIFICATE` from your secure Agora RTC project. The App ID is public; the certificate is never compiled into Flutter. `.env` and the device configuration below are ignored by Git.
-2. In the project directory run `npm start --prefix tools/voice-server` and keep it running. Node 22+ is required. Dependencies are installed with `npm ci --prefix tools/voice-server`.
-3. Put the computer's Wi-Fi IPv4 address into `config/voice.local.json` (copy `config/voice.example.json` on another computer). The endpoint is `http://COMPUTER_IP:8787/voice/token`. Both devices must be able to reach it. If Windows asks about Node network access, use the private network you are testing on.
-4. Stop the previous Flutter run. Select **Lurk (Wi-Fi voice)** in VS Code, choose your device, and start debugging. Alternatively: `flutter run --dart-define-from-file=config/voice.local.json -d DEVICE_ID`.
-5. Sign in with two different accounts, join the same party, and voice connects automatically with microphones muted. Tap **Mic: OFF** to unmute; grant microphone permission when asked. Use headphones or separate rooms for the two-device audio test.
+1. Run `flutter run` or select **Lurk** in VS Code. No local Node server or extra voice flags are needed.
+2. The shared public settings in `config/voice.json` use `https://lurk-voice-token.onrender.com/voice/token`.
+3. Sign in, join a party, and voice connects automatically with your microphone muted. Tap **Mic: OFF** to unmute and grant microphone permission. Test with two different accounts and headphones.
 
-SDK changes require a full stop/start; hot reload alone cannot load a new native plugin. Enable Windows Developer Mode if Flutter reports that plugin symlinks cannot be created.
+Settings precedence is: explicit `--dart-define` values, then optional `config/voice.local.json`, then the shared `config/voice.json`. The local file is ignored by Git; a lecturer's fresh checkout uses the shared settings. Commit and push the shared configuration and startup-loader changes before distributing the project.
 
-## Behavior
+Render Free sleeps after 15 minutes without requests. The first voice connection can take about a minute while the server wakes. Lurk waits up to 90 seconds for the initial health check; token requests and renewals use a separate 15-second timeout. Warmup does not send Firebase credentials.
 
-- Entering the party lobby automatically connects voice as a listener. Microphone capture stays disabled until the player unmutes and grants microphone permission.
-- Mic ON/OFF only toggles publishing and local microphone capture while connected. Muting leaves remote squad audio connected. Use **Join voice** to reconnect after a connection failure.
-- Players leave voice by leaving the party; there is no separate voice-disconnect control.
-- Firebase membership and party listeners disconnect the client on removal, leaving, sign-out, or session end.
-- This first version is foreground-only: backgrounding Lurk disconnects voice. Voice while using another game app requires a separate Android foreground-service implementation. iOS has not been built or device-tested here.
-- Short-lived tokens are renewed after rechecking Firebase membership. Expired credentials are not replaced if access is lost. This prototype does not implement Agora REST-side immediate revocation against a modified client; current tokens have a 120-second lifetime.
-- Release builds refuse a cleartext token endpoint. An HTTPS-hosted token service is needed for use beyond local development. The HTTP allowance is Android-debug-only.
-- Changing Wi-Fi/IP requires updating the local config and restarting the Flutter run. Keep Agora usage within your account's free participant-minute allowance.
+## Voice behavior
+
+- Lobby entry connects voice as a listener. Microphone capture stays disabled until the player unmutes and grants permission.
+- Mic toggles publishing and local capture. Muting keeps incoming squad audio connected.
+- Players leave voice by leaving the party. **Join voice** is available after a connection failure.
+- Membership listeners disconnect on removal, leaving, sign-out, or session end.
+- This version is foreground-only: backgrounding Lurk disconnects voice. Background voice needs an Android foreground service. iOS has not been device-tested.
+- The server verifies Firebase ID tokens and active membership before issuing/renewing 120-second Agora tokens. Modified clients are not immediately revoked through Agora's REST API; already-issued tokens expire after their short lifetime.
+- Release builds require an HTTPS token endpoint. HTTP is allowed only for Android debug.
+
+## Server management
+
+Render dashboard: https://dashboard.render.com/web/srv-dbj0m4ec6qcc73b54olg
+
+See RENDER.md for deploy settings. Render runs the server from nicole_branch using `npm ci --prefix tools/voice-server --omit=dev` and `node tools/voice-server/server.mjs`. Pushes to that branch deploy automatically. Only the Node server runs on Render; Flutter builds and Firestore rules are not deployed by this service.
+
+The App Certificate is stored in Render's private environment settings. Keep it out of Flutter, Git, Firestore and screenshots. Only public client settings belong in config/, because Flutter bundles that directory.
+
+## Optional local development
+
+To test a local server, set its private `.env` values and run `npm start --prefix tools/voice-server` (Node 22.9+). Set `config/voice.local.json` to `http://COMPUTER_IP:8787/voice/token`, then fully restart Flutter. This local mode requires devices to reach that PC. Remove the override or change it back to the hosted URL when finished.
 
 ## Checks
 
 `npm test --prefix tools/voice-server`
 
 `flutter test --no-pub`
-
-The token server verifies Firebase ID tokens, derives the room/user identity on the server, and checks open-party status plus active membership using the same user's Firestore permissions. No Firebase service-account key is needed. Do not place the certificate in Flutter, Firestore, Git, or screenshots.

@@ -1,0 +1,22 @@
+services:
+  - type: web
+    name: lurk-voice-token
+    runtime: node
+    plan: free
+    region: singapore
+    branch: nicole_branch
+    rootDir: tools/voice-server
+    buildCommand: npm ci --omit=dev
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_VERSION
+        value: '22'
+      - key: NODE_ENV
+        value: production
+      - key: FIREBASE_PROJECT_ID
+        value: lurk-mae
+      - key: AGORA_APP_ID
+        value: 8e12f857aa6641dc894b3a7b241d0b21
+      - key: AGORA_APP_CERTIFICATE
+        sync: false
