@@ -25,7 +25,7 @@ class ChatMessageBubble extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.end,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  PartyInviteCard(partyId: message.partyId!),
+                  PartyInviteCard(partyId: message.partyId!, sentByMe: mine),
                   if (message.pending)
                     const Text(
                       'Sending…',

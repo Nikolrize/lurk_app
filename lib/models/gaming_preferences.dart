@@ -12,15 +12,11 @@ class GamingPreferences {
   });
 
   static final Map<String, String> gameLabels =
-    Map<String, String>.unmodifiable({
-      for (final game in GameCatalog.games.values)
-        game.id: game.name,
-    });
+      Map<String, String>.unmodifiable({
+        for (final game in GameCatalog.games.values) game.id: game.name,
+      });
 
-  static const modeLabels = {
-    'competitive': 'Competitive',
-    'casual': 'Casual',
-  };
+  static const modeLabels = {'competitive': 'Competitive', 'casual': 'Casual'};
 
   static const styleLabels = {
     'chill': 'Chill',
@@ -34,17 +30,9 @@ class GamingPreferences {
     'chat_only': 'Chat only',
   };
 
-  static const valorantRanks = [
-    'Iron',
-    'Bronze',
-    'Silver',
-    'Gold',
-    'Platinum',
-    'Diamond',
-    'Ascendant',
-    'Immortal',
-  ];  
-
+  static List<String> ranksForGame(String? game) =>
+      GameCatalog.find(game)?.ranks.values.toList(growable: false) ?? const [];
+  static List<String> get valorantRanks => ranksForGame('valorant');
   final List<String> games;
   final String? currentGame;
   final String? mode;
@@ -107,7 +95,10 @@ class GamingPreferences {
   }
 
   void validate() {
-    if (games.isEmpty || games.length > gameLabels.length || games.toSet().length != games.length || games.any((game)=> !gameLabels.containsKey(game))) {
+    if (games.isEmpty ||
+        games.length > gameLabels.length ||
+        games.toSet().length != games.length ||
+        games.any((game) => !gameLabels.containsKey(game))) {
       throw ArgumentError('Choose at least one supported game.');
     }
 
@@ -119,11 +110,14 @@ class GamingPreferences {
       throw ArgumentError('Invalid game mode.');
     }
 
-    if (playstyles.length > styleLabels.length || playstyles.toSet().length != playstyles.length || playstyles.any((style)=> !styleLabels.containsKey(style))) {
+    if (playstyles.length > styleLabels.length ||
+        playstyles.toSet().length != playstyles.length ||
+        playstyles.any((style) => !styleLabels.containsKey(style))) {
       throw ArgumentError('Invalid playstyle selection.');
     }
 
-    if (communication != null && !communicationLabels.containsKey(communication)) {
+    if (communication != null &&
+        !communicationLabels.containsKey(communication)) {
       throw ArgumentError('Invalid communication preference.');
     }
 

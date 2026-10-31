@@ -1,3 +1,4 @@
+import '../widgets/home_games.dart';
 import '../../../providers/profile_provider.dart';
 import '../../../core/widgets/action_card.dart';
 import '../../../providers/player_provider.dart';
@@ -13,8 +14,9 @@ import '../../../core/theme/app_colors.dart';
 import '../../../providers/auth_provider.dart';
 
 class HomeScreen extends ConsumerWidget {
-  const HomeScreen({super.key, this.onFindParties});
+  const HomeScreen({super.key, this.onFindParties, this.onFindGame});
   final VoidCallback? onFindParties;
+  final ValueChanged<String>? onFindGame;
 
   void _preview(BuildContext context, String title, String description) {
     showModalBottomSheet<void>(
@@ -96,70 +98,7 @@ class HomeScreen extends ConsumerWidget {
             style: text.titleLarge?.copyWith(fontWeight: FontWeight.w700),
           ),
           const SizedBox(height: 14),
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                for (final game in const [
-                  ('Valorant', Icons.gps_fixed_rounded),
-                  ('MLBB', Icons.shield_outlined),
-                  ('Fortnite', Icons.sports_esports_outlined),
-                ]) ...[
-                  SizedBox(
-                    width: 76,
-                    child: Column(
-                      children: [
-                        SizedBox(
-                          width: 76,
-                          height: 76,
-                          child: IconButton.filledTonal(
-                            style: IconButton.styleFrom(
-                              backgroundColor: AppColors.surface,
-                              foregroundColor: AppColors.secondary,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(16),
-                              ),
-                            ),
-                            tooltip: 'Find ${game.$1} parties',
-                            onPressed:
-                                onFindParties ??
-                                () => _preview(
-                                  context,
-                                  game.$1,
-                                  'Game filtering is not connected yet.',
-                                ),
-                            icon: Icon(game.$2, size: 30),
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(game.$1, style: text.bodySmall),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                ],
-                SizedBox(
-                  width: 76,
-                  height: 76,
-                  child: OutlinedButton(
-                    style: OutlinedButton.styleFrom(
-                      padding: EdgeInsets.zero,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                    ),
-                    onPressed: () => _preview(
-                      context,
-                      'Your games',
-                      'These are sample games. Game preferences will be managed through your player profile.',
-                    ),
-                    child: const Icon(Icons.add, semanticLabel: 'Add game'),
-                  ),
-                ),
-              ],
-            ),
-          ),
+          HomeGames(uid: uid, onFindGame: onFindGame),
           const SizedBox(height: 30),
           Text(
             'Recommended parties',
@@ -187,18 +126,7 @@ class HomeScreen extends ConsumerWidget {
                       for (final party in parties.take(3))
                         Padding(
                           padding: const EdgeInsets.only(bottom: 12),
-                          child: PartyCard(
-                            party: party,
-                            onJoin: () {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text(
-                                    'Party joining is not connected yet.',
-                                  ),
-                                ),
-                              );
-                            },
-                          ),
+                          child: PartyCard(party: party),
                         ),
                     ],
                   ),

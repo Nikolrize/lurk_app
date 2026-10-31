@@ -20,6 +20,9 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
+          currentHostedPartyProvider.overrideWith(
+            (ref) => Stream.value(testParties.first),
+          ),
           discoverablePlayersProvider.overrideWith(
             (ref) => Stream.value(testPlayers),
           ),
