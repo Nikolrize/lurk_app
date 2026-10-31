@@ -23,8 +23,14 @@ class JoinUser extends Fake implements User {
 class JoinService extends Fake implements PartyService {
   final result = Completer<void>();
   int calls = 0;
+  String? switchedFrom;
   @override
-  Future<void> joinParty(String id, {required String expectedUid}) {
+  Future<void> joinParty(
+    String id, {
+    required String expectedUid,
+    String? switchFromPartyId,
+  }) {
+    switchedFrom = switchFromPartyId;
     calls++;
     return result.future;
   }
@@ -40,10 +46,26 @@ const squad = Party(
   currentPlayers: 1,
   maxPlayers: 5,
 );
-Widget app(JoinService service) => ProviderScope(
+Widget app(JoinService service, {String? currentPartyId}) => ProviderScope(
   overrides: [
     authStateProvider.overrideWith((ref) => Stream.value(JoinUser())),
-    joinedPartyIdProvider.overrideWith((ref) => Stream.value(null)),
+    joinedPartyIdProvider.overrideWith((ref) => Stream.value(currentPartyId)),
+    myPartyMembershipProvider.overrideWith(
+      (ref, id) => Stream.value({'role': 'member', 'leftAt': null}),
+    ),
+    partyByIdProvider('old').overrideWith(
+      (ref) => Stream.value(
+        const Party(
+          id: 'old',
+          hostId: 'other',
+          title: 'Old squad',
+          gameName: 'Valorant',
+          playStyle: 'Chill',
+          currentPlayers: 2,
+          maxPlayers: 5,
+        ),
+      ),
+    ),
     gamingPreferencesProvider.overrideWith(
       (ref, uid) => Stream.value(const GamingPreferences()),
     ),
@@ -82,6 +104,42 @@ Widget app(JoinService service) => ProviderScope(
   ),
 );
 void main() {
+  testWidgets('Current squad Join is disabled for members', (tester) async {
+    final service = JoinService();
+    await tester.pumpWidget(app(service, currentPartyId: 'squad'));
+    await tester.pumpAndSettle();
+    expect(
+      tester.widget<FilledButton>(find.byType(FilledButton)).onPressed,
+      isNull,
+    );
+    expect(service.calls, 0);
+  });
+  testWidgets(
+    'Switch requires confirmation and cancel keeps the current squad',
+    (tester) async {
+      final service = JoinService();
+      await tester.pumpWidget(app(service, currentPartyId: 'old'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Join'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Join Party'));
+      await tester.pumpAndSettle();
+      expect(find.text('Switch parties?'), findsOneWidget);
+      expect(service.calls, 0);
+      await tester.tap(find.text('Cancel'));
+      await tester.pumpAndSettle();
+      expect(service.calls, 0);
+      await tester.tap(find.text('Join Party'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Switch Party'));
+      await tester.pump();
+      expect(service.calls, 1);
+      expect(service.switchedFrom, 'old');
+      service.result.complete();
+      await tester.pumpAndSettle();
+      expect(find.text('Opened squad'), findsOneWidget);
+    },
+  );
   testWidgets('Joining submits once and requests the party lobby', (
     tester,
   ) async {

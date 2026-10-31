@@ -528,7 +528,8 @@ service cloud.firestore {
       function canReplace() {
         return resource == null
           || get(/databases/$(database)/documents/parties/$(resource.data.partyId)).data.status != 'open'
-          || get(/databases/$(database)/documents/parties/$(resource.data.partyId)/members/$(uid)).data.leftAt != null;
+          || get(/databases/$(database)/documents/parties/$(resource.data.partyId)/members/$(uid)).data.leftAt != null
+          || getAfter(/databases/$(database)/documents/parties/$(resource.data.partyId)/members/$(uid)).data.leftAt != null;
       }
       allow create, update: if owns(uid) && canReplace()
         && request.resource.data.keys().hasAll(['partyId', 'updatedAt'])
