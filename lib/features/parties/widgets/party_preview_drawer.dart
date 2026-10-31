@@ -96,7 +96,15 @@ class _PartyPreviewState extends ConsumerState<_PartyPreview> {
         Expanded(
           child: ListView(
             controller: widget.controller,
-            padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
+            padding: EdgeInsets.fromLTRB(
+              24,
+              8,
+              24,
+              30 +
+                  (widget.showJoinButton && !widget.history
+                      ? 0
+                      : MediaQuery.viewPaddingOf(context).bottom),
+            ),
             children: [
               if (widget.onEdit != null)
                 Align(

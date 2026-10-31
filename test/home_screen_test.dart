@@ -43,6 +43,9 @@ void main() {
     expect(tester.takeException(), isNull);
     await tester.tap(find.text('Quick Match'));
     await tester.pumpAndSettle();
+    expect(find.text('Sign in to use Quick Match.'), findsOneWidget);
+    await tester.tap(find.text('Find'));
+    await tester.pumpAndSettle();
     expect(find.byType(TextField), findsOneWidget);
     await tester.tap(find.text('Parties'));
     await tester.pumpAndSettle();
