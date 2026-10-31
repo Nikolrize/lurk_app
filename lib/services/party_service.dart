@@ -1,3 +1,4 @@
+import '../features/parties/models/party_history_entry.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../features/parties/models/party_draft.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -71,6 +72,12 @@ class PartyService {
         'role': 'host',
         'joinedAt': FieldValue.serverTimestamp(),
         'leftAt': null,
+      });
+      transaction.set(_history(expectedUid, party.id), {
+        'title': draft.title.trim(),
+        'gameId': draft.gameId,
+        'mode': draft.mode,
+        'joinedAt': FieldValue.serverTimestamp(),
       });
       transaction.set(slot, {
         'activeCount': 1,
@@ -165,6 +172,12 @@ class PartyService {
       transaction.update(party, {
         'memberCount': (data['memberCount'] as num).toInt() + 1,
         'updatedAt': FieldValue.serverTimestamp(),
+      });
+      transaction.set(_history(expectedUid, id), {
+        'title': data['title'],
+        'gameId': data['gameId'],
+        'mode': data['mode'],
+        'joinedAt': FieldValue.serverTimestamp(),
       });
       transaction.set(current, {
         'partyId': id,
@@ -360,4 +373,33 @@ class PartyService {
           return List.unmodifiable(parties);
         });
   }
+
+  DocumentReference<Map<String, dynamic>> _history(
+    String uid,
+    String partyId,
+  ) => _firestore
+      .collection('players')
+      .doc(uid)
+      .collection('party_history')
+      .doc(partyId);
+
+  Stream<List<PartyHistoryRecord>> watchHistory(String uid) => _firestore
+      .collection('players')
+      .doc(uid)
+      .collection('party_history')
+      .orderBy('joinedAt', descending: true)
+      .limit(50)
+      .snapshots()
+      .map(
+        (snapshot) => snapshot.docs
+            .map((doc) => PartyHistoryRecord.fromMap(doc.id, doc.data()))
+            .toList(),
+      );
+
+  Stream<List<String>> watchHistoryMemberIds(String id) => _firestore
+      .collection('parties')
+      .doc(id)
+      .collection('members')
+      .snapshots()
+      .map((snapshot) => snapshot.docs.map((doc) => doc.id).toList());
 }

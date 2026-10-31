@@ -21,6 +21,14 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
+    match /notification_preferences/{uid} {
+      allow read: if owns(uid);
+      allow create, update: if owns(uid)
+        && request.resource.data.keys().hasOnly(['messages', 'invitations'])
+        && request.resource.data.messages is bool
+        && request.resource.data.invitations is bool;
+      allow delete: if false;
+    }
     // Tokens are private to their account. Sending is reserved for the Admin SDK.
     match /notification_users/{uid}/devices/{deviceId} {
       allow read, delete: if owns(uid);
@@ -396,6 +404,20 @@ service cloud.firestore {
         && getAfter(/databases/$(database)/documents/chats/$(chatId)/messages/$(request.resource.data.lastMessageId)).data.createdAt == request.time;
       allow delete: if false;
 
+      match /receipts/{uid} {
+        allow read: if member(get(/databases/$(database)/documents/chats/$(chatId)).data);
+        allow create, update: if owns(uid)
+          && member(get(/databases/$(database)/documents/chats/$(chatId)).data)
+          && request.resource.data.keys().hasOnly(['messageId', 'readThrough'])
+          && request.resource.data.messageId is string
+          && request.resource.data.messageId.matches('[^/]+')
+          && request.resource.data.readThrough is timestamp
+          && request.resource.data.readThrough <= request.time
+          && request.resource.data.readThrough == get(/databases/$(database)/documents/chats/$(chatId)/messages/$(request.resource.data.messageId)).data.createdAt
+          && (resource == null || request.resource.data.readThrough >= resource.data.readThrough);
+        allow delete: if false;
+      }
+
       match /settings/{uid} {
         allow read: if owns(uid) && member(get(/databases/$(database)/documents/chats/$(chatId)).data);
         allow create, update: if owns(uid)
@@ -553,11 +575,18 @@ service cloud.firestore {
         || getAfter(/databases/$(database)/documents/parties/$(getAfter(pointer).data.partyId)/members/$(uid)).data.leftAt != null;
     }
 
+    function hasPartyHistory(partyId) {
+      return signedIn()
+        && exists(/databases/$(database)/documents/players/$(request.auth.uid)/party_history/$(partyId))
+        && exists(/databases/$(database)/documents/parties/$(partyId)/members/$(request.auth.uid));
+    }
+
     match /parties/{partyId} {
       allow read: if signedIn() && (
         (resource.data.visibility == 'public' && resource.data.status == 'open')
         || resource.data.hostId == request.auth.uid
         || activeMember(request.auth.uid)
+        || hasPartyHistory(partyId)
         || (resource.data.status == 'open'
           && exists(/databases/$(database)/documents/parties/$(partyId)/invitations/$(request.auth.uid)))
       );
@@ -678,8 +707,8 @@ service cloud.firestore {
             || activeMember(request.auth.uid)
             || exists(/databases/$(database)/documents/parties/$(partyId)/invitations/$(request.auth.uid)));
         }
-        allow get: if signedIn() && (owns(uid) || parent().hostId == request.auth.uid || canPreviewRoster());
-        allow list: if signedIn() && (parent().hostId == request.auth.uid || canPreviewRoster());
+        allow get: if signedIn() && (owns(uid) || parent().hostId == request.auth.uid || canPreviewRoster() || hasPartyHistory(partyId));
+        allow list: if signedIn() && (parent().hostId == request.auth.uid || canPreviewRoster() || hasPartyHistory(partyId));
         allow create: if owns(uid) && (
           (!exists(/databases/$(database)/documents/parties/$(partyId))
             && getAfter(/databases/$(database)/documents/parties/$(partyId)).data.hostId == uid
@@ -704,6 +733,22 @@ service cloud.firestore {
         allow delete: if false;
       }
     }
+    // Each player can list only their own participation history.
+    match /players/{uid}/party_history/{partyId} {
+      allow read: if owns(uid);
+      allow create, update: if owns(uid)
+        && request.resource.data.keys().hasAll(['title', 'gameId', 'mode', 'joinedAt'])
+        && request.resource.data.keys().hasOnly(['title', 'gameId', 'mode', 'joinedAt'])
+        && request.resource.data.joinedAt == request.time
+        && getAfter(/databases/$(database)/documents/parties/$(partyId)/members/$(uid)).data.joinedAt == request.time
+        && getAfter(/databases/$(database)/documents/parties/$(partyId)/members/$(uid)).data.leftAt == null
+        && getAfter(/databases/$(database)/documents/parties/$(partyId)).data.status == 'open'
+        && request.resource.data.title == getAfter(/databases/$(database)/documents/parties/$(partyId)).data.title
+        && request.resource.data.gameId == getAfter(/databases/$(database)/documents/parties/$(partyId)).data.gameId
+        && request.resource.data.mode == getAfter(/databases/$(database)/documents/parties/$(partyId)).data.mode;
+      allow delete: if false;
+    }
+
     match /players/{uid} {
       allow read: if signedIn();
 

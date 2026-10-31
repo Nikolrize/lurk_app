@@ -50,20 +50,11 @@ void main() {
     expect(find.text('Back to Current Party'), findsOneWidget);
     await tester.tap(find.text('Party History'));
     await tester.pumpAndSettle();
-    expect(
-      find.text(
-        'Completed sessions will appear here once party history is connected.',
-      ),
-      findsOneWidget,
-    );
-    Navigator.of(
-      tester.element(
-        find.text(
-          'Completed sessions will appear here once party history is connected.',
-        ),
-      ),
-    ).pop();
+    expect(find.text('No party history yet'), findsOneWidget);
+    expect(find.byType(NavigationBar), findsOneWidget);
+    await tester.tap(find.byTooltip('Back to Parties'));
     await tester.pumpAndSettle();
+    expect(find.text('Create Party'), findsOneWidget);
     await tester.tap(find.text('Home'));
     await tester.pumpAndSettle();
     await tester.scrollUntilVisible(

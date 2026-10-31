@@ -1,3 +1,4 @@
+import '../../features/parties/screens/party_history_screen.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../providers/party_provider.dart';
 import '../../features/parties/models/party.dart';
@@ -26,6 +27,7 @@ class _AppShellState extends ConsumerState<AppShell> {
   int _selectedIndex = 0;
   String? _findGame;
   Party? _lobbyParty;
+  bool _showHistory = false;
 
   void _selectTab(int index) => setState(() => _selectedIndex = index);
 
@@ -35,15 +37,21 @@ class _AppShellState extends ConsumerState<AppShell> {
       if (next != null) {
         setState(() {
           _lobbyParty = next.party;
+          _showHistory = false;
           _selectedIndex = 2;
         });
       }
     });
     return PopScope(
-      canPop: _selectedIndex != 2 || _lobbyParty == null,
+      canPop: _selectedIndex != 2 || (_lobbyParty == null && !_showHistory),
       onPopInvokedWithResult: (didPop, result) {
-        if (!didPop && _selectedIndex == 2 && _lobbyParty != null) {
-          setState(() => _lobbyParty = null);
+        if (!didPop &&
+            _selectedIndex == 2 &&
+            (_lobbyParty != null || _showHistory)) {
+          setState(() {
+            _lobbyParty = null;
+            _showHistory = false;
+          });
         }
       },
       child: Scaffold(
@@ -63,15 +71,20 @@ class _AppShellState extends ConsumerState<AppShell> {
             ),
             FindSreen(key: ValueKey(_findGame), initialGame: _findGame),
             _lobbyParty == null
-                ? PartiesScreen(
-                    onQuickMatch: () => _selectTab(1),
-                    onOpenLobby: (party) {
-                      setState(() {
-                        _lobbyParty = party;
-                        _selectedIndex = 2;
-                      });
-                    },
-                  )
+                ? _showHistory
+                      ? PartyHistoryScreen(
+                          onBack: () => setState(() => _showHistory = false),
+                        )
+                      : PartiesScreen(
+                          onHistory: () => setState(() => _showHistory = true),
+                          onQuickMatch: () => _selectTab(1),
+                          onOpenLobby: (party) {
+                            setState(() {
+                              _lobbyParty = party;
+                              _selectedIndex = 2;
+                            });
+                          },
+                        )
                 : PartyLobbyScreen(
                     party: _lobbyParty!,
                     viewerUid: widget.uid,
