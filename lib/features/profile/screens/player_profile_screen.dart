@@ -7,6 +7,8 @@ import '../widgets/gaming_preferences_card.dart';
 
 import 'package:lurk_app/features/availability/widgets/availability_summary_card.dart';
 
+import 'package:lurk_app/core/widgets/player_status_badge.dart';
+
 class PlayerProfileScreen extends ConsumerWidget {
   const PlayerProfileScreen({super.key, required this.uid});
 
@@ -82,6 +84,11 @@ class PlayerProfileScreen extends ConsumerWidget {
                                   : profile.username,
                               textAlign: TextAlign.center,
                               style: text.headlineSmall,
+                            ),
+                            Center(
+                              child: IntrinsicWidth( //centers read-only badge underneath username
+                                child: PlayerStatusBadge(uid: uid),
+                              ),
                             ),
                             if (profile.region.isNotEmpty) ...[
                               const SizedBox(height: 8),

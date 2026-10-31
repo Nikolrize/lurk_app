@@ -9,6 +9,9 @@ import 'package:lurk_app/features/player/widgets/player_card.dart';
 import 'package:lurk_app/providers/party_provider.dart';
 import 'package:lurk_app/providers/player_provider.dart';
 
+import 'package:lurk_app/providers/auth_provider.dart';
+import 'package:lurk_app/providers/presence_provider.dart';
+
 void main() {
   test(
     'Existing public schema reads username without inventing presence or game',
@@ -66,17 +69,35 @@ void main() {
     tester,
   ) async {
     await tester.pumpWidget(
-      MaterialApp(
-        home: Scaffold(
-          body: PlayerCard(
-            player: Player.fromFirestoreData('uid', {'username': 'Yessir'}),
+      ProviderScope(
+        overrides: [
+          authStateProvider.overrideWith(
+            (ref) => Stream.value(null),
+          ),
+          playerPresenceProvider.overrideWith(
+            (ref, uid) => Stream.value(null),
+          ),
+        ],
+        child: MaterialApp(
+          home: Scaffold(
+            body: PlayerCard(
+              player: Player.fromFirestoreData(
+                'uid',
+                {'username': 'Yessir'},
+              ),
+            ),
           ),
         ),
       ),
     );
-    expect(find.text('Status unavailable'), findsNothing);
+
+    await tester.pumpAndSettle();
+
+    expect(find.text('Status unavailable'), findsOneWidget);
     expect(find.text('Offline'), findsNothing);
+    expect(find.text('Online'), findsNothing);
     expect(find.textContaining('Playing'), findsNothing);
+    expect(tester.takeException(), isNull);
   });
   testWidgets(
     'Player tab handles loading, empty, real updates, errors and region values',

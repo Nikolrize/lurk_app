@@ -17,6 +17,7 @@ import 'package:lurk_app/features/parties/models/party.dart';
 import 'package:lurk_app/features/player/models/player.dart';
 import 'package:lurk_app/features/chat/models/chat_settings.dart';
 
+import 'package:lurk_app/providers/presence_provider.dart';
 Widget _optionsApp(_ChatService service) => ProviderScope(
   overrides: [
     authStateProvider.overrideWith((ref) => Stream.value(_User())),
@@ -33,6 +34,9 @@ Widget _optionsApp(_ChatService service) => ProviderScope(
         ChatMessage(id: '1', senderId: 'alice', text: 'Hello teammate'),
         ChatMessage(id: '2', senderId: 'bob', text: 'Ranked tonight'),
       ]),
+    ),
+    playerPresenceProvider.overrideWith(
+      (ref, uid) => Stream.value(null),
     ),
   ],
   child: MaterialApp(
@@ -186,6 +190,9 @@ void main() {
                 ),
               ),
             ),
+            playerPresenceProvider.overrideWith(
+              (ref, uid) => Stream.value(null),
+            ),
           ],
           child: MaterialApp(
             theme: AppTheme.dark,
@@ -228,6 +235,9 @@ void main() {
           playerProfileProvider.overrideWith((ref, uid) => Stream.value(null)),
           messagesProvider.overrideWith(
             (ref, key) => Stream.value(<ChatMessage>[]),
+          ),
+          playerPresenceProvider.overrideWith(
+            (ref, uid) => Stream.value(null),
           ),
         ],
         child: MaterialApp(
@@ -325,6 +335,9 @@ void main() {
                 ),
               ]),
             ),
+            playerPresenceProvider.overrideWith(
+              (ref, uid) => Stream.value(null),
+            ),
           ],
           child: MaterialApp(
             theme: AppTheme.dark,
@@ -333,7 +346,9 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      expect(find.text('Status unavailable'), findsNothing);
+      expect(find.text('Status unavailable'), findsOneWidget);    
+      expect(find.text('Offline'), findsNothing);
+      expect(find.text('Online'), findsNothing);
       expect(find.text('Valorant · Rank 3 · 4.8 rating'), findsOneWidget);
       expect(find.textContaining('TODAY ·'), findsOneWidget);
       expect(find.text('PARTY INVITE'), findsOneWidget);

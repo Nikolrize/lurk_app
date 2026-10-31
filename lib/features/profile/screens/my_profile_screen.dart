@@ -12,6 +12,8 @@ import '../widgets/gaming_preferences_card.dart';
 import 'package:lurk_app/features/availability/screens/availability_screen.dart';
 import 'package:lurk_app/features/availability/widgets/availability_summary_card.dart';
 
+import 'package:lurk_app/core/widgets/player_status_badge.dart';
+
 class MyProfileScreen extends ConsumerStatefulWidget {
   const MyProfileScreen({
     super.key,
@@ -241,6 +243,10 @@ class _MyProfileScreenState extends ConsumerState<MyProfileScreen> {
                                         style: text.titleLarge?.copyWith(
                                           fontWeight: FontWeight.w700,
                                         ),
+                                      ),
+                                      PlayerStatusBadge(
+                                        uid: widget.uid,
+                                        editable: true,
                                       ),
                                       const SizedBox(height: 8),
                                       Text(

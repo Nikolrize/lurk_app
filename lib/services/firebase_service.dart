@@ -5,6 +5,8 @@ import 'package:google_sign_in/google_sign_in.dart';
 class FirebaseService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
 
+  Future<void> Function()? beforeSignOut;
+
   // returns currently signed-in user, or null of signed out
   User? get currentUser => _auth.currentUser;
 
@@ -64,8 +66,10 @@ class FirebaseService {
     return _auth.sendPasswordResetEmail(email: email.trim());
   }
 
-  //sign out
-  Future<void> signOut() {
-    return _auth.signOut();
+  //sign out 
+  //shared logout hook 
+  Future<void> signOut() async {
+    await beforeSignOut?.call();
+    await _auth.signOut();
   }
 }

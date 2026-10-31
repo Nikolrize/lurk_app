@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../models/player.dart';
 
+import 'package:lurk_app/core/widgets/player_status_badge.dart';
+
 class PlayerCard extends StatelessWidget {
   const PlayerCard({super.key, required this.player, this.onTap});
 
@@ -28,6 +30,7 @@ class PlayerCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(player.name, style: text.titleMedium),
+                PlayerStatusBadge(uid: player.id), 
                 if (game != null && game.isNotEmpty) ...[
                   const SizedBox(height: 6),
                   Text(
