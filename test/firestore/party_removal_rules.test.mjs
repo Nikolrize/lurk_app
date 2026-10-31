@@ -8,6 +8,7 @@ test('only host can remove active members atomically; rejoining requires a fresh
   await env.clearFirestore();
   await env.withSecurityRulesDisabled(async c=>{
    const db=c.firestore();
+      for (const uid of ["alice","bob","eve"]) await setDoc(doc(db, 'players/'+uid), {username:uid,region:'Asia'});
    await setDoc(doc(db,'parties/squad'),{title:'Squad',hostId:'alice',gameId:'valorant',region:'asia',mode:'competitive',visibility:'private',maxPlayers:5,memberCount:3,minRank:null,maxRank:null,playstyles:['chill'],communication:'mic_required',minimumRating:0,description:'',status:'open',createdAt:new Date(),updatedAt:new Date(),startedAt:null,completedAt:null});
    for(const uid of ['alice','bob','eve']){
     await setDoc(doc(db,'parties/squad/members/'+uid),{role:uid==='alice'?'host':'member',joinedAt:new Date(),leftAt:null});

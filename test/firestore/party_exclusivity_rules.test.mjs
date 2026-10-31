@@ -8,6 +8,7 @@ test('joined players cannot host until leaving or session end, including simulta
   await env.clearFirestore();
   await env.withSecurityRulesDisabled(async c=>{
    const db=c.firestore();
+      for (const uid of ["alice","bob","joined","left","ended","host","fresh","free"]) await setDoc(doc(db, 'players/'+uid), {username:uid,region:'Asia'});
    await setDoc(doc(db,'parties/squad'),{hostId:'alice',status:'open',visibility:'public',memberCount:3,maxPlayers:5});
    await setDoc(doc(db,'parties/ended'),{hostId:'alice',status:'closed',visibility:'public',memberCount:0,maxPlayers:5});
    for(const [uid,id] of [['bob','squad'],['leaver','squad'],['past','ended']]){

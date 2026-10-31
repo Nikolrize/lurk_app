@@ -1,3 +1,4 @@
+import '../../../core/widgets/player_avatar.dart';
 import 'package:flutter/material.dart';
 
 import '../models/player.dart';
@@ -21,11 +22,7 @@ class PlayerCard extends StatelessWidget {
       padding: const EdgeInsets.all(16),
       child: Row(
         children: [
-          CircleAvatar(
-            radius: 28,
-            backgroundColor: colors.surfaceContainerHighest,
-            child: Icon(Icons.person_outline, color: colors.onSurfaceVariant),
-          ),
+          PlayerAvatar(photoPath: player.photoPath, radius: 28),
           const SizedBox(width: 16),
           Expanded(
             child: Column(
@@ -36,14 +33,11 @@ class PlayerCard extends StatelessWidget {
                   runSpacing: 4,
                   crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
-                    Text(
-                      player.name,
-                      style: text.titleMedium,
-                    ),
+                    Text(player.name, style: text.titleMedium),
                     PlayerVerificationBadge(uid: player.id),
                   ],
                 ),
-                PlayerStatusBadge(uid: player.id), 
+                PlayerStatusBadge(uid: player.id),
                 if (game != null && game.isNotEmpty) ...[
                   const SizedBox(height: 6),
                   Text(

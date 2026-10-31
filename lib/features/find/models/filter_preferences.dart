@@ -76,9 +76,7 @@ class FilterPreferences {
     final selected = GameCatalog.find(game);
     final candidate = GameCatalog.find(gameName);
 
-    return selected != null &&
-        candidate != null &&
-        selected.id == candidate.id;
+    return selected != null && candidate != null && selected.id == candidate.id;
   }
 
   bool _matchesRank({
@@ -112,6 +110,7 @@ class FilterPreferences {
 
   bool matches({
     required String? gameName,
+    Iterable<String> games = const [],
     required String? regionName,
     required String? gameMode,
     required int? rank,
@@ -125,7 +124,7 @@ class FilterPreferences {
     required bool hasAvailability,
     int? partySize,
   }) {
-    return _matchesGame(gameName) &&
+    return (_matchesGame(gameName) || games.any(_matchesGame)) &&
         (region == null || region == regionName) &&
         (mode == null || mode == gameMode) &&
         _matchesRank(
@@ -137,10 +136,8 @@ class FilterPreferences {
             playstyles.contains(style) ||
             styleOptions.any(playstyles.contains)) &&
         (communication == null || communication == comms) &&
-        (minimumRating == 0 ||
-            (rating != null && rating >= minimumRating)) &&
-        (!availableNowOnly ||
-            playerAvailability?.availableNow == true) &&
+        (minimumRating == 0 || (rating != null && rating >= minimumRating)) &&
+        (!availableNowOnly || playerAvailability?.availableNow == true) &&
         (preferredTimes.isEmpty ||
             (playerAvailability != null &&
                 preferredTimes.any(

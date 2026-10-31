@@ -1,3 +1,4 @@
+import '../../../core/data/game_catalog.dart';
 import '../../player/models/player_availability.dart';
 import 'package:flutter/material.dart';
 import '../models/filter_preferences.dart';
@@ -26,28 +27,30 @@ class _FilterPreferencesScreenState extends State<FilterPreferencesScreen> {
   bool _availableNowOnly = false;
   Set<String> _preferredTimes = {};
   int? _weekday;
+  bool _matchScheduleTime = false;
+  int _scheduleStart = 18 * 60, _scheduleEnd = 23 * 60;
   int? _maxPartySize;
   late RangeValues _ranks;
   late double _rating;
   late bool _onlyAvailable;
 
-  List<String> get _rankNames =>
-    FilterPreferences.ranksForGame(_game);
+  List<String> get _rankNames => FilterPreferences.ranksForGame(_game);
 
-    void _changeGame(String? value) {
-      _game = value;
+  void _changeGame(String? value) {
+    _game = value;
 
-      final names = _rankNames;
+    final names = _rankNames;
 
-      _ranks = names.isEmpty
-          ? const RangeValues(0, 0)
-          : RangeValues(0, (names.length - 1).toDouble());
-    }
+    _ranks = names.isEmpty
+        ? const RangeValues(0, 0)
+        : RangeValues(0, (names.length - 1).toDouble());
+  }
+
   @override
   void initState() {
     super.initState();
     final f = widget.initial;
-    _game = f.game;
+    _game = GameCatalog.find(f.game)?.name ?? f.game;
     _region = f.region;
     _mode = f.mode;
     _playstyles = Set.of(f.playstyles);
@@ -55,6 +58,13 @@ class _FilterPreferencesScreenState extends State<FilterPreferencesScreen> {
     _availableNowOnly = f.availableNowOnly;
     _preferredTimes = Set.of(f.preferredTimes);
     _weekday = f.scheduleWindow?.weekday;
+    final window = f.scheduleWindow;
+    _matchScheduleTime =
+        window != null && (window.startMinute != 0 || window.endMinute != 0);
+    if (_matchScheduleTime) {
+      _scheduleStart = window!.startMinute;
+      _scheduleEnd = window.endMinute % 1440;
+    }
     _maxPartySize = f.maxPartySize;
     final names = _rankNames;
     //restores selected range while keeping slider within bounds
@@ -80,11 +90,34 @@ class _FilterPreferencesScreenState extends State<FilterPreferencesScreen> {
     _availableNowOnly = false;
     _preferredTimes = {};
     _weekday = null;
+    _matchScheduleTime = false;
+    _scheduleStart = 18 * 60;
+    _scheduleEnd = 23 * 60;
     _maxPartySize = null;
     _ranks = const RangeValues(0, 0);
     _rating = 0;
     _onlyAvailable = false;
   });
+  Future<void> _pickScheduleTime(bool start) async {
+    final minute = start ? _scheduleStart : _scheduleEnd;
+    final selected = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay(hour: minute ~/ 60, minute: minute % 60),
+    );
+    if (selected == null || !mounted) return;
+    setState(() {
+      if (start) {
+        _scheduleStart = selected.hour * 60 + selected.minute;
+      } else {
+        _scheduleEnd = selected.hour * 60 + selected.minute;
+      }
+    });
+  }
+
+  String _timeLabel(int minutes) => MaterialLocalizations.of(
+    context,
+  ).formatTimeOfDay(TimeOfDay(hour: minutes ~/ 60, minute: minutes % 60));
+
   Widget _label(String label) => Padding(
     padding: const EdgeInsets.only(top: 18, bottom: 8),
     child: Text(
@@ -304,6 +337,39 @@ class _FilterPreferencesScreenState extends State<FilterPreferencesScreen> {
               ],
               onChanged: (v) => setState(() => _weekday = v == 0 ? null : v),
             ),
+            if (_weekday != null) ...[
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                title: const Text('Match a time range'),
+                value: _matchScheduleTime,
+                onChanged: (value) =>
+                    setState(() => _matchScheduleTime = value),
+              ),
+              if (_matchScheduleTime) ...[
+                Wrap(
+                  spacing: 12,
+                  runSpacing: 8,
+                  children: [
+                    OutlinedButton.icon(
+                      onPressed: () => _pickScheduleTime(true),
+                      icon: const Icon(Icons.schedule),
+                      label: Text('From ${_timeLabel(_scheduleStart)}'),
+                    ),
+                    OutlinedButton.icon(
+                      onPressed: () => _pickScheduleTime(false),
+                      icon: const Icon(Icons.schedule),
+                      label: Text('Until ${_timeLabel(_scheduleEnd)}'),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  _scheduleEnd < _scheduleStart
+                      ? 'Ends the following day. Matches overlapping availability.'
+                      : 'Matches players with overlapping availability.',
+                ),
+              ],
+            ],
           ] else ...[
             _label('Max party size'),
             DropdownButtonFormField<int>(
@@ -336,32 +402,45 @@ class _FilterPreferencesScreenState extends State<FilterPreferencesScreen> {
         child: Padding(
           padding: const EdgeInsets.fromLTRB(24, 12, 24, 16),
           child: FilledButton(
-            onPressed: () => Navigator.pop(
-              context,
-              FilterPreferences(
-                game: _game,
-                region: _region,
-                mode: _mode,
-                minRank: names.isEmpty ? 0 : _ranks.start.round(),
-                maxRank: names.isEmpty ? null : _ranks.end.round(),   
-                playstyles: Set.unmodifiable(_playstyles),
-                communication: _communication,
-                minimumRating: _rating,
-                availableNowOnly: widget.forPlayers && _availableNowOnly,
-                preferredTimes: widget.forPlayers
-                    ? Set.unmodifiable(_preferredTimes)
-                    : const {},
-                scheduleWindow: widget.forPlayers && _weekday != null
-                    ? WeeklyGamingSlot(
-                        weekday: _weekday!,
-                        startMinute: 0,
-                        endMinute: 0,
-                      )
-                    : null,
-                maxPartySize: widget.forPlayers ? null : _maxPartySize,
-                onlyAvailable: !widget.forPlayers && _onlyAvailable,
-              ),
-            ),
+            onPressed: () {
+              if (widget.forPlayers &&
+                  _weekday != null &&
+                  _matchScheduleTime &&
+                  _scheduleStart == _scheduleEnd) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Choose different start and end times.'),
+                  ),
+                );
+                return;
+              }
+              Navigator.pop(
+                context,
+                FilterPreferences(
+                  game: _game,
+                  region: _region,
+                  mode: _mode,
+                  minRank: names.isEmpty ? 0 : _ranks.start.round(),
+                  maxRank: names.isEmpty ? null : _ranks.end.round(),
+                  playstyles: Set.unmodifiable(_playstyles),
+                  communication: _communication,
+                  minimumRating: _rating,
+                  availableNowOnly: widget.forPlayers && _availableNowOnly,
+                  preferredTimes: widget.forPlayers
+                      ? Set.unmodifiable(_preferredTimes)
+                      : const {},
+                  scheduleWindow: widget.forPlayers && _weekday != null
+                      ? WeeklyGamingSlot(
+                          weekday: _weekday!,
+                          startMinute: _matchScheduleTime ? _scheduleStart : 0,
+                          endMinute: _matchScheduleTime ? _scheduleEnd : 0,
+                        )
+                      : null,
+                  maxPartySize: widget.forPlayers ? null : _maxPartySize,
+                  onlyAvailable: !widget.forPlayers && _onlyAvailable,
+                ),
+              );
+            },
             child: const Text('Show Results'),
           ),
         ),

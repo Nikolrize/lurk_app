@@ -1,3 +1,4 @@
+import '../../../core/widgets/player_avatar.dart';
 import 'package:flutter/material.dart';
 import '../models/lobby_member.dart';
 
@@ -8,11 +9,13 @@ class LobbyMemberCard extends StatelessWidget {
     this.isHost = false,
     required this.onViewProfile,
     this.onRemove,
+    this.onMakeHost,
   });
   final LobbyMember member;
   final bool isHost;
   final VoidCallback onViewProfile;
   final VoidCallback? onRemove;
+  final VoidCallback? onMakeHost;
 
   @override
   Widget build(BuildContext context) {
@@ -62,14 +65,7 @@ class LobbyMemberCard extends StatelessWidget {
                 child: InkWell(
                   onTap: onViewProfile,
                   borderRadius: BorderRadius.circular(27),
-                  child: CircleAvatar(
-                    radius: 27,
-                    backgroundColor: colors.surfaceContainerHighest,
-                    child: Icon(
-                      Icons.person_outline,
-                      color: colors.onSurfaceVariant,
-                    ),
-                  ),
+                  child: PlayerAvatar(photoPath: member.photoPath, radius: 27),
                 ),
               ),
               const SizedBox(width: 14),
@@ -81,7 +77,7 @@ class LobbyMemberCard extends StatelessWidget {
                       children: [
                         Flexible(
                           child: Text(
-                            '${member.name}${rank == null || rank.isEmpty ? '' : ' · $rank'}',
+                            member.name,
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
                             style: theme.textTheme.titleMedium,
@@ -106,15 +102,43 @@ class LobbyMemberCard extends StatelessWidget {
                       runSpacing: 4,
                       crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
-                        Icon(
-                          Icons.star_rounded,
-                          size: 16,
-                          color: colors.onSurfaceVariant,
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.star_rounded,
+                              size: 16,
+                              color: colors.onSurfaceVariant,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              member.rating?.toStringAsFixed(1) ??
+                                  member.ratingLabel ??
+                                  'Not rated',
+                              style: theme.textTheme.bodySmall,
+                            ),
+                          ],
                         ),
-                        Text(
-                          member.rating?.toStringAsFixed(1) ?? 'Not rated',
-                          style: theme.textTheme.bodySmall,
-                        ),
+                        if (rank != null && rank.isNotEmpty)
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.military_tech_outlined,
+                                size: 16,
+                                color: colors.onSurfaceVariant,
+                              ),
+                              const SizedBox(width: 4),
+                              Flexible(
+                                child: Text(
+                                  rank,
+                                  style: theme.textTheme.bodySmall?.copyWith(
+                                    color: colors.onSurfaceVariant,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
                         Tooltip(
                           message: mic,
                           child: Icon(
@@ -139,6 +163,8 @@ class LobbyMemberCard extends StatelessWidget {
                 onSelected: (value) {
                   if (value == 'profile') {
                     onViewProfile();
+                  } else if (value == 'host') {
+                    onMakeHost?.call();
                   } else {
                     onRemove?.call();
                   }
@@ -148,6 +174,11 @@ class LobbyMemberCard extends StatelessWidget {
                     value: 'profile',
                     child: Text('View profile'),
                   ),
+                  if (onMakeHost != null)
+                    const PopupMenuItem(
+                      value: 'host',
+                      child: Text('Make host'),
+                    ),
                   if (onRemove != null)
                     const PopupMenuItem(
                       value: 'remove',

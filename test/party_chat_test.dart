@@ -169,16 +169,18 @@ void main() {
   testWidgets('lobby avatar invokes existing profile action', (tester) async {
     var tapped = false;
     await tester.pumpWidget(
-      MaterialApp(
-        home: Scaffold(
-          body: LobbyMemberCard(
-            member: const LobbyMember(uid: 'bob', name: 'Bob'),
-            onViewProfile: () => tapped = true,
+      ProviderScope(
+        child: MaterialApp(
+          home: Scaffold(
+            body: LobbyMemberCard(
+              member: const LobbyMember(uid: 'bob', name: 'Bob'),
+              onViewProfile: () => tapped = true,
+            ),
           ),
         ),
       ),
     );
-    await tester.tap(find.byType(CircleAvatar));
+    await tester.tap(find.byTooltip('View Bob profile'));
     expect(tapped, true);
   });
 }

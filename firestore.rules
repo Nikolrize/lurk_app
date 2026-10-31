@@ -21,6 +21,38 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
+    // Totals change only together with one new, independently validated review.
+    function validRatingSummary(uid, reviewId, stars) {
+      let path = /databases/$(database)/documents/player_rating_summaries/$(uid);
+      let before = exists(path) ? get(path).data : {'total': 0, 'count': 0};
+      let after = getAfter(path).data;
+      return after.keys().hasAll(['total', 'count', 'lastReviewId', 'updatedAt'])
+        && after.keys().hasOnly(['total', 'count', 'lastReviewId', 'updatedAt'])
+        && after.total is int && after.count is int
+        && after.total == before.total + stars && after.count == before.count + 1
+        && after.lastReviewId == reviewId && after.updatedAt == request.time;
+    }
+    match /player_rating_summaries/{uid} {
+      allow get: if signedIn();
+      allow list, delete: if false;
+      allow create, update: if signedIn() && request.auth.uid != uid
+        && !exists(/databases/$(database)/documents/player_reviews/$(uid)/reviews/$(request.resource.data.lastReviewId))
+        && getAfter(/databases/$(database)/documents/player_reviews/$(uid)/reviews/$(request.resource.data.lastReviewId)).data.raterId == request.auth.uid
+        && validRatingSummary(uid, request.resource.data.lastReviewId,
+          getAfter(/databases/$(database)/documents/player_reviews/$(uid)/reviews/$(request.resource.data.lastReviewId)).data.stars);
+    }
+    function normalizedRegion(region) {
+      return {'Asia': 'asia', 'Europe': 'europe', 'North America': 'north_america',
+        'South America': 'south_america', 'Africa': 'africa', 'Oceania': 'oceania'}.get(region, region);
+    }
+    function meetsPartyRequirements(data) {
+      let profile = /databases/$(database)/documents/players/$(request.auth.uid);
+      let summary = /databases/$(database)/documents/player_rating_summaries/$(request.auth.uid);
+      let minimum = data.get('minimumRating', 0);
+      return normalizedRegion(get(profile).data.region) == data.region
+        && (minimum == 0 || (exists(summary) && get(summary).data.count > 0
+          && get(summary).data.total >= minimum * get(summary).data.count));
+    }
     match /player_reviews/{targetUid}/reviews/{reviewId} {
       function participatedTogether(partyId) {
         let party = get(/databases/$(database)/documents/parties/$(partyId)).data;
@@ -51,7 +83,8 @@ service cloud.firestore {
         && request.resource.data.comment is string && request.resource.data.comment.size() <= 500
         && request.resource.data.createdAt == request.time
         && exists(/databases/$(database)/documents/players/$(targetUid))
-        && participatedTogether(request.resource.data.partyId);
+        && participatedTogether(request.resource.data.partyId)
+        && validRatingSummary(targetUid, reviewId, request.resource.data.stars);
       allow update, delete: if false;
     }
     match /notification_preferences/{uid} {
@@ -798,7 +831,25 @@ service cloud.firestore {
 
     // One counter per host serializes creation across devices.
     // Existing hosts may initially have >1; closing each session reduces it.
+    // A host transfer preserves the session and changes ownership atomically.
+    function transferringHost(partyId) {
+      let before = get(/databases/$(database)/documents/parties/$(partyId)).data;
+      let after = getAfter(/databases/$(database)/documents/parties/$(partyId)).data;
+      return signedIn() && before.hostId == request.auth.uid && before.status == 'open'
+        && after.hostId is string && after.hostId != before.hostId
+        && after.updatedAt == request.time
+        && after.diff(before).affectedKeys().hasOnly(['hostId', 'updatedAt']);
+    }
+
     match /party_host_slots/{uid} {
+      allow create, update: if transferringHost(request.resource.data.lastPartyId)
+        && request.resource.data.keys().hasOnly(['activeCount', 'lastPartyId', 'updatedAt'])
+        && request.resource.data.updatedAt == request.time
+        && (uid == request.auth.uid
+          ? resource.data.activeCount == 1 && request.resource.data.activeCount == 0
+          : (resource == null || resource.data.activeCount == 0)
+            && request.resource.data.activeCount == 1
+            && getAfter(/databases/$(database)/documents/parties/$(request.resource.data.lastPartyId)).data.hostId == uid);
       allow get: if owns(uid);
       allow list, delete: if false;
       allow create, update: if owns(uid)
@@ -823,6 +874,14 @@ service cloud.firestore {
     }
 
     match /party_memberships/{uid} {
+      allow create, update: if owns(uid) && canReplace()
+        && transferringHost(request.resource.data.partyId)
+        && request.resource.data.keys().hasAll(['partyId', 'updatedAt'])
+        && request.resource.data.keys().hasOnly(['partyId', 'updatedAt'])
+        && request.resource.data.updatedAt == request.time;
+      allow delete: if transferringHost(resource.data.partyId)
+        && getAfter(/databases/$(database)/documents/parties/$(resource.data.partyId)).data.hostId == uid;
+
       allow get: if owns(uid);
       allow list: if false;
       function canReplace() {
@@ -907,12 +966,9 @@ service cloud.firestore {
           && (!existsAfter(/databases/$(database)/documents/party_host_slots/$(request.auth.uid))
             || getAfter(/databases/$(database)/documents/party_host_slots/$(request.auth.uid)).data.activeCount == 0)
           && resource.data.memberCount < resource.data.maxPlayers
+          && meetsPartyRequirements(resource.data)
           && (resource.data.visibility == 'public'
             || exists(/databases/$(database)/documents/parties/$(partyId)/invitations/$(request.auth.uid)))
-          && (!exists(member) || (get(member).data.leftAt != null
-            && (get(member).data.get('removedBy', null) == null
-              || (exists(/databases/$(database)/documents/parties/$(partyId)/invitations/$(request.auth.uid))
-                && get(/databases/$(database)/documents/parties/$(partyId)/invitations/$(request.auth.uid)).data.createdAt > get(member).data.leftAt))))
           && unblocked([resource.data.hostId, request.auth.uid])
           && joined.keys().hasAll(['role', 'joinedAt', 'leftAt'])
           && joined.keys().hasOnly(['role', 'joinedAt', 'leftAt'])
@@ -926,7 +982,17 @@ service cloud.firestore {
       allow update: if signedIn() && resource.data.status == 'open'
         && request.resource.data.updatedAt == request.time
         && (
-          (resource.data.hostId == request.auth.uid
+          (transferringHost(partyId)
+            && get(/databases/$(database)/documents/parties/$(partyId)/members/$(resource.data.hostId)).data.role == 'host'
+            && get(/databases/$(database)/documents/parties/$(partyId)/members/$(request.resource.data.hostId)).data.role == 'member'
+            && getAfter(/databases/$(database)/documents/parties/$(partyId)/members/$(resource.data.hostId)).data.role == 'member'
+            && getAfter(/databases/$(database)/documents/parties/$(partyId)/members/$(request.resource.data.hostId)).data.role == 'host'
+            && getAfter(/databases/$(database)/documents/party_host_slots/$(resource.data.hostId)).data.activeCount == 0
+            && getAfter(/databases/$(database)/documents/party_host_slots/$(request.resource.data.hostId)).data.activeCount == 1
+            && getAfter(/databases/$(database)/documents/party_host_slots/$(request.resource.data.hostId)).data.lastPartyId == partyId
+            && getAfter(/databases/$(database)/documents/party_memberships/$(resource.data.hostId)).data.partyId == partyId
+            && !existsAfter(/databases/$(database)/documents/party_memberships/$(request.resource.data.hostId)))
+          || (resource.data.hostId == request.auth.uid
             && validPartyDetails(request.resource.data)
             && request.resource.data.maxPlayers >= resource.data.memberCount
             && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
@@ -943,9 +1009,8 @@ service cloud.firestore {
             && get(/databases/$(database)/documents/parties/$(partyId)/members/$(request.resource.data.lastRemovedMemberId)).data.leftAt == null
             && getAfter(/databases/$(database)/documents/parties/$(partyId)/members/$(request.resource.data.lastRemovedMemberId)).data.leftAt == request.time
             && getAfter(/databases/$(database)/documents/parties/$(partyId)/members/$(request.resource.data.lastRemovedMemberId)).data.removedBy == request.auth.uid)
-          || (canJoin()
-            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['memberCount', 'updatedAt'])
-            && request.resource.data.memberCount == resource.data.memberCount + 1)
+          || (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['memberCount', 'updatedAt'])
+            && request.resource.data.memberCount == resource.data.memberCount + 1 && canJoin())
           || (leftSelf()
             && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'memberCount', 'updatedAt'])
             && (resource.data.hostId == request.auth.uid
@@ -991,6 +1056,9 @@ service cloud.firestore {
         function joining() {
           let data = request.resource.data;
           return uid != parent().hostId && parent().status == 'open'
+            && (resource == null || resource.data.get('removedBy', null) == null
+              || (exists(/databases/$(database)/documents/parties/$(partyId)/invitations/$(uid))
+                && get(/databases/$(database)/documents/parties/$(partyId)/invitations/$(uid)).data.createdAt > resource.data.leftAt))
             && parent().memberCount < parent().maxPlayers
             && (parent().visibility == 'public' || exists(/databases/$(database)/documents/parties/$(partyId)/invitations/$(uid)))
             && data.keys().hasAll(['role', 'joinedAt', 'leftAt']) && data.keys().hasOnly(['role', 'joinedAt', 'leftAt'])
@@ -1009,6 +1077,13 @@ service cloud.firestore {
           (!exists(/databases/$(database)/documents/parties/$(partyId))
             && getAfter(/databases/$(database)/documents/parties/$(partyId)).data.hostId == uid
             && validHostMembership(request.resource.data)) || joining());
+        allow update: if transferringHost(partyId)
+          && resource.data.leftAt == null
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['role'])
+          && (uid == request.auth.uid
+            ? resource.data.role == 'host' && request.resource.data.role == 'member'
+            : uid == getAfter(/databases/$(database)/documents/parties/$(partyId)).data.hostId
+              && resource.data.role == 'member' && request.resource.data.role == 'host');
         allow update: if owns(uid) && (
           (resource.data.leftAt != null && joining())
           || (resource.data.leftAt == null

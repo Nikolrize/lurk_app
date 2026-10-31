@@ -1,3 +1,4 @@
+import '../../../core/widgets/game_icon.dart';
 import 'package:flutter/material.dart';
 import '../../../core/data/game_catalog.dart';
 import '../models/party.dart';
@@ -51,10 +52,8 @@ class PartyHistoryCard extends StatelessWidget {
                 color: colors.primary.withValues(alpha: .18),
                 borderRadius: BorderRadius.circular(14),
               ),
-              child: Icon(
-                Icons.sports_esports_rounded,
-                color: colors.secondary,
-              ),
+              alignment: Alignment.center,
+              child: GameIcon(game: entry.gameId, size: 34),
             ),
             const SizedBox(width: 14),
             Expanded(

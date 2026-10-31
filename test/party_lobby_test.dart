@@ -1,3 +1,6 @@
+import 'package:lurk_app/providers/rating_provider.dart';
+import 'package:lurk_app/features/ratings/models/teammate_rating.dart';
+import 'package:lurk_app/models/gaming_preferences.dart';
 import 'package:lurk_app/providers/voice_provider.dart';
 import 'package:lurk_app/services/party_voice_service.dart';
 import 'dart:async';
@@ -47,6 +50,18 @@ class LobbyVoiceService extends PartyVoiceService {
 
 class LobbyPartyService extends Fake implements PartyService {
   int leaves = 0;
+  int transfers = 0;
+  String? newHostUid;
+  @override
+  Future<void> transferHost(
+    String id,
+    String uid, {
+    required String expectedUid,
+  }) async {
+    transfers++;
+    newHostUid = uid;
+  }
+
   int removals = 0;
   String? removedUid;
   @override
@@ -99,6 +114,108 @@ const members = [
   ),
 ];
 void main() {
+  testWidgets('Lobby ranks follow the party game and update live', (
+    tester,
+  ) async {
+    final ratings = StreamController<RatingSummary>();
+    addTearDown(ratings.close);
+    final preferences = StreamController<GamingPreferences>();
+    final parties = StreamController<Party?>();
+    addTearDown(preferences.close);
+    addTearDown(parties.close);
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          ratingSummaryProvider('host').overrideWith((ref) => ratings.stream),
+          partyByIdProvider('party').overrideWith((ref) => parties.stream),
+          partyMemberIdsProvider(
+            'party',
+          ).overrideWith((ref) => Stream.value(['host'])),
+          gamingPreferencesProvider(
+            'host',
+          ).overrideWith((ref) => preferences.stream),
+          playerProfileProvider('host').overrideWith(
+            (ref) => Stream.value(
+              const PlayerProfile(
+                uid: 'host',
+                username: 'Nicole',
+                bio: '',
+                region: 'Asia',
+                createdAt: null,
+                updatedAt: null,
+              ),
+            ),
+          ),
+        ],
+        child: MaterialApp(
+          theme: AppTheme.dark,
+          home: Scaffold(
+            body: PartyLobbyScreen(
+              party: const Party(
+                id: 'party',
+                hostId: 'host',
+                title: 'ML squad',
+                gameId: 'mobile_legends',
+                gameName: 'Mobile Legends',
+                playStyle: 'Competitive',
+                currentPlayers: 1,
+                maxPlayers: 5,
+              ),
+              viewerUid: 'host',
+              onBack: () {},
+              onToggleMic: () {},
+            ),
+          ),
+        ),
+      ),
+    );
+    preferences.add(
+      const GamingPreferences(
+        currentGame: 'valorant',
+        gameRanks: {'valorant': 'diamond', 'mobile_legends': 'epic'},
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Epic'), findsOneWidget);
+    expect(find.text('Loading rating…'), findsOneWidget);
+    ratings.add(const RatingSummary(total: 9, count: 2));
+    await tester.pumpAndSettle();
+    expect(find.text('4.5'), findsOneWidget);
+    ratings.add(const RatingSummary(total: 15, count: 3));
+    await tester.pumpAndSettle();
+    expect(find.text('5.0'), findsOneWidget);
+    ratings.add(const RatingSummary());
+    await tester.pumpAndSettle();
+    expect(find.text('Not rated'), findsOneWidget);
+    ratings.addError(StateError('Ratings unavailable'));
+    await tester.pumpAndSettle();
+    expect(find.text('Rating unavailable'), findsOneWidget);
+    expect(find.text('Diamond'), findsNothing);
+    preferences.add(
+      const GamingPreferences(gameRanks: {'mobile_legends': 'legend'}),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Legend'), findsOneWidget);
+    preferences.add(const GamingPreferences());
+    await tester.pumpAndSettle();
+    expect(find.text('Unranked'), findsOneWidget);
+    parties.add(
+      const Party(
+        id: 'party',
+        hostId: 'host',
+        title: 'Unranked game',
+        gameId: 'fortnite',
+        gameName: 'Fortnite',
+        playStyle: 'Casual',
+        currentPlayers: 1,
+        maxPlayers: 5,
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Unranked'), findsNothing);
+    expect(find.text('Loading rank…'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
   for (final viewer in ['host', 'alex']) {
     testWidgets('Lobby auto-connects muted and restricts invites for $viewer', (
       tester,
@@ -187,7 +304,8 @@ void main() {
       );
       expect(find.text('Valorant party'), findsOneWidget);
       expect(find.text('3 / 5 players · Private party'), findsOneWidget);
-      expect(find.text('Nicole · Platinum'), findsOneWidget);
+      expect(find.text('Nicole'), findsOneWidget);
+      expect(find.text('Platinum'), findsOneWidget);
       expect(find.byTooltip('Party host'), findsOneWidget);
       final controlPosition = tester.getTopLeft(find.text('Leave Party'));
       await tester.drag(find.byType(ListView).first, const Offset(0, -350));
@@ -442,6 +560,23 @@ void main() {
     await tester.pumpAndSettle();
     expect(service.removals, 1);
     expect(service.removedUid, 'alex');
+    await tester.ensureVisible(find.byTooltip('Options for Alex'));
+    await tester.tap(find.byTooltip('Options for Alex'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Make host'));
+    await tester.pumpAndSettle();
+    expect(find.text('Transfer host?'), findsOneWidget);
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
+    expect(service.transfers, 0);
+    await tester.tap(find.byTooltip('Options for Alex'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Make host'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilledButton, 'Make host'));
+    await tester.pumpAndSettle();
+    expect(service.transfers, 1);
+    expect(service.newHostUid, 'alex');
   });
   testWidgets('A removed player loses lobby controls immediately', (
     tester,
