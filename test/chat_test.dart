@@ -1,3 +1,5 @@
+import 'dart:async';
+import 'package:lurk_app/services/player_safety_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -14,33 +16,46 @@ import 'package:lurk_app/providers/chat_provider.dart';
 import 'package:lurk_app/providers/party_provider.dart';
 import 'package:lurk_app/providers/profile_provider.dart';
 import 'package:lurk_app/services/chat_service.dart';
+import 'package:lurk_app/features/chat/models/chat_receipt.dart';
 import 'package:lurk_app/features/parties/models/party.dart';
 import 'package:lurk_app/features/player/models/player.dart';
 import 'package:lurk_app/features/chat/models/chat_settings.dart';
 
-Widget _optionsApp(_ChatService service) => ProviderScope(
-  overrides: [
-    authStateProvider.overrideWith((ref) => Stream.value(_User())),
+Widget _optionsApp(_ChatService service, {List<ChatMessage>? messages}) =>
+    ProviderScope(
+      overrides: [
+        chatReceiptProvider.overrideWith(
+          (ref, key) => Stream.value(const ChatReceipt()),
+        ),
+        authStateProvider.overrideWith((ref) => Stream.value(_User())),
+        blockedPlayersProvider.overrideWith((ref) => Stream.value(<String>{})),
 
-    chatServiceProvider.overrideWithValue(service),
+        chatServiceProvider.overrideWithValue(service),
 
-    chatSettingsProvider.overrideWith(
-      (ref, id) => Stream.value(const ChatSettings()),
-    ),
-    chatPlayerProvider.overrideWith((ref, uid) => Stream.value(null)),
-    playerProfileProvider.overrideWith((ref, uid) => Stream.value(null)),
-    messagesProvider.overrideWith(
-      (ref, key) => Stream.value(const [
-        ChatMessage(id: '1', senderId: 'alice', text: 'Hello teammate'),
-        ChatMessage(id: '2', senderId: 'bob', text: 'Ranked tonight'),
-      ]),
-    ),
-  ],
-  child: MaterialApp(
-    theme: AppTheme.dark,
-    home: const ChatScreen(chatId: 'chat', otherUid: 'bob'),
-  ),
-);
+        chatSettingsProvider.overrideWith(
+          (ref, id) => Stream.value(const ChatSettings()),
+        ),
+        chatPlayerProvider.overrideWith((ref, uid) => Stream.value(null)),
+        playerProfileProvider.overrideWith((ref, uid) => Stream.value(null)),
+        messagesProvider.overrideWith(
+          (ref, key) => Stream.value(
+            messages ??
+                const [
+                  ChatMessage(
+                    id: '1',
+                    senderId: 'alice',
+                    text: 'Hello teammate',
+                  ),
+                  ChatMessage(id: '2', senderId: 'bob', text: 'Ranked tonight'),
+                ],
+          ),
+        ),
+      ],
+      child: MaterialApp(
+        theme: AppTheme.dark,
+        home: const ChatScreen(chatId: 'chat', otherUid: 'bob'),
+      ),
+    );
 
 class _User extends Fake implements User {
   @override
@@ -48,6 +63,15 @@ class _User extends Fake implements User {
 }
 
 class _ChatService extends Fake implements ChatService {
+  @override
+  Stream<ChatReceipt> watchReceipt(String chatId, String uid) =>
+      Stream.value(const ChatReceipt());
+  @override
+  Future<void> markRead(String chatId, String uid, ChatMessage message) async {
+    readIds.add(message.id);
+  }
+
+  final readIds = <String>[];
   bool fail = true;
   final sent = <String>[];
   int clears = 0;
@@ -64,6 +88,31 @@ class _ChatService extends Fake implements ChatService {
 }
 
 void main() {
+  testWidgets('messages are marked read only when the chat is resumed', (
+    tester,
+  ) async {
+    final service = _ChatService();
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+    await tester.pumpWidget(
+      _optionsApp(
+        service,
+        messages: [
+          ChatMessage(
+            id: 'incoming',
+            senderId: 'bob',
+            text: 'Hello',
+            createdAt: DateTime(2026, 10, 31),
+          ),
+        ],
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(service.readIds, isEmpty);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await tester.pumpAndSettle();
+    expect(service.readIds, ['incoming']);
+  });
+
   testWidgets('search fits a narrow phone with its keyboard open', (
     tester,
   ) async {
@@ -153,6 +202,8 @@ void main() {
   testWidgets(
     'inbox searches names and fits a narrow screen with 24px padding',
     (tester) async {
+      final unreadCounts = StreamController<int>();
+      addTearDown(unreadCounts.close);
       tester.view.physicalSize = const Size(320, 760);
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.resetPhysicalSize);
@@ -160,7 +211,14 @@ void main() {
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
+            unreadCountProvider.overrideWith((ref, id) => unreadCounts.stream),
+            chatReceiptProvider.overrideWith(
+              (ref, key) => Stream.value(const ChatReceipt()),
+            ),
             authStateProvider.overrideWith((ref) => Stream.value(_User())),
+            blockedPlayersProvider.overrideWith(
+              (ref) => Stream.value(<String>{}),
+            ),
 
             chatSettingsProvider.overrideWith(
               (ref, id) => Stream.value(const ChatSettings()),
@@ -196,6 +254,15 @@ void main() {
       );
       await tester.pumpAndSettle();
       expect(find.text('Bob'), findsOneWidget);
+      unreadCounts.add(3);
+      await tester.pumpAndSettle();
+      expect(find.text('3'), findsOneWidget);
+      unreadCounts.add(0);
+      await tester.pumpAndSettle();
+      expect(find.text('3'), findsNothing);
+      unreadCounts.add(101);
+      await tester.pumpAndSettle();
+      expect(find.text('99+'), findsOneWidget);
       expect(
         find.descendant(
           of: find.byTooltip('New message'),
@@ -219,7 +286,13 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
+          chatReceiptProvider.overrideWith(
+            (ref, key) => Stream.value(const ChatReceipt()),
+          ),
           authStateProvider.overrideWith((ref) => Stream.value(_User())),
+          blockedPlayersProvider.overrideWith(
+            (ref) => Stream.value(<String>{}),
+          ),
 
           chatSettingsProvider.overrideWith(
             (ref, id) => Stream.value(const ChatSettings()),
@@ -277,7 +350,13 @@ void main() {
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
+            chatReceiptProvider.overrideWith(
+              (ref, key) => Stream.value(const ChatReceipt()),
+            ),
             authStateProvider.overrideWith((ref) => Stream.value(_User())),
+            blockedPlayersProvider.overrideWith(
+              (ref) => Stream.value(<String>{}),
+            ),
 
             chatSettingsProvider.overrideWith(
               (ref, id) => Stream.value(const ChatSettings()),

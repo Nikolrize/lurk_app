@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../core/widgets/notification_gate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:lurk_app/core/widgets/app_shell.dart';
@@ -41,7 +42,10 @@ class AuthGate extends ConsumerWidget {
         return ProfileGate(
           key: ValueKey(user.uid),
           uid: user.uid,
-          child: AppShell(uid: user.uid),
+          child: NotificationGate(
+            uid: user.uid,
+            child: AppShell(uid: user.uid),
+          ),
         );
       },
     );

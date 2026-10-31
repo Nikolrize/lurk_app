@@ -143,7 +143,7 @@ void main() {
       for (final rate in tester.widgetList<OutlinedButton>(
         find.widgetWithText(OutlinedButton, 'Rate'),
       )) {
-        expect(rate.onPressed, isNull);
+        expect(rate.onPressed, isNotNull);
       }
       await tester.tap(find.widgetWithText(ChoiceChip, 'Valorant'));
       await tester.pumpAndSettle();

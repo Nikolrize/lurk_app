@@ -1,3 +1,7 @@
+import 'blocked_players_screen.dart';
+import 'notification_settings_screen.dart';
+import '../../parties/screens/party_history_screen.dart';
+import '../../ratings/widgets/player_rating_summary.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -48,26 +52,26 @@ class _MyProfileScreenState extends ConsumerState<MyProfileScreen> {
     if (_isBusy) return;
 
     Navigator.of(context).push<void>(
-      MaterialPageRoute(
-        builder: (_) => AvailabilityScreen(uid: widget.uid),
-      ),
+      MaterialPageRoute(builder: (_) => AvailabilityScreen(uid: widget.uid)),
     );
   }
+
   Future<void> _openGamingPreferences() async {
     if (_isBusy) return;
 
     final saved = await Navigator.of(context).push<bool>(
       MaterialPageRoute(
         builder: (_) => GamingPreferencesScreen(uid: widget.uid),
-      ),     
+      ),
     );
 
     if (!mounted || saved != true) return;
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Gaming preferences updated')),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('Gaming preferences updated')));
   }
+
   Future<void> _editProfile() async {
     if (_isBusy) return;
 
@@ -242,6 +246,8 @@ class _MyProfileScreenState extends ConsumerState<MyProfileScreen> {
                                           fontWeight: FontWeight.w700,
                                         ),
                                       ),
+                                      const SizedBox(height: 6),
+                                      PlayerRatingSummary(uid: widget.uid),
                                       const SizedBox(height: 8),
                                       Text(
                                         profile.region.isEmpty
@@ -285,7 +291,8 @@ class _MyProfileScreenState extends ConsumerState<MyProfileScreen> {
                           uid: widget.uid,
                           onEdit: _isBusy
                               ? null
-                              : widget.onGamingPreferences ?? _openGamingPreferences,
+                              : widget.onGamingPreferences ??
+                                    _openGamingPreferences,
                         ),
                         const SizedBox(height: 24),
                         Text(
@@ -333,17 +340,32 @@ class _MyProfileScreenState extends ConsumerState<MyProfileScreen> {
                                   (
                                     icon: Icons.sports_esports_outlined,
                                     title: 'Gaming Preferences',
-                                    onTap: widget.onGamingPreferences ?? _openGamingPreferences,
+                                    onTap:
+                                        widget.onGamingPreferences ??
+                                        _openGamingPreferences,
                                   ),
                                   (
                                     icon: Icons.schedule_outlined,
                                     title: 'Availability',
-                                    onTap: widget.onAvailability ?? _openAvailability,
+                                    onTap:
+                                        widget.onAvailability ??
+                                        _openAvailability,
                                   ),
                                   (
                                     icon: Icons.history,
                                     title: 'Party History',
-                                    onTap: widget.onPartyHistory,
+                                    onTap:
+                                        widget.onPartyHistory ??
+                                        () => Navigator.of(context).push(
+                                          MaterialPageRoute<void>(
+                                            builder: (pageContext) => Scaffold(
+                                              body: PartyHistoryScreen(
+                                                onBack: () =>
+                                                    Navigator.pop(pageContext),
+                                              ),
+                                            ),
+                                          ),
+                                        ),
                                   ),
                                   (
                                     icon: Icons.verified_user_outlined,
@@ -358,12 +380,27 @@ class _MyProfileScreenState extends ConsumerState<MyProfileScreen> {
                                   (
                                     icon: Icons.block_outlined,
                                     title: 'Blocked Players',
-                                    onTap: widget.onBlockedPlayers,
+                                    onTap:
+                                        widget.onBlockedPlayers ??
+                                        () => Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (_) =>
+                                                const BlockedPlayersScreen(),
+                                          ),
+                                        ),
                                   ),
                                   (
                                     icon: Icons.settings_outlined,
                                     title: 'Settings',
-                                    onTap: widget.onSettings,
+                                    onTap:
+                                        widget.onSettings ??
+                                        () => Navigator.of(context).push(
+                                          MaterialPageRoute<void>(
+                                            builder: (_) =>
+                                                const NotificationSettingsScreen(),
+                                          ),
+                                        ),
                                   ),
                                 ];
 
