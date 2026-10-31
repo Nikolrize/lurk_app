@@ -1,10 +1,10 @@
-import '../../../core/data/game_catalog.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:lurk_app/models/gaming_preferences.dart';
 import 'package:lurk_app/providers/profile_provider.dart';
+import 'package:lurk_app/core/data/game_catalog.dart';
 
 import '../widgets/profile_page_layout.dart';
 
@@ -62,7 +62,7 @@ class _GamingPreferencesFormState
   String? _currentGame;
   String? _mode;
   String? _communication;
-  int? _rank;
+  late Map<String, String> _gameRanks;
 
   bool _isSaving = false;
 
@@ -77,7 +77,7 @@ class _GamingPreferencesFormState
     _currentGame = data.currentGame;
     _mode = data.mode;
     _communication = data.communication;
-    _rank = data.rank;
+    _gameRanks = Map<String, String>.of(data.gameRanks);
   }
 
   void _toggleGame(String game, bool selected) {
@@ -86,11 +86,11 @@ class _GamingPreferencesFormState
         _games.add(game);
       } else {
         _games.remove(game);
+        _gameRanks.remove(game);
       }
 
       if (!_games.contains(_currentGame)) {
         _currentGame = _games.isEmpty ? null : _games.first;
-        _rank = null;
       }
     });
   }
@@ -104,7 +104,7 @@ class _GamingPreferencesFormState
       mode: _mode,
       playstyles: _playstyles.toList()..sort(),
       communication: _communication,
-      rank: _rank,
+      gameRanks: Map<String, String>.of(_gameRanks),
     );
 
     setState(() {
@@ -184,6 +184,40 @@ class _GamingPreferencesFormState
     );
   }
 
+  //each dropdown reads and changes on entry in _gameRanks
+  Widget _rankDropdown(String gameId) {
+    final game = GameCatalog.games[gameId]!;
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 20),
+      child: DropdownButtonFormField<String>(
+        key: ValueKey('rank:$gameId:${_gameRanks[gameId]}'),
+        initialValue: _gameRanks[gameId] ?? '',
+        isExpanded: true,
+        decoration: InputDecoration(labelText: '${game.name} rank'),
+        items: [
+          const DropdownMenuItem(
+            value: '',
+            child: Text('Unranked / not specified'),
+          ),
+          for (final entry in game.ranks.entries)
+            DropdownMenuItem(value: entry.key, child: Text(entry.value)),
+        ],
+        onChanged: _isSaving
+            ? null
+            : (value) {
+                setState(() {
+                  if (value == null || value.isEmpty) {
+                    _gameRanks.remove(gameId);
+                  } else {
+                    _gameRanks[gameId] = value;
+                  }
+                });
+              },
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return PopScope(
@@ -192,7 +226,7 @@ class _GamingPreferencesFormState
         introduction: const ProfileIntroduction(
           title: 'Find your kind of teammates.',
           description:
-              'Choose your games and how you like to play.'
+              'Choose your games and how you like to play. '
               'These preferences are visible to other signed-in players '
               'and can help them find compatible teammates.',
         ),
@@ -244,9 +278,6 @@ class _GamingPreferencesFormState
                       ? null
                       : (value) {
                           setState(() {
-                            if (_currentGame != value) {
-                              _rank = null;
-                            }
                             _currentGame = value;
                           });
                         },
@@ -288,42 +319,10 @@ class _GamingPreferencesFormState
                   options: GamingPreferences.communicationLabels,
                   onChanged: (value) => _communication = value,
                 ),
-                if (GameCatalog.find(_currentGame)?.supportsRanks == true) ...[
-                  const SizedBox(height: 20),
-                  DropdownButtonFormField<int>(
-                    key: ValueKey('rank:$_rank'),
-                    initialValue: _rank ?? -1,
-                    isExpanded: true,
-                    decoration: InputDecoration(
-                      labelText: '${GameCatalog.find(_currentGame)?.name} rank',
-                    ),
-                    items: [
-                      const DropdownMenuItem(
-                        value: -1,
-                        child: Text('Unranked / not specified'),
-                      ),
-                      for (
-                        var index = 0;
-                        index <
-                            GamingPreferences.ranksForGame(_currentGame).length;
-                        index++
-                      )
-                        DropdownMenuItem(
-                          value: index,
-                          child: Text(
-                            GamingPreferences.ranksForGame(_currentGame)[index],
-                          ),
-                        ),
-                    ],
-                    onChanged: _isSaving
-                        ? null
-                        : (value) {
-                            setState(() {
-                              _rank = value == -1 ? null : value;
-                            });
-                          },
-                  ),
-                ],
+                //creates one drop down for each game that supports ranks
+                for (final gameId in _games)
+                  if (GameCatalog.games[gameId]?.supportsRanks == true)
+                    _rankDropdown(gameId),
 
                 const SizedBox(height: 28),
                 FilledButton.icon(

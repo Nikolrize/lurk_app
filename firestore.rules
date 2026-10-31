@@ -79,7 +79,6 @@ service cloud.firestore {
       );
     }
 
-
     // Keep these server-side bounds aligned with GameCatalog.
     function catalogueRankCount(game) {
       return {'valorant': 9, 'mobile_legends': 10, 'fortnite': 0}.get(game, 0);
@@ -211,34 +210,15 @@ service cloud.firestore {
   //weekly schedule: max 7 slots, ordered by unique weekday
   //times: mins after midnight; overnight sessions are allowed
   function validAvailabilitySlot(slot) {
+    let weekday = slot.get('weekday', null);
+    let start = slot.get('startMinute', null);
+    let end = slot.get('endMinute', null);
     return slot is map
-      && slot.keys().hasAll([
-        'weekday', 'startMinute', 'endMinute'
-      ])
-      && slot.keys().hasOnly([
-        'weekday', 'startMinute', 'endMinute'
-      ])
-      && slot.weekday is int
-      && slot.weekday >= 1
-      && slot.weekday <= 7
-      && slot.startMinute is int
-      && slot.startMinute >= 0
-      && slot.startMinute < 1440
-      && slot.endMinute is int
-      && slot.endMinute >= 0
-      && slot.endMinute <= 1440
-      && slot.startMinute != slot.endMinute;
-  }
-
-  function validAvailabilitySlotAt(slots, index) {
-    return slots.size() <= index
-      || (
-        validAvailabilitySlot(slots[index])
-        && (
-          index == 0
-          || slots[index - 1].weekday < slots[index].weekday
-        )
-      );
+      && slot.keys().hasOnly(['weekday', 'startMinute', 'endMinute'])
+      && weekday is int && weekday >= 1 && weekday <= 7
+      && start is int && start >= 0 && start < 1440
+      && end is int && end >= 0 && end <= 1440
+      && start != end;
   }
 
   function validAvailability(data) {
@@ -269,13 +249,13 @@ service cloud.firestore {
         ])
         && slots is list
         && slots.size() <= 7
-        && validAvailabilitySlotAt(slots, 0)
-        && validAvailabilitySlotAt(slots, 1)
-        && validAvailabilitySlotAt(slots, 2)
-        && validAvailabilitySlotAt(slots, 3)
-        && validAvailabilitySlotAt(slots, 4)
-        && validAvailabilitySlotAt(slots, 5)
-        && validAvailabilitySlotAt(slots, 6)
+        && (slots.size() <= 0 || (slots[0] is map && validAvailabilitySlot(slots[0])))
+        && (slots.size() <= 1 || (slots[1] is map && validAvailabilitySlot(slots[1]) && slots[0].weekday < slots[1].weekday))
+        && (slots.size() <= 2 || (slots[2] is map && validAvailabilitySlot(slots[2]) && slots[1].weekday < slots[2].weekday))
+        && (slots.size() <= 3 || (slots[3] is map && validAvailabilitySlot(slots[3]) && slots[2].weekday < slots[3].weekday))
+        && (slots.size() <= 4 || (slots[4] is map && validAvailabilitySlot(slots[4]) && slots[3].weekday < slots[4].weekday))
+        && (slots.size() <= 5 || (slots[5] is map && validAvailabilitySlot(slots[5]) && slots[4].weekday < slots[5].weekday))
+        && (slots.size() <= 6 || (slots[6] is map && validAvailabilitySlot(slots[6]) && slots[5].weekday < slots[6].weekday))
       );
   }
 
@@ -731,16 +711,22 @@ service cloud.firestore {
         && request.resource.data.createdAt == request.time
         && request.resource.data.updatedAt == request.time;
 
-      allow update: if owns(uid)
-        && validPublicProfile(request.resource.data)
-        && request.resource.data.diff(resource.data).affectedKeys()
-        .hasOnly([
+      function validProfileUpdate() {
+        let data = request.resource.data;
+        let changed = data.diff(resource.data).affectedKeys();
+        return owns(uid) && data.updatedAt == request.time && (
+          (changed.hasOnly(['availability', 'updatedAt']) && validAvailability(data))
+          || (changed.hasOnly([
           'username', 'bio', 'region', 'updatedAt',
           'sharedAge', 'ageSharedAt', 'sharedGender',
           'games', 'currentGame', 'mode', 'playstyles',
           'communication', 'rank', 'gameRanks', 'availability'
         ])
-        && request.resource.data.updatedAt == request.time;
+            && validPublicProfile(data)
+            && (!changed.hasAny(['availability']) || validAvailability(data)))
+        );
+      }
+      allow update: if validProfileUpdate();
 
       allow delete: if false;
     }
