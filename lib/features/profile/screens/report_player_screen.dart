@@ -1,4 +1,5 @@
 import '../../../providers/chat_provider.dart';
+import '../../../core/widgets/player_avatar.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../providers/profile_provider.dart';
@@ -67,10 +68,7 @@ class _ReportPlayerScreenState extends ConsumerState<ReportPlayerScreen> {
             children: [
               ListTile(
                 contentPadding: EdgeInsets.zero,
-                leading: const CircleAvatar(
-                  radius: 28,
-                  child: Icon(Icons.person_outline),
-                ),
+                leading: PlayerAvatar(uid: widget.uid, radius: 28),
                 title: Text(name),
                 subtitle: Text(
                   ref

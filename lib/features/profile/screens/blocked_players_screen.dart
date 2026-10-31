@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../services/player_safety_service.dart';
 import '../../../providers/profile_provider.dart';
 import 'player_profile_screen.dart';
+import '../../../core/widgets/player_avatar.dart';
 
 class BlockedPlayersScreen extends ConsumerWidget {
   const BlockedPlayersScreen({super.key});
@@ -25,9 +26,7 @@ class BlockedPlayersScreen extends ConsumerWidget {
                   children: [
                     for (final uid in ids)
                       ListTile(
-                        leading: const CircleAvatar(
-                          child: Icon(Icons.person_outline),
-                        ),
+                        leading: PlayerAvatar(uid: uid, radius: 20),
                         title: Text(
                           ref
                                   .watch(playerProfileProvider(uid))

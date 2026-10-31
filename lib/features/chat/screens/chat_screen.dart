@@ -219,7 +219,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
                     child: InkWell(
                       onTap: () => _menuAction('profile'),
                       borderRadius: BorderRadius.circular(24),
-                      child: ChatAvatar(name: name),
+                      child: ChatAvatar(name: name, uid: widget.otherUid),
                     ),
                   ),
                   const SizedBox(width: 12),

@@ -8,6 +8,7 @@ import '../../../services/player_safety_service.dart';
 import '../../profile/screens/player_profile_screen.dart';
 import '../models/chat_message.dart';
 import '../widgets/chat_message_bubble.dart';
+import '../widgets/chat_widgets.dart';
 
 class PartyChatScreen extends ConsumerStatefulWidget {
   const PartyChatScreen({super.key, required this.partyId});
@@ -321,16 +322,10 @@ class _PartyMessage extends ConsumerWidget {
                     builder: (_) => PlayerProfileScreen(uid: message.senderId),
                   ),
                 ),
-                child: CircleAvatar(
+                child: ChatAvatar(
+                  name: name,
+                  uid: message.senderId,
                   radius: 20,
-                  backgroundColor: Theme.of(
-                    context,
-                  ).colorScheme.surfaceContainerHighest,
-                  child: Text(
-                    name.trim().isEmpty
-                        ? '?'
-                        : name.trim().characters.first.toUpperCase(),
-                  ),
                 ),
               ),
             ),

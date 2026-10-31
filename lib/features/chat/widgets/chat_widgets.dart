@@ -1,20 +1,23 @@
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/widgets/player_avatar.dart';
 
 class ChatAvatar extends StatelessWidget {
-  const ChatAvatar({super.key, required this.name});
+  const ChatAvatar({
+    super.key,
+    required this.name,
+    this.uid,
+    this.photoPath,
+    this.radius = 24,
+  });
   final String name;
+  final String? uid, photoPath;
+  final double radius;
   @override
-  Widget build(BuildContext context) => CircleAvatar(
-    radius: 24,
-    backgroundColor: AppColors.primary.withValues(alpha: 0.2),
-    child: Text(
-      name.trim().isEmpty ? '?' : name.trim().characters.first.toUpperCase(),
-      style: const TextStyle(
-        color: AppColors.secondary,
-        fontWeight: FontWeight.bold,
-      ),
-    ),
+  Widget build(BuildContext context) => PlayerAvatar(
+    uid: uid,
+    photoPath: photoPath,
+    radius: radius,
   );
 }
 
