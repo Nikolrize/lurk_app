@@ -84,3 +84,10 @@ final myPartyMembershipProvider = StreamProvider.autoDispose
       if (uid == null) return const Stream<Map<String, dynamic>?>.empty();
       return ref.watch(partyServiceProvider).watchMembership(id, uid);
     }, retry: (count, error) => null);
+
+final partyHistoryMemberIdsProvider = StreamProvider.autoDispose
+    .family<List<String>, String>((ref, id) {
+      final uid = ref.watch(authStateProvider).asData?.value?.uid;
+      if (uid == null) return Stream.value(const []);
+      return ref.watch(partyServiceProvider).watchHistoryMemberIds(id);
+    }, retry: (retryCount, error) => null);

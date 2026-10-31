@@ -12,6 +12,7 @@ Future<void> showPartyPreview(
   BuildContext context,
   Party party, {
   bool showJoinButton = true,
+  bool history = false,
   VoidCallback? onEdit,
 }) => showModalBottomSheet<void>(
   context: context,
@@ -27,6 +28,7 @@ Future<void> showPartyPreview(
       party: party,
       controller: controller,
       showJoinButton: showJoinButton,
+      history: history,
       onEdit: onEdit,
     ),
   ),
@@ -37,9 +39,10 @@ class _PartyPreview extends ConsumerStatefulWidget {
     required this.party,
     required this.controller,
     required this.showJoinButton,
+    required this.history,
     this.onEdit,
   });
-  final bool showJoinButton;
+  final bool showJoinButton, history;
   final VoidCallback? onEdit;
   final Party party;
   final ScrollController controller;
@@ -52,8 +55,25 @@ class _PartyPreviewState extends ConsumerState<_PartyPreview> {
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(partyByIdProvider(widget.party.id));
+    if (widget.history && state.asData?.value == null) {
+      return Center(
+        child: state.isLoading
+            ? const CircularProgressIndicator()
+            : TextButton(
+                onPressed: () =>
+                    ref.invalidate(partyByIdProvider(widget.party.id)),
+                child: Text(
+                  state.hasError
+                      ? 'Unable to load party. Try again'
+                      : 'Party details are no longer available.',
+                ),
+              ),
+      );
+    }
     final party = state.asData?.value ?? widget.party;
-    final members = ref.watch(partyMemberIdsProvider(party.id));
+    final members = widget.history
+        ? ref.watch(partyHistoryMemberIdsProvider(party.id))
+        : ref.watch(partyMemberIdsProvider(party.id));
     final ready = state.asData?.value != null && party.status == 'open';
     final ranks =
         GameCatalog.find(party.gameId)?.ranks.values.toList() ?? <String>[];
@@ -158,35 +178,41 @@ class _PartyPreviewState extends ConsumerState<_PartyPreview> {
                     ),
                     const SizedBox(height: 20),
                     Text(
-                      '${party.currentPlayers} / ${party.maxPlayers} players · ${party.visibility == 'private' ? 'Private' : 'Public'} party',
+                      widget.history
+                          ? (members.asData == null
+                                ? 'Squad history'
+                                : '${ids.length} players participated')
+                          : '${party.currentPlayers} / ${party.maxPlayers} players · ${party.visibility == 'private' ? 'Private' : 'Public'} party',
                       style: text.bodySmall,
                     ),
-                    const SizedBox(height: 10),
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(8),
-                      child: LinearProgressIndicator(
-                        minHeight: 6,
-                        value: party.maxPlayers > 0
-                            ? (party.currentPlayers / party.maxPlayers).clamp(
-                                0,
-                                1,
-                              )
-                            : 0,
-                        color: AppColors.secondary,
-                        backgroundColor: AppColors.primary.withValues(
-                          alpha: .18,
+                    if (!widget.history) ...[
+                      const SizedBox(height: 10),
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: LinearProgressIndicator(
+                          minHeight: 6,
+                          value: party.maxPlayers > 0
+                              ? (party.currentPlayers / party.maxPlayers).clamp(
+                                  0,
+                                  1,
+                                )
+                              : 0,
+                          color: AppColors.secondary,
+                          backgroundColor: AppColors.primary.withValues(
+                            alpha: .18,
+                          ),
                         ),
                       ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      party.isFull
-                          ? 'Squad is full'
-                          : '${party.maxPlayers - party.currentPlayers} spots available',
-                      style: text.bodySmall?.copyWith(
-                        color: AppColors.textSecondary,
+                      const SizedBox(height: 8),
+                      Text(
+                        party.isFull
+                            ? 'Squad is full'
+                            : '${party.maxPlayers - party.currentPlayers} spots available',
+                        style: text.bodySmall?.copyWith(
+                          color: AppColors.textSecondary,
+                        ),
                       ),
-                    ),
+                    ],
                   ],
                 ),
               ),
@@ -248,8 +274,6 @@ class _PartyPreviewState extends ConsumerState<_PartyPreview> {
                   onPressed: () => ref.invalidate(partyByIdProvider(party.id)),
                   child: const Text('Unable to load party. Try again'),
                 ),
-              if (state.asData != null && !ready)
-                const Text('This party session has ended.'),
               const SizedBox(height: 24),
               Text(
                 'Squad members',
@@ -257,7 +281,11 @@ class _PartyPreviewState extends ConsumerState<_PartyPreview> {
               ),
               const SizedBox(height: 8),
               Text(
-                'Meet your teammates before you join.',
+                widget.history
+                    ? 'Players who joined this party.'
+                    : widget.showJoinButton
+                    ? 'Meet your teammates before you join.'
+                    : 'Your squad.',
                 style: text.bodySmall?.copyWith(color: AppColors.textSecondary),
               ),
               const SizedBox(height: 8),
@@ -267,8 +295,9 @@ class _PartyPreviewState extends ConsumerState<_PartyPreview> {
                   child: LinearProgressIndicator(),
                 ),
                 error: (_, stack) => TextButton(
-                  onPressed: () =>
-                      ref.invalidate(partyMemberIdsProvider(party.id)),
+                  onPressed: () => widget.history
+                      ? ref.invalidate(partyHistoryMemberIdsProvider(party.id))
+                      : ref.invalidate(partyMemberIdsProvider(party.id)),
                   child: const Text('Unable to load players. Try again'),
                 ),
                 data: (_) => ids.isEmpty
@@ -283,10 +312,19 @@ class _PartyPreviewState extends ConsumerState<_PartyPreview> {
                         ],
                       ),
               ),
+              if (state.asData != null && !ready) ...[
+                const SizedBox(height: 24),
+                const Center(
+                  child: Text(
+                    'This party session has ended.',
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              ],
             ],
           ),
         ),
-        if (widget.showJoinButton)
+        if (widget.showJoinButton && !widget.history)
           DecoratedBox(
             decoration: BoxDecoration(
               color: Theme.of(context).colorScheme.surface,
