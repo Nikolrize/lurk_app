@@ -352,7 +352,45 @@ class PartyService {
           .snapshots()
           .map((doc) => doc.data());
 
-  Future<void> leaveParty(String id, {required String expectedUid}) async {
+  /// Finish participation while authentication is still available, including
+  /// sessions hosted before the one-party restriction was introduced.
+  Future<void> leaveCurrentParties({required String expectedUid}) async {
+    _checkAccount(expectedUid);
+    final hosted = await _firestore
+        .collection('parties')
+        .where('hostId', isEqualTo: expectedUid)
+        .where('status', isEqualTo: 'open')
+        .get(const GetOptions(source: Source.server));
+    final pointer = await _firestore
+        .collection('party_memberships')
+        .doc(expectedUid)
+        .get(const GetOptions(source: Source.server));
+    final ids = hosted.docs.map((doc) => doc.id).toSet();
+    final joinedId = pointer.data()?['partyId'] as String?;
+    if (joinedId != null) {
+      // A kicked member may retain a stale pointer; their own membership is
+      // always readable, even when private party details are no longer visible.
+      final member = await _firestore
+          .collection('parties')
+          .doc(joinedId)
+          .collection('members')
+          .doc(expectedUid)
+          .get(const GetOptions(source: Source.server));
+      if (member.exists && member.data()?['leftAt'] == null) ids.add(joinedId);
+    }
+    for (final id in ids) {
+      await _leaveParty(id, expectedUid: expectedUid, onlyIfActive: true);
+    }
+  }
+
+  Future<void> leaveParty(String id, {required String expectedUid}) =>
+      _leaveParty(id, expectedUid: expectedUid);
+
+  Future<void> _leaveParty(
+    String id, {
+    required String expectedUid,
+    bool onlyIfActive = false,
+  }) async {
     _checkAccount(expectedUid);
     final party = _firestore.collection('parties').doc(id);
     final member = party.collection('members').doc(expectedUid);
@@ -361,9 +399,11 @@ class PartyService {
       final membership = await transaction.get(member);
       final data = snapshot.data();
       if (data == null || data['status'] != 'open') {
+        if (onlyIfActive) return;
         throw StateError('This party is already closed.');
       }
       if (!membership.exists || membership.data()?['leftAt'] != null) {
+        if (onlyIfActive) return;
         throw StateError('You are no longer in this party.');
       }
       final current = _firestore

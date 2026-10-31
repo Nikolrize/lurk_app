@@ -39,3 +39,7 @@ To test a local server, set its private `.env` values and run `npm start --prefi
 `npm test --prefix tools/voice-server`
 
 `flutter test --no-pub`
+
+## Leaving on logout
+
+Logging out leaves the current party before Firebase signs the user out. If the user is the host, the session ends; a regular member leaves while the party stays open. If leaving fails, the user stays signed in and can retry. This runs in the Flutter app and does not depend on the voice server. Closing or backgrounding the app keeps party membership; voice still disconnects when the app backgrounds. No Firebase service-account key is needed for logout.

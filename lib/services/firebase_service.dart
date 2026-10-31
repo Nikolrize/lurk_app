@@ -2,9 +2,23 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'notification_service.dart';
+import 'party_service.dart';
 
 class FirebaseService {
-  final FirebaseAuth _auth = FirebaseAuth.instance;
+  FirebaseService({
+    FirebaseAuth? auth,
+    Future<void> Function(String uid)? leaveParties,
+    Future<void> Function()? unregisterNotifications,
+  }) : _auth = auth ?? FirebaseAuth.instance,
+       _leaveParties =
+           leaveParties ??
+           ((uid) => PartyService().leaveCurrentParties(expectedUid: uid)),
+       _unregisterNotifications =
+           unregisterNotifications ?? NotificationService.instance.unregister;
+
+  final FirebaseAuth _auth;
+  final Future<void> Function(String uid) _leaveParties;
+  final Future<void> Function() _unregisterNotifications;
 
   Future<void> Function()? beforeSignOut;
 
@@ -67,9 +81,11 @@ class FirebaseService {
     return _auth.sendPasswordResetEmail(email: email.trim());
   }
 
-  // Both cleanup operations need the user to remain authenticated.
+  // Party, notification and presence cleanup all need authentication.
   Future<void> signOut() async {
-    await NotificationService.instance.unregister();
+    final uid = _auth.currentUser?.uid;
+    if (uid != null) await _leaveParties(uid);
+    await _unregisterNotifications();
     await beforeSignOut?.call();
     await _auth.signOut();
   }
