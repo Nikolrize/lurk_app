@@ -81,7 +81,10 @@ class _RateTeammateScreenState extends ConsumerState<RateTeammateScreen> {
       child: Scaffold(
         appBar: AppBar(
           automaticallyImplyLeading: false,
-          title: const Text('Rate Your Teammate'),
+          title: const Text(
+            'Rate Your Teammate',
+            style: TextStyle(fontWeight: FontWeight.bold),
+          ),
           actions: [
             IconButton(
               tooltip: 'Close rating',

@@ -124,163 +124,178 @@ class _PlayerProfileScreenState extends ConsumerState<PlayerProfileScreen> {
     final own = ref.watch(authStateProvider).asData?.value?.uid == widget.uid;
     final text = Theme.of(context).textTheme;
     return Scaffold(
-      appBar: AppBar(title: const Text('Player Profile')),
-      body: profile.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (_, _) => Center(
-          child: TextButton(
-            onPressed: () => ref.invalidate(playerProfileProvider(widget.uid)),
-            child: const Text('Unable to load player. Retry'),
-          ),
+      appBar: AppBar(
+        title: const Text(
+          'Player Profile',
+          style: TextStyle(fontWeight: FontWeight.bold),
         ),
-        data: (player) {
-          if (player == null) {
-            return const Center(child: Text('Player not found.'));
-          }
-          final pronoun = {
-            'male': 'He/Him',
-            'female': 'She/Her',
-            'other': 'They/Them',
-          }[player.sharedGender];
-          return Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 700),
-              child: ListView(
-                padding: const EdgeInsets.fromLTRB(16, 20, 16, 24),
-                children: [
-                  Container(
-                    height: 120,
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(20),
-                      gradient: LinearGradient(
-                        colors: [
-                          Theme.of(context).colorScheme.primaryContainer,
-                          Theme.of(context).colorScheme.surfaceContainerHighest,
-                        ],
-                      ),
-                    ),
-                    child: const Icon(Icons.sports_esports_outlined, size: 64),
-                  ),
-                  const SizedBox(height: 16),
-                  Row(
-                    children: [
-                      PlayerAvatar(photoPath: player.photoPath, radius: 36),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Wrap(
-                              spacing: 6,
-                              runSpacing: 4,
-                              crossAxisAlignment: WrapCrossAlignment.center,
-                              children: [
-                                Text(
-                                  player.username.isEmpty
-                                      ? 'New player'
-                                      : player.username,
-                                  style: text.headlineSmall,
-                                ),
-                                PlayerVerificationBadge(uid: widget.uid),
-                              ],
-                            ),
-                            PlayerStatusBadge(uid: widget.uid),
-                            Text(
-                              [
-                                if (player.sharedAge != null)
-                                  'Age ${player.sharedAge}',
-                                ?pronoun,
-                                if (player.region.isNotEmpty) player.region,
-                              ].join(' • '),
-                            ),
+      ),
+      body: SafeArea(
+        top: false,
+        child: profile.when(
+          loading: () => const Center(child: CircularProgressIndicator()),
+          error: (_, _) => Center(
+            child: TextButton(
+              onPressed: () =>
+                  ref.invalidate(playerProfileProvider(widget.uid)),
+              child: const Text('Unable to load player. Retry'),
+            ),
+          ),
+          data: (player) {
+            if (player == null) {
+              return const Center(child: Text('Player not found.'));
+            }
+            final pronoun = {
+              'male': 'He/Him',
+              'female': 'She/Her',
+              'other': 'They/Them',
+            }[player.sharedGender];
+            return Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 700),
+                child: ListView(
+                  padding: const EdgeInsets.fromLTRB(16, 20, 16, 24),
+                  children: [
+                    Container(
+                      height: 120,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(20),
+                        gradient: LinearGradient(
+                          colors: [
+                            Theme.of(context).colorScheme.primaryContainer,
+                            Theme.of(
+                              context,
+                            ).colorScheme.surfaceContainerHighest,
                           ],
                         ),
                       ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  PlayerRatingSummary(uid: widget.uid),
-                  const SizedBox(height: 24),
-                  Text(
-                    'About Me',
-                    style: text.titleLarge?.copyWith(
-                      fontWeight: FontWeight.w700,
+                      child: const Icon(
+                        Icons.sports_esports_outlined,
+                        size: 64,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(player.bio.isEmpty ? 'No bio added yet.' : player.bio),
-                  const SizedBox(height: 24),
-                  Text(
-                    'Gaming Preferences',
-                    style: text.titleLarge?.copyWith(
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  GamingPreferencesCard(uid: widget.uid),
-                  const SizedBox(height: 24),
-                  Text(
-                    'Availability',
-                    style: text.titleLarge?.copyWith(
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  AvailabilitySummaryCard(uid: widget.uid),
-                  if (!own) ...[
-                    const SizedBox(height: 24),
-                    FilledButton(
-                      onPressed: _busy || blocked || !blocks.hasValue
-                          ? null
-                          : _invite,
-                      child: const Text('Invite to Party'),
-                    ),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 16),
                     Row(
                       children: [
+                        PlayerAvatar(photoPath: player.photoPath, radius: 36),
+                        const SizedBox(width: 16),
                         Expanded(
-                          child: OutlinedButton(
-                            onPressed: _busy
-                                ? null
-                                : () => Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (_) =>
-                                          ReportPlayerScreen(uid: widget.uid),
-                                    ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Wrap(
+                                spacing: 6,
+                                runSpacing: 4,
+                                crossAxisAlignment: WrapCrossAlignment.center,
+                                children: [
+                                  Text(
+                                    player.username.isEmpty
+                                        ? 'New player'
+                                        : player.username,
+                                    style: text.headlineSmall,
                                   ),
-                            child: const Text('Report'),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: OutlinedButton(
-                            onPressed: _busy || !blocks.hasValue
-                                ? null
-                                : () => _block(blocked),
-                            child: Text(blocked ? 'Unblock' : 'Block'),
+                                  PlayerVerificationBadge(uid: widget.uid),
+                                ],
+                              ),
+                              PlayerStatusBadge(uid: widget.uid),
+                              Text(
+                                [
+                                  if (player.sharedAge != null)
+                                    'Age ${player.sharedAge}',
+                                  ?pronoun,
+                                  if (player.region.isNotEmpty) player.region,
+                                ].join(' • '),
+                              ),
+                            ],
                           ),
                         ),
                       ],
                     ),
-                    if (blocked)
-                      const Padding(
-                        padding: EdgeInsets.only(top: 12),
-                        child: Text('You have blocked this player.'),
+                    const SizedBox(height: 16),
+                    PlayerRatingSummary(uid: widget.uid),
+                    const SizedBox(height: 24),
+                    Text(
+                      'About Me',
+                      style: text.titleLarge?.copyWith(
+                        fontWeight: FontWeight.w700,
                       ),
-                    if (blocks.hasError)
-                      TextButton(
-                        onPressed: () => ref.invalidate(blockedPlayersProvider),
-                        child: const Text(
-                          'Unable to load block settings. Retry',
+                    ),
+                    const SizedBox(height: 8),
+                    Text(player.bio.isEmpty ? 'No bio added yet.' : player.bio),
+                    const SizedBox(height: 24),
+                    Text(
+                      'Gaming Preferences',
+                      style: text.titleLarge?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    GamingPreferencesCard(uid: widget.uid),
+                    const SizedBox(height: 24),
+                    Text(
+                      'Availability',
+                      style: text.titleLarge?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    AvailabilitySummaryCard(uid: widget.uid),
+                    if (!own) ...[
+                      const SizedBox(height: 24),
+                      FilledButton(
+                        onPressed: _busy || blocked || !blocks.hasValue
+                            ? null
+                            : _invite,
+                        child: const Text('Invite to Party'),
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton(
+                              onPressed: _busy
+                                  ? null
+                                  : () => Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (_) =>
+                                            ReportPlayerScreen(uid: widget.uid),
+                                      ),
+                                    ),
+                              child: const Text('Report'),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: OutlinedButton(
+                              onPressed: _busy || !blocks.hasValue
+                                  ? null
+                                  : () => _block(blocked),
+                              child: Text(blocked ? 'Unblock' : 'Block'),
+                            ),
+                          ),
+                        ],
+                      ),
+                      if (blocked)
+                        const Padding(
+                          padding: EdgeInsets.only(top: 12),
+                          child: Text('You have blocked this player.'),
                         ),
-                      ),
+                      if (blocks.hasError)
+                        TextButton(
+                          onPressed: () =>
+                              ref.invalidate(blockedPlayersProvider),
+                          child: const Text(
+                            'Unable to load block settings. Retry',
+                          ),
+                        ),
+                    ],
                   ],
-                ],
+                ),
               ),
-            ),
-          );
-        },
+            );
+          },
+        ),
       ),
     );
   }
