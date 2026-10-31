@@ -4,6 +4,7 @@ import 'player_availability.dart';
 class Player {
   const Player({
     this.bio = '',
+    this.photoPath,
     this.playstyles = const [],
     this.region,
     this.mode,
@@ -23,6 +24,7 @@ class Player {
   final int? rank;
   final double? rating;
   final String bio;
+  final String? photoPath;
   final List<String> playstyles;
   final String id;
   final String name;
@@ -85,6 +87,7 @@ class Player {
     return Player(
       id: uid,
       name: string('username') ?? '',
+      photoPath: string('photoPath'),
       bio: string('bio') ?? '',
       region: string('region') == null ? null : label(string('region')!),
       currentGame:

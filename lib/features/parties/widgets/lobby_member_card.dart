@@ -1,3 +1,4 @@
+import '../../../core/widgets/player_avatar.dart';
 import 'package:flutter/material.dart';
 import '../models/lobby_member.dart';
 
@@ -64,14 +65,7 @@ class LobbyMemberCard extends StatelessWidget {
                 child: InkWell(
                   onTap: onViewProfile,
                   borderRadius: BorderRadius.circular(27),
-                  child: CircleAvatar(
-                    radius: 27,
-                    backgroundColor: colors.surfaceContainerHighest,
-                    child: Icon(
-                      Icons.person_outline,
-                      color: colors.onSurfaceVariant,
-                    ),
-                  ),
+                  child: PlayerAvatar(photoPath: member.photoPath, radius: 27),
                 ),
               ),
               const SizedBox(width: 14),

@@ -1,3 +1,4 @@
+import '../../../core/widgets/game_icon.dart';
 import '../../../core/data/game_catalog.dart';
 import '../widgets/party_preview_drawer.dart';
 import '../../../providers/voice_provider.dart';
@@ -439,10 +440,12 @@ class _PartyLobbyScreenState extends ConsumerState<PartyLobbyScreen> {
                                   color: colors.primary.withValues(alpha: .28),
                                   borderRadius: BorderRadius.circular(16),
                                 ),
-                                child: Icon(
-                                  Icons.sports_esports_rounded,
-                                  size: 28,
-                                  color: colors.onSurface,
+                                alignment: Alignment.center,
+                                child: GameIcon(
+                                  game: party.gameId.isEmpty
+                                      ? party.gameName
+                                      : party.gameId,
+                                  size: 36,
                                 ),
                               ),
                             ],
@@ -474,6 +477,7 @@ class _PartyLobbyScreenState extends ConsumerState<PartyLobbyScreen> {
                           uid: member.uid,
                           name: member.name,
                           rank: member.rank,
+                          photoPath: member.photoPath,
                           rating: member.rating,
                           micEnabled:
                               voice.connected && voice.partyId == party.id
@@ -741,6 +745,7 @@ class _HostCard extends ConsumerWidget {
         member: LobbyMember(
           uid: uid,
           rank: rank,
+          photoPath: profile?.photoPath,
           micEnabled: micEnabled,
           isSpeaking: isSpeaking,
           name: profile?.username.trim().isNotEmpty == true
