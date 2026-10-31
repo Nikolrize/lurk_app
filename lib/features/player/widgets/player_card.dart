@@ -1,7 +1,7 @@
+import '../../../core/widgets/player_avatar.dart';
 import 'package:flutter/material.dart';
 
 import '../models/player.dart';
-import '../../../core/widgets/player_avatar.dart';
 
 import 'package:lurk_app/core/widgets/player_status_badge.dart';
 

@@ -1,3 +1,4 @@
+import '../../../core/widgets/player_avatar.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../providers/auth_provider.dart';
@@ -123,9 +124,9 @@ class _NewMessageScreenState extends ConsumerState<NewMessageScreen> {
                           contentPadding: const EdgeInsets.symmetric(
                             vertical: 8,
                           ),
-                          leading: ChatAvatar(
-                            name: name,
+                          leading: PlayerAvatar(
                             photoPath: player.photoPath,
+                            radius: 24,
                           ),
                           title: Text(name),
                           subtitle: Text(

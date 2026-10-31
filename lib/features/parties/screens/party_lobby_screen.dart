@@ -1,3 +1,6 @@
+import '../../../providers/rating_provider.dart';
+import '../../../core/widgets/game_icon.dart';
+import '../../../core/data/game_catalog.dart';
 import '../widgets/party_preview_drawer.dart';
 import '../../../providers/voice_provider.dart';
 import '../../../services/party_voice_service.dart';
@@ -104,6 +107,53 @@ class _PartyLobbyScreenState extends ConsumerState<PartyLobbyScreen> {
               : 'Unable to connect voice chat.',
         );
       }
+    }
+  }
+
+  Future<void> _makeHost(BuildContext context, String uid, String name) async {
+    if (_removing != null ||
+        _leaving ||
+        viewerUid != party.hostId ||
+        uid == party.hostId) {
+      return;
+    }
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Transfer host?'),
+        content: Text(
+          'Make $name the host? You will stay in the party as a squad member. They will control party details, invitations and member removal.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Make host'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted || _removing != null) return;
+    setState(() => _removing = uid);
+    try {
+      await ref
+          .read(partyServiceProvider)
+          .transferHost(party.id, uid, expectedUid: viewerUid!);
+      if (context.mounted) _notice(context, '$name is now the host.');
+    } catch (error) {
+      if (context.mounted) {
+        _notice(
+          context,
+          error is StateError
+              ? error.message.toString()
+              : 'Unable to transfer host. Please try again.',
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _removing = null);
     }
   }
 
@@ -391,10 +441,12 @@ class _PartyLobbyScreenState extends ConsumerState<PartyLobbyScreen> {
                                   color: colors.primary.withValues(alpha: .28),
                                   borderRadius: BorderRadius.circular(16),
                                 ),
-                                child: Icon(
-                                  Icons.sports_esports_rounded,
-                                  size: 28,
-                                  color: colors.onSurface,
+                                alignment: Alignment.center,
+                                child: GameIcon(
+                                  game: party.gameId.isEmpty
+                                      ? party.gameName
+                                      : party.gameId,
+                                  size: 36,
                                 ),
                               ),
                             ],
@@ -426,7 +478,9 @@ class _PartyLobbyScreenState extends ConsumerState<PartyLobbyScreen> {
                           uid: member.uid,
                           name: member.name,
                           rank: member.rank,
+                          photoPath: member.photoPath,
                           rating: member.rating,
+                          ratingLabel: member.ratingLabel,
                           micEnabled:
                               voice.connected && voice.partyId == party.id
                               ? (member.uid == viewerUid
@@ -439,6 +493,13 @@ class _PartyLobbyScreenState extends ConsumerState<PartyLobbyScreen> {
                         ),
                         isHost: member.uid == party.hostId,
                         onViewProfile: () => _profile(context, member.uid),
+                        onMakeHost:
+                            viewerUid == party.hostId &&
+                                member.uid != party.hostId &&
+                                _removing == null &&
+                                !_leaving
+                            ? () => _makeHost(context, member.uid, member.name)
+                            : null,
                         onRemove:
                             viewerUid == party.hostId &&
                                 member.uid != party.hostId
@@ -457,6 +518,9 @@ class _PartyLobbyScreenState extends ConsumerState<PartyLobbyScreen> {
                     Padding(
                       padding: const EdgeInsets.only(bottom: 12),
                       child: _HostCard(
+                        partyGame: party.gameId.isEmpty
+                            ? party.gameName
+                            : party.gameId,
                         uid: uid,
                         isSpeaking: voice.speakingPlayers.contains(uid),
                         isHost: uid == party.hostId,
@@ -464,6 +528,13 @@ class _PartyLobbyScreenState extends ConsumerState<PartyLobbyScreen> {
                             ? micEnabled
                             : voice.remoteMics[uid],
                         onViewProfile: () => _profile(context, uid),
+                        onMakeHost:
+                            viewerUid == party.hostId &&
+                                uid != party.hostId &&
+                                _removing == null &&
+                                !_leaving
+                            ? (name) => _makeHost(context, uid, name)
+                            : null,
                         onRemove:
                             viewerUid == party.hostId &&
                                 uid != party.hostId &&
@@ -476,6 +547,9 @@ class _PartyLobbyScreenState extends ConsumerState<PartyLobbyScreen> {
                 ] else ...[
                   if (party.hostId.isNotEmpty)
                     _HostCard(
+                      partyGame: party.gameId.isEmpty
+                          ? party.gameName
+                          : party.gameId,
                       uid: party.hostId,
                       isSpeaking: voice.speakingPlayers.contains(party.hostId),
                       micEnabled: party.hostId == viewerUid
@@ -628,22 +702,36 @@ class _PartyLobbyScreenState extends ConsumerState<PartyLobbyScreen> {
 
 class _HostCard extends ConsumerWidget {
   const _HostCard({
+    required this.partyGame,
     required this.uid,
     required this.onViewProfile,
     this.isHost = true,
     this.micEnabled,
     this.isSpeaking = false,
     this.onRemove,
+    this.onMakeHost,
   });
   final bool isHost;
   final bool? micEnabled;
   final bool isSpeaking;
   final ValueChanged<String>? onRemove;
-  final String uid;
+  final ValueChanged<String>? onMakeHost;
+  final String uid, partyGame;
   final VoidCallback onViewProfile;
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final profile = ref.watch(playerProfileProvider(uid));
+    final rating = ref.watch(ratingSummaryProvider(uid));
+    final summary = rating.asData?.value;
+    final game = GameCatalog.find(partyGame);
+    final preferences = game?.supportsRanks == true
+        ? ref.watch(gamingPreferencesProvider(uid))
+        : null;
+    final rank = preferences?.when(
+      data: (value) => value.rankLabelFor(game!.id) ?? 'Unranked',
+      loading: () => 'Loading rank…',
+      error: (_, stack) => 'Rank unavailable',
+    );
     return profile.when(
       loading: () => const Card(
         child: Padding(
@@ -660,6 +748,14 @@ class _HostCard extends ConsumerWidget {
       data: (profile) => LobbyMemberCard(
         member: LobbyMember(
           uid: uid,
+          rank: rank,
+          photoPath: profile?.photoPath,
+          rating: summary != null && summary.count > 0 ? summary.average : null,
+          ratingLabel: rating.isLoading
+              ? 'Loading rating…'
+              : rating.hasError
+              ? 'Rating unavailable'
+              : null,
           micEnabled: micEnabled,
           isSpeaking: isSpeaking,
           name: profile?.username.trim().isNotEmpty == true
@@ -670,6 +766,9 @@ class _HostCard extends ConsumerWidget {
         ),
         isHost: isHost,
         onViewProfile: onViewProfile,
+        onMakeHost: onMakeHost == null
+            ? null
+            : () => onMakeHost!(profile?.username ?? 'this player'),
         onRemove: onRemove == null
             ? null
             : () => onRemove!(profile?.username ?? 'this player'),

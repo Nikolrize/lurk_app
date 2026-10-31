@@ -1,7 +1,8 @@
+import '../../../core/widgets/player_avatar.dart';
+import '../../../core/widgets/game_icon.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/data/game_catalog.dart';
-import '../../../core/widgets/player_avatar.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../providers/party_provider.dart';
 import '../../../providers/profile_provider.dart';
@@ -147,10 +148,11 @@ class _PartyPreviewState extends ConsumerState<_PartyPreview> {
                             color: AppColors.primary.withValues(alpha: .25),
                             borderRadius: BorderRadius.circular(16),
                           ),
-                          child: const Icon(
-                            Icons.sports_esports_rounded,
-                            color: AppColors.text,
-                            size: 28,
+                          child: GameIcon(
+                            game: party.gameId.isEmpty
+                                ? party.gameName
+                                : party.gameId,
+                            size: 36,
                           ),
                         ),
                         const SizedBox(width: 12),
@@ -407,7 +409,7 @@ class _PreviewMember extends ConsumerWidget {
           ),
           leading: PlayerAvatar(
             photoPath: profile.asData?.value?.photoPath,
-            radius: 20,
+            radius: 24,
           ),
           title: Text(
             name != null && name.trim().isNotEmpty

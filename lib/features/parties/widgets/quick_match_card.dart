@@ -1,3 +1,4 @@
+import '../../../core/data/gaming_regions.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/data/game_catalog.dart';
@@ -59,12 +60,23 @@ class _QuickMatchCardState extends ConsumerState<QuickMatchCard> {
         );
         return;
       }
+      final profile = await ref
+          .read(playerProfileProvider(uid).future)
+          .timeout(const Duration(seconds: 15));
+      final regionId = GamingRegions.idFor(profile?.region);
+      if (regionId == null) {
+        _notice('Set your region in your profile before using Quick Match.');
+        return;
+      }
+      final region = GamingRegions.values.firstWhere(
+        (value) => GamingRegions.idFor(value) == regionId,
+      );
       final currentId = await ref
           .read(joinedPartyIdProvider.future)
           .timeout(const Duration(seconds: 15));
       final parties = await ref
           .read(partyServiceProvider)
-          .findQuickMatchParties(game.id)
+          .findQuickMatchParties(game.id, regionId: regionId)
           .timeout(const Duration(seconds: 15));
       if (!mounted || ref.read(authStateProvider).asData?.value?.uid != uid) {
         return;
@@ -72,12 +84,13 @@ class _QuickMatchCardState extends ConsumerState<QuickMatchCard> {
       final match = pickQuickMatchParty(
         parties,
         mainGameId: game.id,
+        regionId: regionId,
         viewerUid: uid,
         currentPartyId: currentId,
       );
       if (match == null) {
         _notice(
-          'No open ${game.name} parties with space right now. Try again soon.',
+          'No open ${game.name} parties with space in $region right now. Try again soon.',
         );
         return;
       }
@@ -95,6 +108,7 @@ class _QuickMatchCardState extends ConsumerState<QuickMatchCard> {
     final preferences = uid == null
         ? null
         : ref.watch(gamingPreferencesProvider(uid)).asData?.value;
+    if (uid != null) ref.watch(playerProfileProvider(uid));
     // Keep these streams alive while their first values are awaited on tap.
     ref.watch(joinedPartyIdProvider);
     final game = GameCatalog.find(preferences?.currentGame);

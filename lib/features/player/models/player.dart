@@ -4,6 +4,9 @@ import 'player_availability.dart';
 class Player {
   const Player({
     this.bio = '',
+    this.photoPath,
+    this.games = const [],
+    this.gameRanks = const {},
     this.playstyles = const [],
     this.region,
     this.mode,
@@ -16,7 +19,6 @@ class Player {
     required this.name,
     required this.isActive,
     this.currentGame,
-    this.photoPath,
   });
 
   final String? region, mode, style, communication;
@@ -24,12 +26,28 @@ class Player {
   final int? rank;
   final double? rating;
   final String bio;
+  final String? photoPath;
+  final List<String> games;
+  final Map<String, String> gameRanks;
+
+  int? rankForGame(String? value) {
+    final game = GameCatalog.find(value);
+    if (game == null || !game.supportsRanks) return null;
+    final saved = gameRanks[game.id];
+    if (saved != null) {
+      final index = game.ranks.keys.toList().indexOf(saved);
+      return index < 0 ? null : index;
+    }
+    return gameRanks.isEmpty && GameCatalog.find(currentGame)?.id == game.id
+        ? rank
+        : null;
+  }
+
   final List<String> playstyles;
   final String id;
   final String name;
   final bool? isActive;
   final String? currentGame;
-  final String? photoPath;
 
   /// Reads public profile data only. Missing presence is unknown, not offline.
   factory Player.fromFirestoreData(String uid, Map<String, dynamic> data) {
@@ -84,10 +102,24 @@ class Player {
       }
     }
     final game = string('currentGame');
+    final rawGames = data['games'];
+    final rawRanks = data['gameRanks'];
+    final savedRanks = <String, String>{};
+    if (rawRanks is Map) {
+      for (final entry in rawRanks.entries) {
+        if (entry.key is String && entry.value is String) {
+          savedRanks[entry.key as String] = entry.value as String;
+        }
+      }
+    }
     return Player(
       id: uid,
       name: string('username') ?? '',
       photoPath: string('photoPath'),
+      games: List.unmodifiable(
+        rawGames is List ? rawGames.whereType<String>() : [?game],
+      ),
+      gameRanks: Map.unmodifiable(savedRanks),
       bio: string('bio') ?? '',
       region: string('region') == null ? null : label(string('region')!),
       currentGame:

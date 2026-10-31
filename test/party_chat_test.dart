@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:lurk_app/core/widgets/player_avatar.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:lurk_app/features/chat/models/chat_message.dart';
@@ -171,11 +170,6 @@ void main() {
     var tapped = false;
     await tester.pumpWidget(
       ProviderScope(
-        overrides: [
-          playerProfileProvider(
-            'bob',
-          ).overrideWith((ref) => Stream.value(null)),
-        ],
         child: MaterialApp(
           home: Scaffold(
             body: LobbyMemberCard(
@@ -186,7 +180,7 @@ void main() {
         ),
       ),
     );
-    await tester.tap(find.byType(PlayerAvatar));
+    await tester.tap(find.byTooltip('View Bob profile'));
     expect(tapped, true);
   });
 }

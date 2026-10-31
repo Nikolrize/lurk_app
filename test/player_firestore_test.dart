@@ -19,12 +19,14 @@ void main() {
       final player = Player.fromFirestoreData('uid', {
         'username': 'Yessir',
         'bio': 'I love gaming',
+        'photoPath': 'uid/profile.webp',
         'region': 'Malaysia',
         'createdAt': Timestamp.now(),
         'sharedAge': null,
       });
       expect(player.id, 'uid');
       expect(player.name, 'Yessir');
+      expect(player.photoPath, 'uid/profile.webp');
       expect(player.region, 'Malaysia');
       expect(player.currentGame, isNull);
       expect(player.isActive, isNull);
@@ -71,20 +73,13 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
-          authStateProvider.overrideWith(
-            (ref) => Stream.value(null),
-          ),
-          playerPresenceProvider.overrideWith(
-            (ref, uid) => Stream.value(null),
-          ),
+          authStateProvider.overrideWith((ref) => Stream.value(null)),
+          playerPresenceProvider.overrideWith((ref, uid) => Stream.value(null)),
         ],
         child: MaterialApp(
           home: Scaffold(
             body: PlayerCard(
-              player: Player.fromFirestoreData(
-                'uid',
-                {'username': 'Yessir'},
-              ),
+              player: Player.fromFirestoreData('uid', {'username': 'Yessir'}),
             ),
           ),
         ),

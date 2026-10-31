@@ -1,3 +1,4 @@
+import '../../../core/widgets/game_icon.dart';
 import '../actions/join_party.dart';
 import 'package:flutter/material.dart';
 
@@ -20,12 +21,39 @@ class PartyCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              party.gameName,
-              style: textStyles.bodySmall?.copyWith(color: colors.secondary),
+            Row(
+              children: [
+                Container(
+                  width: 48,
+                  height: 48,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: colors.primary.withValues(alpha: .18),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: GameIcon(
+                    game: party.gameId.isEmpty ? party.gameName : party.gameId,
+                    size: 34,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        party.gameName,
+                        style: textStyles.bodySmall?.copyWith(
+                          color: colors.secondary,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(party.title, style: textStyles.titleMedium),
+                    ],
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(height: 8),
-            Text(party.title, style: textStyles.titleMedium),
             const SizedBox(height: 8),
             Text(
               '${party.playStyle} • '
