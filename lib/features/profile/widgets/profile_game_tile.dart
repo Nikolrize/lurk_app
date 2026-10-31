@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:lurk_app/core/widgets/game_icon.dart';
 
 class ProfileGameTile extends StatelessWidget {
   const ProfileGameTile({
@@ -18,12 +19,14 @@ class ProfileGameTile extends StatelessWidget {
 
     return SizedBox(
       width: 104,
-      child: Tooltip( // star on the desktop
+      child: Tooltip(
+        // star on the desktop
         message: isMainGame ? '$name — main game' : name,
         child: Semantics(
           button: true,
           label: isMainGame ? '$name, main game' : name,
-          child: InkWell( // handles tapping and provides visual feedback
+          child: InkWell(
+            // handles tapping and provides visual feedback
             onTap: onTap,
             borderRadius: BorderRadius.circular(16),
             child: Padding(
@@ -39,16 +42,10 @@ class ProfileGameTile extends StatelessWidget {
                           color: colors.primary.withValues(alpha: 0.12),
                           borderRadius: BorderRadius.circular(16),
                           border: Border.all(
-                            color: isMainGame
-                                ? colors.primary
-                                : colors.outline,
+                            color: isMainGame ? colors.primary : colors.outline,
                           ),
                         ),
-                        child: Icon(
-                          Icons.sports_esports_outlined,
-                          size: 32,
-                          color: colors.secondary,
-                        ),
+                        child: Center(child: GameIcon(game: name, size: 52)),
                       ),
                       if (isMainGame)
                         Positioned(
@@ -63,10 +60,7 @@ class ProfileGameTile extends StatelessWidget {
                     ],
                   ),
                   const SizedBox(height: 8),
-                  Text(
-                    name,
-                    textAlign: TextAlign.center,
-                  ),
+                  Text(name, textAlign: TextAlign.center),
                 ],
               ),
             ),

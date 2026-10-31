@@ -22,6 +22,9 @@
       }
     }
   },
+  "database": {
+    "rules": "database.rules.json"
+  },
   "firestore": {
     "database": "(default)",
     "location": "asia-southeast1",
@@ -29,6 +32,9 @@
     "indexes": "firestore.indexes.json"
   },
   "emulators": {
+    "database": {
+      "port": 9000
+    },
     "firestore": {
       "port": 8080
     },

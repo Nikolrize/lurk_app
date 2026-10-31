@@ -21,9 +21,12 @@ import 'package:lurk_app/features/parties/models/party.dart';
 import 'package:lurk_app/features/player/models/player.dart';
 import 'package:lurk_app/features/chat/models/chat_settings.dart';
 
+import 'package:lurk_app/providers/presence_provider.dart';
+
 Widget _optionsApp(_ChatService service, {List<ChatMessage>? messages}) =>
     ProviderScope(
       overrides: [
+        playerPresenceProvider.overrideWith((ref, uid) => Stream.value(null)),
         chatReceiptProvider.overrideWith(
           (ref, key) => Stream.value(const ChatReceipt()),
         ),
@@ -245,6 +248,9 @@ void main() {
                 ),
               ),
             ),
+            playerPresenceProvider.overrideWith(
+              (ref, uid) => Stream.value(null),
+            ),
           ],
           child: MaterialApp(
             theme: AppTheme.dark,
@@ -303,6 +309,7 @@ void main() {
           messagesProvider.overrideWith(
             (ref, key) => Stream.value(<ChatMessage>[]),
           ),
+          playerPresenceProvider.overrideWith((ref, uid) => Stream.value(null)),
         ],
         child: MaterialApp(
           theme: AppTheme.dark,
@@ -410,6 +417,9 @@ void main() {
                 ),
               ]),
             ),
+            playerPresenceProvider.overrideWith(
+              (ref, uid) => Stream.value(null),
+            ),
           ],
           child: MaterialApp(
             theme: AppTheme.dark,
@@ -418,7 +428,9 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      expect(find.text('Status unavailable'), findsNothing);
+      expect(find.text('Status unavailable'), findsOneWidget);
+      expect(find.text('Offline'), findsNothing);
+      expect(find.text('Online'), findsNothing);
       expect(find.text('Valorant · Rank 3 · 4.8 rating'), findsOneWidget);
       expect(find.textContaining('TODAY ·'), findsOneWidget);
       expect(find.text('PARTY INVITE'), findsOneWidget);

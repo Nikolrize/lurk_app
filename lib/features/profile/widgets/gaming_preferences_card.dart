@@ -4,17 +4,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:lurk_app/core/data/game_catalog.dart';
+import 'package:lurk_app/core/widgets/game_icon.dart';
 import 'package:lurk_app/models/gaming_preferences.dart';
 import 'package:lurk_app/providers/profile_provider.dart';
 
 import 'profile_game_tile.dart';
 
 class GamingPreferencesCard extends ConsumerWidget {
-  const GamingPreferencesCard({
-    super.key,
-    required this.uid,
-    this.onEdit,
-  });
+  const GamingPreferencesCard({super.key, required this.uid, this.onEdit});
 
   final String uid;
   final VoidCallback? onEdit;
@@ -45,10 +42,7 @@ class GamingPreferencesCard extends ConsumerWidget {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                const Icon(
-                  Icons.sports_esports_outlined,
-                  size: 48,
-                ),
+                Center(child: GameIcon(game: game.id, size: 64)),
                 const SizedBox(height: 16),
                 Text(
                   game.name,
@@ -57,9 +51,7 @@ class GamingPreferencesCard extends ConsumerWidget {
                 ),
                 const SizedBox(height: 12),
                 Text(
-                  isMainGame
-                      ? 'Main matchmaking game'
-                      : 'Additional game',
+                  isMainGame ? 'Main matchmaking game' : 'Additional game',
                   textAlign: TextAlign.center,
                 ),
                 if (game.supportsRanks) ...[
@@ -99,9 +91,7 @@ class GamingPreferencesCard extends ConsumerWidget {
       child: Padding(
         padding: const EdgeInsets.all(20),
         child: state.when(
-          loading: () => const Center(
-            child: CircularProgressIndicator(),
-          ),
+          loading: () => const Center(child: CircularProgressIndicator()),
           error: (error, stackTrace) => TextButton(
             onPressed: () {
               ref.invalidate(gamingPreferencesProvider(uid));
@@ -109,13 +99,10 @@ class GamingPreferencesCard extends ConsumerWidget {
             child: const Text('Unable to load preferences. Retry'),
           ),
           data: (preferences) {
-            final mode =
-                GamingPreferences.modeLabels[preferences.mode];
+            final mode = GamingPreferences.modeLabels[preferences.mode];
 
-            final communication =
-                GamingPreferences.communicationLabels[
-                  preferences.communication
-                ];
+            final communication = GamingPreferences
+                .communicationLabels[preferences.communication];
 
             final gameIds = preferences.games
                 .where(GameCatalog.games.containsKey)
@@ -130,9 +117,7 @@ class GamingPreferencesCard extends ConsumerWidget {
                     child: TextButton.icon(
                       onPressed: onEdit,
                       icon: const Icon(Icons.edit_outlined),
-                      label: Text(
-                        gameIds.isEmpty ? 'Add games' : 'Edit games',
-                      ),
+                      label: Text(gameIds.isEmpty ? 'Add games' : 'Edit games'),
                     ),
                   ),
                 if (gameIds.isEmpty)
@@ -153,14 +138,9 @@ class GamingPreferencesCard extends ConsumerWidget {
                           for (final gameId in gameIds)
                             ProfileGameTile(
                               name: GameCatalog.games[gameId]!.name,
-                              isMainGame:
-                                  preferences.currentGame == gameId,
+                              isMainGame: preferences.currentGame == gameId,
                               onTap: () {
-                                _openGameDetails(
-                                  context,
-                                  preferences,
-                                  gameId,
-                                );
+                                _openGameDetails(context, preferences, gameId);
                               },
                             ),
                         ],
@@ -174,10 +154,7 @@ class GamingPreferencesCard extends ConsumerWidget {
                 if (preferences.playstyles.isNotEmpty) ...[
                   const SizedBox(height: 12),
                   Text(
-                    'Playstyles: ${preferences.playstyles.map(
-                      (style) =>
-                          GamingPreferences.styleLabels[style] ?? style,
-                    ).join(', ')}',
+                    'Playstyles: ${preferences.playstyles.map((style) => GamingPreferences.styleLabels[style] ?? style).join(', ')}',
                   ),
                 ],
                 if (communication != null) ...[

@@ -1,4 +1,7 @@
+import 'dart:ui' as ui;
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:lurk_app/core/data/game_catalog.dart';
@@ -24,6 +27,63 @@ PartyDraft draft(String game, int? min, int? max) => PartyDraft(
   maxRank: max,
 );
 void main() {
+  test('Expanded games preserve per-game ranks through a save and reload', () {
+    const preferences = GamingPreferences(
+      games: [
+        'apex_legends',
+        'cs2',
+        'honor_of_kings',
+        'league_of_legends',
+        'minecraft',
+        'roblox',
+        'peak',
+      ],
+      currentGame: 'cs2',
+      gameRanks: {
+        'apex_legends': 'apex_predator',
+        'cs2': 'global_elite',
+        'honor_of_kings': 'legend',
+        'league_of_legends': 'challenger',
+      },
+    );
+    expect(preferences.validate, returnsNormally);
+    final saved = preferences.toMap();
+    expect(saved['rank'], 17);
+    final loaded = GamingPreferences.fromMap(saved);
+    expect(loaded.rankLabelFor('apex_legends'), 'Apex Predator');
+    expect(loaded.rankLabelFor('cs2'), 'Global Elite');
+    expect(loaded.rankLabelFor('honor_of_kings'), 'Legend');
+    expect(loaded.rankLabelFor('league_of_legends'), 'Challenger');
+    expect(() => draft('cs2', 0, 17).validate(), returnsNormally);
+    expect(() => draft('cs2', 0, 18).validate(), throwsArgumentError);
+    expect(() => draft('minecraft', 0, 1).validate(), throwsArgumentError);
+    expect(
+      () => const GamingPreferences(
+        games: ['apex_legends'],
+        currentGame: 'apex_legends',
+        gameRanks: {'apex_legends': 'challenger'},
+      ).validate(),
+      throwsArgumentError,
+    );
+  });
+
+  testWidgets('Every catalogue logo is bundled and decodes as an image', (
+    tester,
+  ) async {
+    await tester.runAsync(() async {
+      for (final game in GameCatalog.games.values) {
+        final bytes = await rootBundle.load(game.iconAsset!);
+        final codec = await ui.instantiateImageCodec(
+          bytes.buffer.asUint8List(bytes.offsetInBytes, bytes.lengthInBytes),
+        );
+        final frame = await codec.getNextFrame();
+        expect(frame.image.width, greaterThan(0), reason: game.id);
+        frame.image.dispose();
+        codec.dispose();
+      }
+    });
+  });
+
   test(
     'Party and player validation follow catalogue ranks and shared regions',
     () {

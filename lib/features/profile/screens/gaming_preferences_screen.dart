@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lurk_app/models/gaming_preferences.dart';
 import 'package:lurk_app/providers/profile_provider.dart';
 import 'package:lurk_app/core/data/game_catalog.dart';
+import 'package:lurk_app/core/widgets/game_icon.dart';
 
 import '../widgets/profile_page_layout.dart';
 
@@ -194,7 +195,11 @@ class _GamingPreferencesFormState
         key: ValueKey('rank:$gameId:${_gameRanks[gameId]}'),
         initialValue: _gameRanks[gameId] ?? '',
         isExpanded: true,
-        decoration: InputDecoration(labelText: '${game.name} rank'),
+        decoration: InputDecoration(
+          labelText: '${game.name} rank',
+          helperText: game.rankHelp,
+          helperMaxLines: 3,
+        ),
         items: [
           const DropdownMenuItem(
             value: '',
@@ -247,6 +252,7 @@ class _GamingPreferencesFormState
                   children: [
                     for (final entry in GamingPreferences.gameLabels.entries)
                       FilterChip(
+                        avatar: GameIcon(game: entry.key, size: 24),
                         label: Text(entry.value),
                         selected: _games.contains(entry.key),
                         onSelected: _isSaving

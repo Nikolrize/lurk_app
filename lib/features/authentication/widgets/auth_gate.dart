@@ -7,6 +7,10 @@ import 'package:lurk_app/providers/auth_provider.dart';
 import 'package:lurk_app/features/profile/widgets/profile_gate.dart';
 import 'package:lurk_app/features/authentication/screens/login_screen.dart';
 
+import 'package:lurk_app/features/profile/widgets/presence_scope.dart';
+
+import 'package:lurk_app/features/verification/widgets/verification_role_gate.dart';
+
 class AuthGate extends ConsumerWidget {
   const AuthGate({super.key});
 
@@ -39,12 +43,19 @@ class AuthGate extends ConsumerWidget {
           return const LoginScreen();
         }
 
-        return ProfileGate(
+        return VerificationRoleGate(
           key: ValueKey(user.uid),
           uid: user.uid,
-          child: NotificationGate(
+          playerChild: PresenceScope(
+            key: ValueKey(user.uid),
             uid: user.uid,
-            child: AppShell(uid: user.uid),
+            child: ProfileGate(
+              uid: user.uid,
+              child: NotificationGate(
+                uid: user.uid,
+                child: AppShell(uid: user.uid),
+              ),
+            ),
           ),
         );
       },
