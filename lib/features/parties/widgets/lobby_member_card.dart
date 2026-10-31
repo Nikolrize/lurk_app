@@ -81,7 +81,7 @@ class LobbyMemberCard extends StatelessWidget {
                       children: [
                         Flexible(
                           child: Text(
-                            '${member.name}${rank == null || rank.isEmpty ? '' : ' · $rank'}',
+                            member.name,
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
                             style: theme.textTheme.titleMedium,
@@ -106,15 +106,41 @@ class LobbyMemberCard extends StatelessWidget {
                       runSpacing: 4,
                       crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
-                        Icon(
-                          Icons.star_rounded,
-                          size: 16,
-                          color: colors.onSurfaceVariant,
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.star_rounded,
+                              size: 16,
+                              color: colors.onSurfaceVariant,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              member.rating?.toStringAsFixed(1) ?? 'Not rated',
+                              style: theme.textTheme.bodySmall,
+                            ),
+                          ],
                         ),
-                        Text(
-                          member.rating?.toStringAsFixed(1) ?? 'Not rated',
-                          style: theme.textTheme.bodySmall,
-                        ),
+                        if (rank != null && rank.isNotEmpty)
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.military_tech_outlined,
+                                size: 16,
+                                color: colors.onSurfaceVariant,
+                              ),
+                              const SizedBox(width: 4),
+                              Flexible(
+                                child: Text(
+                                  rank,
+                                  style: theme.textTheme.bodySmall?.copyWith(
+                                    color: colors.onSurfaceVariant,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
                         Tooltip(
                           message: mic,
                           child: Icon(

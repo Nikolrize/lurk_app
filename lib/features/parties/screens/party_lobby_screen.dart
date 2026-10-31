@@ -1,3 +1,4 @@
+import '../../../core/data/game_catalog.dart';
 import '../widgets/party_preview_drawer.dart';
 import '../../../providers/voice_provider.dart';
 import '../../../services/party_voice_service.dart';
@@ -457,6 +458,9 @@ class _PartyLobbyScreenState extends ConsumerState<PartyLobbyScreen> {
                     Padding(
                       padding: const EdgeInsets.only(bottom: 12),
                       child: _HostCard(
+                        partyGame: party.gameId.isEmpty
+                            ? party.gameName
+                            : party.gameId,
                         uid: uid,
                         isSpeaking: voice.speakingPlayers.contains(uid),
                         isHost: uid == party.hostId,
@@ -476,6 +480,9 @@ class _PartyLobbyScreenState extends ConsumerState<PartyLobbyScreen> {
                 ] else ...[
                   if (party.hostId.isNotEmpty)
                     _HostCard(
+                      partyGame: party.gameId.isEmpty
+                          ? party.gameName
+                          : party.gameId,
                       uid: party.hostId,
                       isSpeaking: voice.speakingPlayers.contains(party.hostId),
                       micEnabled: party.hostId == viewerUid
@@ -628,6 +635,7 @@ class _PartyLobbyScreenState extends ConsumerState<PartyLobbyScreen> {
 
 class _HostCard extends ConsumerWidget {
   const _HostCard({
+    required this.partyGame,
     required this.uid,
     required this.onViewProfile,
     this.isHost = true,
@@ -639,11 +647,20 @@ class _HostCard extends ConsumerWidget {
   final bool? micEnabled;
   final bool isSpeaking;
   final ValueChanged<String>? onRemove;
-  final String uid;
+  final String uid, partyGame;
   final VoidCallback onViewProfile;
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final profile = ref.watch(playerProfileProvider(uid));
+    final game = GameCatalog.find(partyGame);
+    final preferences = game?.supportsRanks == true
+        ? ref.watch(gamingPreferencesProvider(uid))
+        : null;
+    final rank = preferences?.when(
+      data: (value) => value.rankLabelFor(game!.id) ?? 'Unranked',
+      loading: () => 'Loading rank…',
+      error: (_, stack) => 'Rank unavailable',
+    );
     return profile.when(
       loading: () => const Card(
         child: Padding(
@@ -660,6 +677,7 @@ class _HostCard extends ConsumerWidget {
       data: (profile) => LobbyMemberCard(
         member: LobbyMember(
           uid: uid,
+          rank: rank,
           micEnabled: micEnabled,
           isSpeaking: isSpeaking,
           name: profile?.username.trim().isNotEmpty == true

@@ -1,3 +1,4 @@
+import 'package:lurk_app/models/gaming_preferences.dart';
 import 'package:lurk_app/providers/voice_provider.dart';
 import 'package:lurk_app/services/party_voice_service.dart';
 import 'dart:async';
@@ -99,6 +100,92 @@ const members = [
   ),
 ];
 void main() {
+  testWidgets('Lobby ranks follow the party game and update live', (
+    tester,
+  ) async {
+    final preferences = StreamController<GamingPreferences>();
+    final parties = StreamController<Party?>();
+    addTearDown(preferences.close);
+    addTearDown(parties.close);
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          partyByIdProvider('party').overrideWith((ref) => parties.stream),
+          partyMemberIdsProvider(
+            'party',
+          ).overrideWith((ref) => Stream.value(['host'])),
+          gamingPreferencesProvider(
+            'host',
+          ).overrideWith((ref) => preferences.stream),
+          playerProfileProvider('host').overrideWith(
+            (ref) => Stream.value(
+              const PlayerProfile(
+                uid: 'host',
+                username: 'Nicole',
+                bio: '',
+                region: 'Asia',
+                createdAt: null,
+                updatedAt: null,
+              ),
+            ),
+          ),
+        ],
+        child: MaterialApp(
+          theme: AppTheme.dark,
+          home: Scaffold(
+            body: PartyLobbyScreen(
+              party: const Party(
+                id: 'party',
+                hostId: 'host',
+                title: 'ML squad',
+                gameId: 'mobile_legends',
+                gameName: 'Mobile Legends',
+                playStyle: 'Competitive',
+                currentPlayers: 1,
+                maxPlayers: 5,
+              ),
+              viewerUid: 'host',
+              onBack: () {},
+              onToggleMic: () {},
+            ),
+          ),
+        ),
+      ),
+    );
+    preferences.add(
+      const GamingPreferences(
+        currentGame: 'valorant',
+        gameRanks: {'valorant': 'diamond', 'mobile_legends': 'epic'},
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Epic'), findsOneWidget);
+    expect(find.text('Diamond'), findsNothing);
+    preferences.add(
+      const GamingPreferences(gameRanks: {'mobile_legends': 'legend'}),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Legend'), findsOneWidget);
+    preferences.add(const GamingPreferences());
+    await tester.pumpAndSettle();
+    expect(find.text('Unranked'), findsOneWidget);
+    parties.add(
+      const Party(
+        id: 'party',
+        hostId: 'host',
+        title: 'Unranked game',
+        gameId: 'fortnite',
+        gameName: 'Fortnite',
+        playStyle: 'Casual',
+        currentPlayers: 1,
+        maxPlayers: 5,
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Unranked'), findsNothing);
+    expect(find.text('Loading rank…'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
   for (final viewer in ['host', 'alex']) {
     testWidgets('Lobby auto-connects muted and restricts invites for $viewer', (
       tester,
@@ -187,7 +274,8 @@ void main() {
       );
       expect(find.text('Valorant party'), findsOneWidget);
       expect(find.text('3 / 5 players · Private party'), findsOneWidget);
-      expect(find.text('Nicole · Platinum'), findsOneWidget);
+      expect(find.text('Nicole'), findsOneWidget);
+      expect(find.text('Platinum'), findsOneWidget);
       expect(find.byTooltip('Party host'), findsOneWidget);
       final controlPosition = tester.getTopLeft(find.text('Leave Party'));
       await tester.drag(find.byType(ListView).first, const Offset(0, -350));
