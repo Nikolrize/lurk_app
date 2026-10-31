@@ -228,42 +228,100 @@ service cloud.firestore {
       );
     }
 
-    // Keep these server-side bounds aligned with GameCatalog.
+    // Supported game IDs and rank positions mirror GameCatalog.
+    // Public gameRanks maps only contain selected ranked games (maximum six).
+    function catalogueGames() {
+      return [
+        'valorant', 'mobile_legends', 'fortnite', 'apex_legends', 'cs2',
+        'honor_of_kings', 'league_of_legends', 'minecraft', 'roblox', 'peak'
+      ];
+    }
+    function catalogueRankNumbers(game) {
+      // Select one map so validation stays below the rules expression limit.
+      return game == 'valorant' ? {
+          'iron': 0,
+          'bronze': 1,
+          'silver': 2,
+          'gold': 3,
+          'platinum': 4,
+          'diamond': 5,
+          'ascendant': 6,
+          'immortal': 7,
+          'radiant': 8
+        } :
+        game == 'mobile_legends' ? {
+          'warrior': 0,
+          'elite': 1,
+          'master': 2,
+          'grandmaster': 3,
+          'epic': 4,
+          'legend': 5,
+          'mythic': 6,
+          'mythical_honor': 7,
+          'mythical_glory': 8,
+          'mythical_immortal': 9
+        } :
+        game == 'apex_legends' ? {
+          'rookie': 0,
+          'bronze': 1,
+          'silver': 2,
+          'gold': 3,
+          'platinum': 4,
+          'diamond': 5,
+          'master': 6,
+          'apex_predator': 7
+        } :
+        game == 'cs2' ? {
+          'silver_1': 0,
+          'silver_2': 1,
+          'silver_3': 2,
+          'silver_4': 3,
+          'silver_elite': 4,
+          'silver_elite_master': 5,
+          'gold_nova_1': 6,
+          'gold_nova_2': 7,
+          'gold_nova_3': 8,
+          'gold_nova_master': 9,
+          'master_guardian_1': 10,
+          'master_guardian_2': 11,
+          'master_guardian_elite': 12,
+          'distinguished_master_guardian': 13,
+          'legendary_eagle': 14,
+          'legendary_eagle_master': 15,
+          'supreme_master_first_class': 16,
+          'global_elite': 17
+        } :
+        game == 'honor_of_kings' ? {
+          'bronze': 0,
+          'silver': 1,
+          'gold': 2,
+          'platinum': 3,
+          'diamond': 4,
+          'master': 5,
+          'grandmaster': 6,
+          'mythic': 7,
+          'epic': 8,
+          'legend': 9
+        } :
+        game == 'league_of_legends' ? {
+          'iron': 0,
+          'bronze': 1,
+          'silver': 2,
+          'gold': 3,
+          'platinum': 4,
+          'emerald': 5,
+          'diamond': 6,
+          'master': 7,
+          'grandmaster': 8,
+          'challenger': 9
+        } : {};
+    }
     function catalogueRankCount(game) {
-      return {'valorant': 9, 'mobile_legends': 10, 'fortnite': 0}.get(game, 0);
+      return catalogueRankNumbers(game).size();
     }
     //rank number same as game's catalogue position
     function rankNumber(game, rankId) {
-      let valorant = {
-        'iron': 0,
-        'bronze': 1,
-        'silver': 2,
-        'gold': 3,
-        'platinum': 4,
-        'diamond': 5,
-        'ascendant': 6,
-        'immortal': 7,
-        'radiant': 8
-      };
-
-      let mobileLegends = {
-        'warrior': 0,
-        'elite': 1,
-        'master': 2,
-        'grandmaster': 3,
-        'epic': 4,
-        'legend': 5,
-        'mythic': 6,
-        'mythical_honor': 7,
-        'mythical_glory': 8,
-        'mythical_immortal': 9
-      };
-
-      return rankId == null ? null: (
-          game == 'valorant' ? valorant.get(rankId, null) : (
-              game == 'mobile_legends' ? mobileLegends.get(rankId, null) : null
-            )
-        );
+      return rankId == null ? null : catalogueRankNumbers(game).get(rankId, null);
     }
 
     //gameRanks - optional public map
@@ -278,8 +336,11 @@ service cloud.firestore {
         : null;
 
       return ranks is map
-        && ranks.keys().size() <= 2
-        && ranks.keys().hasOnly(['valorant', 'mobile_legends'])
+        && ranks.keys().size() <= 6
+        && ranks.keys().hasOnly([
+          'valorant', 'mobile_legends', 'apex_legends', 'cs2',
+          'honor_of_kings', 'league_of_legends'
+        ])
         && ranks.keys().hasOnly(games)
         && (
           !('valorant' in ranks)
@@ -296,6 +357,14 @@ service cloud.firestore {
             'mythical_glory', 'mythical_immortal'
           ]
         )
+        && (!('apex_legends' in ranks)
+          || ranks.apex_legends is string && ranks.apex_legends in catalogueRankNumbers('apex_legends'))
+        && (!('cs2' in ranks)
+          || ranks.cs2 is string && ranks.cs2 in catalogueRankNumbers('cs2'))
+        && (!('honor_of_kings' in ranks)
+          || ranks.honor_of_kings is string && ranks.honor_of_kings in catalogueRankNumbers('honor_of_kings'))
+        && (!('league_of_legends' in ranks)
+          || ranks.league_of_legends is string && ranks.league_of_legends in catalogueRankNumbers('league_of_legends'))
         && data.get('rank', null) == rankNumber(game, chosenRank);
     }
 
@@ -308,11 +377,9 @@ service cloud.firestore {
       let rank = data.get('rank', null);
 
       return games is list
-        && games.size() <= 3
+        && games.size() <= 10
         && games.toSet().size() == games.size()
-        && games.hasOnly([
-          'valorant', 'mobile_legends', 'fortnite'
-        ])
+        && games.hasOnly(catalogueGames())
         && (
           (game == null && games.size() == 0)
           || (game is string && game in games)
@@ -642,7 +709,7 @@ service cloud.firestore {
         && data.hostId == request.auth.uid
         && data.title is string && data.title.size() >= 1 && data.title.size() <= 60
         && data.title.matches('.*\\S.*')
-        && data.gameId in ['valorant', 'mobile_legends', 'fortnite']
+        && data.gameId in catalogueGames()
         && data.region in ['asia', 'europe', 'north_america', 'south_america', 'africa', 'oceania']
         && data.mode in ['competitive', 'casual']
         && data.visibility in ['public', 'private']

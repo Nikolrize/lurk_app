@@ -204,6 +204,42 @@ test('gaming preferences ownership and validation', async () => {
     saved = await getDoc(aliceProfile);
     assert.equal(saved.data().gameRanks.valorant, 'radiant');
     assert.equal(saved.data().gameRanks.mobile_legends, 'epic');
+
+    // All ten selections and six independent ranks may coexist.
+    const expanded = {
+      games: ['valorant', 'mobile_legends', 'fortnite', 'apex_legends', 'cs2',
+        'honor_of_kings', 'league_of_legends', 'minecraft', 'roblox', 'peak'],
+      currentGame: 'cs2', rank: 17,
+      gameRanks: {valorant: 'radiant', mobile_legends: 'mythical_immortal',
+        apex_legends: 'apex_predator', cs2: 'global_elite',
+        honor_of_kings: 'legend', league_of_legends: 'challenger'},
+      updatedAt: serverTimestamp(),
+    };
+    await assertSucceeds(updateDoc(aliceProfile, expanded));
+    for (const [gameId, rank] of [
+      ['apex_legends', 7], ['honor_of_kings', 9], ['league_of_legends', 9],
+    ]) {
+      await assertSucceeds(updateDoc(aliceProfile, {
+        currentGame: gameId, rank, updatedAt: serverTimestamp(),
+      }));
+    }
+    for (const gameId of ['minecraft', 'roblox', 'peak']) {
+      await assertSucceeds(updateDoc(aliceProfile, {
+        currentGame: gameId, rank: null, updatedAt: serverTimestamp(),
+      }));
+      await assertFails(updateDoc(aliceProfile, {rank: 0, updatedAt: serverTimestamp()}));
+    }
+    await assertFails(updateDoc(aliceProfile, {
+      gameRanks: {...expanded.gameRanks, apex_legends: 'challenger'},
+      updatedAt: serverTimestamp(),
+    }));
+    await assertFails(updateDoc(aliceProfile, {
+      gameRanks: {...expanded.gameRanks, minecraft: 'diamond'},
+      updatedAt: serverTimestamp(),
+    }));
+    await assertFails(updateDoc(aliceProfile, {
+      games: [...expanded.games, 'not_a_game'], updatedAt: serverTimestamp(),
+    }));
   } finally {
     await environment.cleanup();
   }

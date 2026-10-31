@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/data/game_catalog.dart';
+import '../../../core/widgets/game_icon.dart';
 import '../../../models/game_definition.dart';
 import '../../../providers/profile_provider.dart';
 import '../../profile/screens/gaming_preferences_screen.dart';
@@ -57,10 +58,7 @@ class HomeGames extends ConsumerWidget {
                               onPressed: onFindGame == null
                                   ? null
                                   : () => onFindGame!(game.id),
-                              icon: const Icon(
-                                Icons.sports_esports_outlined,
-                                size: 30,
-                              ),
+                              icon: GameIcon(game: game.id, size: 46),
                             ),
                           ),
                           const SizedBox(height: 8),
