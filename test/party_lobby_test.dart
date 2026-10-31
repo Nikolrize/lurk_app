@@ -1,3 +1,5 @@
+import 'package:lurk_app/providers/voice_provider.dart';
+import 'package:lurk_app/services/party_voice_service.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -113,7 +115,9 @@ void main() {
       await tester.tap(find.text('Mic: OFF'));
       await tester.pumpAndSettle();
       expect(
-        find.text('Voice chat is not connected. Your microphone is off.'),
+        find.text(
+          'Voice chat is not configured. Run with config/voice.local.json.',
+        ),
         findsOneWidget,
       );
       expect(find.text('Mic: ON'), findsNothing);
@@ -228,9 +232,12 @@ void main() {
     tester,
   ) async {
     final service = LobbyPartyService();
+    final voice = StreamController<VoiceState>();
+    addTearDown(voice.close);
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
+          voiceStateProvider.overrideWith((ref) => voice.stream),
           partyByIdProvider('party').overrideWith((ref) => Stream.value(party)),
           partyMemberIdsProvider(
             'party',
@@ -262,6 +269,28 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
+    voice.add(
+      const VoiceState(
+        partyId: 'party',
+        connected: true,
+        remoteCount: 1,
+        remoteMics: {'alex': true},
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('· Mic on'), findsOneWidget);
+    expect(find.textContaining('1 others in voice'), findsOneWidget);
+    voice.add(
+      const VoiceState(
+        partyId: 'party',
+        connected: true,
+        remoteCount: 1,
+        remoteMics: {'alex': false},
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('· Mic on'), findsNothing);
+    expect(find.text('· Mic off'), findsNWidgets(2));
     await tester.tap(find.byTooltip('Options for Nicole'));
     await tester.pumpAndSettle();
     expect(find.text('Remove player'), findsNothing);

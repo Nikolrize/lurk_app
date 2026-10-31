@@ -23,6 +23,14 @@ test('preserved blocks and chat settings still protect conversations',async()=>{
    await assertFails(setDoc(doc(bob,'chats/blocked'),chat()));
    await assertFails(deleteDoc(doc(bob,'player_blocks/alice/users/bob')));
    await assertSucceeds(deleteDoc(doc(alice,'player_blocks/alice/users/bob')));
+   // Preserve the newer block path alongside existing users-path blocks.
+   await assertSucceeds(setDoc(doc(alice,'player_blocks/alice/blocked/bob'),{createdAt:serverTimestamp()}));
+   await assertFails(setDoc(doc(bob,'chats/newer-blocked'),chat()));
+   await assertSucceeds(deleteDoc(doc(alice,'player_blocks/alice/blocked/bob')));
+   const report={reporterId:'alice',reporterUsername:'Alice',playerId:'bob',playerUsername:'Bob',reasons:['Harassment'],details:'Test report',status:'pending',createdAt:serverTimestamp()};
+   await assertSucceeds(setDoc(doc(alice,'player_reports/valid'),report));
+   await assertFails(setDoc(doc(bob,'player_reports/forged'),report));
+   await assertFails(getDoc(doc(alice,'player_reports/valid')));
    await assertSucceeds(setDoc(doc(alice,'chats/direct'),chat()));
    await assertSucceeds(setDoc(doc(alice,'chats/direct/settings/alice'),{clearedAt:serverTimestamp()}));
    await assertFails(setDoc(doc(bob,'chats/direct/settings/alice'),{clearedAt:serverTimestamp()}));

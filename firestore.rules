@@ -21,6 +21,17 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
+    // Tokens are private to their account. Sending is reserved for the Admin SDK.
+    match /notification_users/{uid}/devices/{deviceId} {
+      allow read, delete: if owns(uid);
+      allow create, update: if owns(uid)
+        && request.resource.data.keys().hasOnly(['token', 'platform', 'updatedAt'])
+        && request.resource.data.token is string
+        && request.resource.data.token == deviceId
+        && deviceId.size() >= 20 && deviceId.size() <= 2048
+        && request.resource.data.platform == 'android'
+        && request.resource.data.updatedAt == request.time;
+    }
     function signedIn() {
       return request.auth != null;
     }
@@ -31,7 +42,9 @@ service cloud.firestore {
 
     function unblocked(users) {
       return !exists(/databases/$(database)/documents/player_blocks/$(users[0])/users/$(users[1]))
-        && !exists(/databases/$(database)/documents/player_blocks/$(users[1])/users/$(users[0]));
+        && !exists(/databases/$(database)/documents/player_blocks/$(users[1])/users/$(users[0]))
+        && !exists(/databases/$(database)/documents/player_blocks/$(users[0])/blocked/$(users[1]))
+        && !exists(/databases/$(database)/documents/player_blocks/$(users[1])/blocked/$(users[0]));
     }
 
     match /player_blocks/{uid}/users/{otherUid} {
@@ -316,6 +329,37 @@ service cloud.firestore {
         && data.updatedAt is timestamp;
     }
 
+    match /player_blocks/{uid}/blocked/{target} {
+      allow read: if owns(uid);
+      allow create, update: if owns(uid) && uid != target
+        && exists(/databases/$(database)/documents/players/$(target))
+        && request.resource.data.keys().hasOnly(['createdAt'])
+        && request.resource.data.createdAt == request.time;
+      allow delete: if owns(uid);
+    }
+    match /player_reports/{reportId} {
+      allow create: if signedIn()
+        && request.resource.data.keys().hasOnly([
+          'reporterId', 'reporterUsername', 'playerId', 'playerUsername',
+          'reasons', 'details', 'status', 'createdAt'])
+        && request.resource.data.reporterId == request.auth.uid
+        && request.resource.data.playerId is string
+        && request.resource.data.playerId != request.auth.uid
+        && request.resource.data.reporterUsername is string
+        && request.resource.data.playerUsername is string
+        && request.resource.data.reporterUsername == get(/databases/$(database)/documents/players/$(request.auth.uid)).data.username
+        && request.resource.data.playerUsername == get(/databases/$(database)/documents/players/$(request.resource.data.playerId)).data.username
+        && request.resource.data.reasons is list
+        && request.resource.data.reasons.size() >= 1
+        && request.resource.data.reasons.size() <= 5
+        && request.resource.data.reasons.toSet().size() == request.resource.data.reasons.size()
+        && request.resource.data.reasons.hasOnly(['Toxic behaviour', 'Harassment', 'Inappropriate language', 'Cheating', 'Other'])
+        && request.resource.data.details is string
+        && request.resource.data.details.size() <= 2000
+        && request.resource.data.status == 'pending'
+        && request.resource.data.createdAt == request.time;
+      allow read, update, delete: if false;
+    }
     // Direct messaging. Membership and message history are immutable to clients.
     match /chats/{chatId} {
       function member(data) {
@@ -323,7 +367,7 @@ service cloud.firestore {
       }
       function validChat(data) {
         return data.keys().hasOnly(['type', 'userIds', 'createdAt', 'updatedAt',
-            'lastMessageId', 'lastMessagePreview', 'lastSenderId'])
+            'lastMessageId', 'lastMessagePreview', 'lastSenderId', 'participantUsernames', 'lastSenderUsername'])
           && data.type == 'direct'
           && data.userIds is list && data.userIds.size() == 2
           && data.userIds[0] is string && data.userIds[1] is string
@@ -332,26 +376,39 @@ service cloud.firestore {
           && data.lastMessageId is string && data.lastMessagePreview is string
           && data.lastSenderId is string;
       }
+      function validNames(data) {
+        let names = data.get('participantUsernames', null);
+        return names == null || (
+          names is map
+          && names.keys().hasOnly(data.userIds)
+          && names.keys().hasAll(data.userIds)
+          && names[data.userIds[0]] == get(/databases/$(database)/documents/players/$(data.userIds[0])).data.username
+          && names[data.userIds[1]] == get(/databases/$(database)/documents/players/$(data.userIds[1])).data.username);
+      }
       // A missing-document get is needed to atomically open an existing/new chat.
       allow get: if signedIn() && (resource == null || member(resource.data));
       allow list: if member(resource.data);
       allow create: if member(request.resource.data)
-        && validChat(request.resource.data)
         && unblocked(request.resource.data.userIds)
+        && validChat(request.resource.data)
+        && validNames(request.resource.data)
         && exists(/databases/$(database)/documents/players/$(request.resource.data.userIds[0]))
         && exists(/databases/$(database)/documents/players/$(request.resource.data.userIds[1]))
         && request.resource.data.createdAt == request.time
         && request.resource.data.updatedAt == request.time
         && request.resource.data.lastMessageId == ''
         && request.resource.data.lastMessagePreview == ''
-        && request.resource.data.lastSenderId == '';
+        && request.resource.data.lastSenderId == ''
+        && request.resource.data.get('lastSenderUsername', '') == '';
       allow update: if member(resource.data)
-        && unblocked(resource.data.userIds)
+        && unblocked(request.resource.data.userIds)
         && validChat(request.resource.data)
+        && validNames(request.resource.data)
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-          'lastMessageId', 'lastMessagePreview', 'lastSenderId', 'updatedAt'])
+          'lastMessageId', 'lastMessagePreview', 'lastSenderId', 'updatedAt', 'participantUsernames', 'lastSenderUsername'])
         && request.resource.data.updatedAt == request.time
         && request.resource.data.lastSenderId == request.auth.uid
+        && (!('lastSenderUsername' in request.resource.data) || request.resource.data.lastSenderUsername == get(/databases/$(database)/documents/players/$(request.auth.uid)).data.username)
         && request.resource.data.lastMessageId != ''
         && !exists(/databases/$(database)/documents/chats/$(chatId)/messages/$(request.resource.data.lastMessageId))
         && getAfter(/databases/$(database)/documents/chats/$(chatId)/messages/$(request.resource.data.lastMessageId)).data.senderId == request.auth.uid
@@ -374,9 +431,9 @@ service cloud.firestore {
           let recipient = users[0] == request.auth.uid ? users[1] : users[0];
           let kind = data.get('type', 'text');
           return (kind == 'text'
-              && data.keys().hasOnly(['senderId', 'text', 'createdAt', 'type']))
+              && data.keys().hasOnly(['senderId', 'senderUsername', 'text', 'createdAt', 'type']))
             || (kind == 'party_invite'
-              && data.keys().hasOnly(['senderId', 'text', 'createdAt', 'type', 'partyId'])
+              && data.keys().hasOnly(['senderId', 'senderUsername', 'text', 'createdAt', 'type', 'partyId'])
               && data.partyId is string
               && data.partyId.size() > 0 && data.partyId.size() <= 1500
               && data.partyId.matches('[^/]+')
@@ -398,6 +455,7 @@ service cloud.firestore {
           && unblocked(parent().userIds)
           && validMessageKind(request.resource.data)
           && request.resource.data.senderId == request.auth.uid
+          && (!('senderUsername' in request.resource.data) || request.resource.data.senderUsername == get(/databases/$(database)/documents/players/$(request.auth.uid)).data.username)
           && request.resource.data.text is string
           && request.resource.data.text.size() > 0
           && request.resource.data.text.size() <= 2000
@@ -549,8 +607,7 @@ service cloud.firestore {
             && (get(member).data.get('removedBy', null) == null
               || (exists(/databases/$(database)/documents/parties/$(partyId)/invitations/$(request.auth.uid))
                 && get(/databases/$(database)/documents/parties/$(partyId)/invitations/$(request.auth.uid)).data.createdAt > get(member).data.leftAt))))
-          && !exists(/databases/$(database)/documents/player_blocks/$(resource.data.hostId)/users/$(request.auth.uid))
-          && !exists(/databases/$(database)/documents/player_blocks/$(request.auth.uid)/users/$(resource.data.hostId))
+          && unblocked([resource.data.hostId, request.auth.uid])
           && joined.keys().hasAll(['role', 'joinedAt', 'leftAt'])
           && joined.keys().hasOnly(['role', 'joinedAt', 'leftAt'])
           && joined.role == 'member' && joined.joinedAt == request.time && joined.leftAt == null

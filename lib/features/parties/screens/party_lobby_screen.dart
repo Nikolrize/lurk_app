@@ -1,3 +1,5 @@
+import '../../../providers/voice_provider.dart';
+import '../../../services/party_voice_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../providers/profile_provider.dart';
@@ -42,11 +44,32 @@ class _PartyLobbyScreenState extends ConsumerState<PartyLobbyScreen> {
       widget.party;
   String? get viewerUid => widget.viewerUid;
   List<LobbyMember>? get members => widget.members;
-  bool get micEnabled => widget.micEnabled;
+  bool get micEnabled {
+    if (widget.onToggleMic != null) return widget.micEnabled;
+    final state = ref.read(partyVoiceServiceProvider).state;
+    return state.partyId == party.id && state.connected && !state.muted;
+  }
+
   VoidCallback get onBack => widget.onBack;
   VoidCallback? get onInvite => widget.onInvite;
   VoidCallback? get onChat => widget.onChat;
   VoidCallback? get onToggleMic => widget.onToggleMic;
+
+  Future<void> _toggleVoice(BuildContext context) async {
+    try {
+      await ref.read(partyVoiceServiceProvider).toggle(party.id);
+    } catch (error) {
+      if (context.mounted &&
+          ref.read(partyVoiceServiceProvider).state.error == null) {
+        _notice(
+          context,
+          error is StateError
+              ? error.message.toString()
+              : 'Unable to connect voice chat.',
+        );
+      }
+    }
+  }
 
   Future<void> _remove(BuildContext context, String uid, String name) async {
     if (_removing != null ||
@@ -198,6 +221,9 @@ class _PartyLobbyScreenState extends ConsumerState<PartyLobbyScreen> {
       await ref
           .read(partyServiceProvider)
           .leaveParty(party.id, expectedUid: viewerUid!);
+      if (ref.read(partyVoiceServiceProvider).state.partyId == party.id) {
+        await ref.read(partyVoiceServiceProvider).disconnect();
+      }
       if (context.mounted) onBack();
     } catch (_) {
       if (context.mounted) {
@@ -210,6 +236,9 @@ class _PartyLobbyScreenState extends ConsumerState<PartyLobbyScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final voice =
+        ref.watch(voiceStateProvider).asData?.value ?? const VoiceState();
+    final voiceBusy = voice.partyId == widget.party.id && voice.connecting;
     final liveParty = ref.watch(partyByIdProvider(widget.party.id));
     if (viewerUid != null && viewerUid != party.hostId) {
       final membership = ref.watch(myPartyMembershipProvider(party.id));
@@ -293,7 +322,9 @@ class _PartyLobbyScreenState extends ConsumerState<PartyLobbyScreen> {
                       tooltip: 'Party options',
                       icon: const Icon(Icons.more_horiz),
                       onSelected: (value) {
-                        if (value == 'details') {
+                        if (value == 'voice') {
+                          ref.read(partyVoiceServiceProvider).disconnect();
+                        } else if (value == 'details') {
                           if (viewerUid == party.hostId) {
                             _edit(context);
                           } else {
@@ -304,6 +335,11 @@ class _PartyLobbyScreenState extends ConsumerState<PartyLobbyScreen> {
                         }
                       },
                       itemBuilder: (_) => [
+                        if (voice.connected && voice.partyId == party.id)
+                          const PopupMenuItem(
+                            value: 'voice',
+                            child: Text('Leave voice chat'),
+                          ),
                         PopupMenuItem(
                           value: 'details',
                           child: Text(
@@ -375,6 +411,9 @@ class _PartyLobbyScreenState extends ConsumerState<PartyLobbyScreen> {
                       child: _HostCard(
                         uid: uid,
                         isHost: uid == party.hostId,
+                        micEnabled: uid == viewerUid
+                            ? micEnabled
+                            : voice.remoteMics[uid],
                         onViewProfile: () => _profile(context, uid),
                         onRemove:
                             viewerUid == party.hostId &&
@@ -389,6 +428,9 @@ class _PartyLobbyScreenState extends ConsumerState<PartyLobbyScreen> {
                   if (party.hostId.isNotEmpty)
                     _HostCard(
                       uid: party.hostId,
+                      micEnabled: party.hostId == viewerUid
+                          ? micEnabled
+                          : voice.remoteMics[party.hostId],
                       onViewProfile: () => _profile(context, party.hostId),
                     ),
                   const SizedBox(height: 12),
@@ -430,20 +472,40 @@ class _PartyLobbyScreenState extends ConsumerState<PartyLobbyScreen> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
+                if (voice.connected && voice.partyId == party.id)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: Text(
+                      'Voice connected · ${voice.remoteCount} others in voice'
+                      '${!voice.muted ? (voice.inputLevel > 5 ? ' · Mic picking up sound' : ' · No mic input detected') : ''}',
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  ),
+                if (voice.error != null)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: Text(
+                      voice.error!,
+                      style: TextStyle(color: colors.error),
+                    ),
+                  ),
                 Row(
                   children: [
                     Expanded(
                       child: OutlinedButton.icon(
-                        onPressed:
-                            onToggleMic ??
-                            () => _notice(
-                              context,
-                              'Voice chat is not connected. Your microphone is off.',
-                            ),
+                        onPressed: voiceBusy
+                            ? null
+                            : onToggleMic ?? () => _toggleVoice(context),
                         icon: Icon(
                           micEnabled ? Icons.mic : Icons.mic_off_outlined,
                         ),
-                        label: Text(micEnabled ? 'Mic: ON' : 'Mic: OFF'),
+                        label: Text(
+                          voiceBusy
+                              ? 'Connecting…'
+                              : micEnabled
+                              ? 'Mic: ON'
+                              : 'Mic: OFF',
+                        ),
                       ),
                     ),
                     const SizedBox(width: 16),
@@ -480,9 +542,11 @@ class _HostCard extends ConsumerWidget {
     required this.uid,
     required this.onViewProfile,
     this.isHost = true,
+    this.micEnabled,
     this.onRemove,
   });
   final bool isHost;
+  final bool? micEnabled;
   final ValueChanged<String>? onRemove;
   final String uid;
   final VoidCallback onViewProfile;
@@ -505,6 +569,7 @@ class _HostCard extends ConsumerWidget {
       data: (profile) => LobbyMemberCard(
         member: LobbyMember(
           uid: uid,
+          micEnabled: micEnabled,
           name: profile?.username.trim().isNotEmpty == true
               ? profile!.username
               : isHost
