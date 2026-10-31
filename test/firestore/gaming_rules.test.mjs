@@ -215,7 +215,47 @@ test('gaming preferences ownership and validation', async () => {
         honor_of_kings: 'legend', league_of_legends: 'challenger'},
       updatedAt: serverTimestamp(),
     };
+    // Regression: games must remain editable on a complete profile, including
+    // all seven scheduled days, a photo, and optional public personal details.
+    const fullAvailability = {
+      availableNow: true,
+      preferredTimes: ['Morning', 'Afternoon', 'Evening', 'Night'],
+      weeklySchedule: Array.from({length: 7}, (_, i) => ({
+        weekday: i + 1, startMinute: 1080, endMinute: 1380,
+      })),
+      timeZone: 'Asia/Kuala_Lumpur',
+    };
+    await assertSucceeds(updateDoc(aliceProfile, {
+      availability: fullAvailability,
+      updatedAt: serverTimestamp(),
+    }));
+    await assertSucceeds(updateDoc(aliceProfile, {
+      photoPath: 'alice/550e8400-e29b-41d4-a716-446655440000.jpg',
+      updatedAt: serverTimestamp(),
+    }));
+    await assertSucceeds(updateDoc(aliceProfile, {
+      sharedAge: 25, ageSharedAt: serverTimestamp(), sharedGender: 'male',
+      updatedAt: serverTimestamp(),
+    }));
     await assertSucceeds(updateDoc(aliceProfile, expanded));
+    await assertSucceeds(updateDoc(aliceProfile, {
+      bio: 'Still editable with all games and a full schedule',
+      updatedAt: serverTimestamp(),
+    }));
+    await assertSucceeds(updateDoc(aliceProfile, {
+      availability: {...fullAvailability, availableNow: false},
+      updatedAt: serverTimestamp(),
+    }));
+    await assertFails(updateDoc(aliceProfile, {
+      availability: {...fullAvailability, weeklySchedule: [
+        {weekday: 8, startMinute: 0, endMinute: 60},
+      ]},
+      updatedAt: serverTimestamp(),
+    }));
+    await assertFails(updateDoc(aliceProfile, {
+      photoPath: 'bob/550e8400-e29b-41d4-a716-446655440000.jpg',
+      updatedAt: serverTimestamp(),
+    }));
     for (const [gameId, rank] of [
       ['apex_legends', 7], ['honor_of_kings', 9], ['league_of_legends', 9],
     ]) {

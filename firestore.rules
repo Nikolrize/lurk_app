@@ -391,13 +391,30 @@ service cloud.firestore {
           ]
         )
         && (!('apex_legends' in ranks)
-          || ranks.apex_legends is string && ranks.apex_legends in catalogueRankNumbers('apex_legends'))
+          || ranks.apex_legends in [
+            'rookie', 'bronze', 'silver', 'gold',
+            'platinum', 'diamond', 'master', 'apex_predator'
+          ])
         && (!('cs2' in ranks)
-          || ranks.cs2 is string && ranks.cs2 in catalogueRankNumbers('cs2'))
+          || ranks.cs2 in [
+            'silver_1', 'silver_2', 'silver_3', 'silver_4',
+            'silver_elite', 'silver_elite_master', 'gold_nova_1', 'gold_nova_2',
+            'gold_nova_3', 'gold_nova_master', 'master_guardian_1', 'master_guardian_2',
+            'master_guardian_elite', 'distinguished_master_guardian', 'legendary_eagle', 'legendary_eagle_master',
+            'supreme_master_first_class', 'global_elite'
+          ])
         && (!('honor_of_kings' in ranks)
-          || ranks.honor_of_kings is string && ranks.honor_of_kings in catalogueRankNumbers('honor_of_kings'))
+          || ranks.honor_of_kings in [
+            'bronze', 'silver', 'gold', 'platinum',
+            'diamond', 'master', 'grandmaster', 'mythic',
+            'epic', 'legend'
+          ])
         && (!('league_of_legends' in ranks)
-          || ranks.league_of_legends is string && ranks.league_of_legends in catalogueRankNumbers('league_of_legends'))
+          || ranks.league_of_legends in [
+            'iron', 'bronze', 'silver', 'gold',
+            'platinum', 'emerald', 'diamond', 'master',
+            'grandmaster', 'challenger'
+          ])
         && data.get('rank', null) == rankNumber(game, chosenRank);
     }
 
@@ -522,7 +539,7 @@ service cloud.firestore {
       )
     );
   }
-    function validPublicProfile(data) {
+    function validPublicProfileFields(data) {
       return data.keys().hasAll([
           'username', 'bio', 'region', 'createdAt', 'updatedAt'
         ])
@@ -545,7 +562,11 @@ service cloud.firestore {
         && data.region.size() <= 60
         && data.createdAt is timestamp
         && data.updatedAt is timestamp
-        && validSharing(data)
+        && validSharing(data);
+    }
+
+    function validPublicProfile(data) {
+      return validPublicProfileFields(data)
         && validGamingPreferences(data)
         && validAvailability(data)
         && validPhotoPath(data);
@@ -1035,33 +1056,29 @@ service cloud.firestore {
       function validProfileUpdate() {
         let data = request.resource.data;
         let changed = data.diff(resource.data).affectedKeys();
+        let profileFields = ['username', 'bio', 'region', 'updatedAt',
+          'sharedAge', 'ageSharedAt', 'sharedGender'];
+        let gamingFields = ['games', 'currentGame', 'mode', 'playstyles',
+          'communication', 'rank', 'gameRanks', 'updatedAt'];
 
-        return owns(uid)
-          && data.updatedAt == request.time
-          && (
-            (
-              changed.hasOnly(['photoPath', 'updatedAt'])
-              && validPhotoPath(data)
-            )
-            || (
-              changed.hasOnly(['availability', 'updatedAt'])
-              && validAvailability(data)
-            )
-            || (
-              changed.hasOnly([
-                'username', 'bio', 'region', 'updatedAt',
-                'sharedAge', 'ageSharedAt', 'sharedGender',
-                'games', 'currentGame', 'mode', 'playstyles',
-                'communication', 'rank', 'gameRanks',
-                'availability', 'photoPath'
-              ])
-              && validPublicProfile(data)
-              && (
-                !changed.hasAny(['availability'])
-                || validAvailability(data)
+        // Choose one validator for the section being saved. Unchanged sections
+        // cannot be altered by these writes and do not need revalidation.
+        return owns(uid) && data.updatedAt == request.time && (
+          changed.hasOnly(profileFields) ? validPublicProfileFields(data) : (
+            changed.hasOnly(gamingFields) ? validGamingPreferences(data) : (
+              changed.hasOnly(['availability', 'updatedAt']) ? validAvailability(data) : (
+                changed.hasOnly(['photoPath', 'updatedAt']) ? validPhotoPath(data) : (
+                  changed.hasOnly([
+                    'username', 'bio', 'region', 'updatedAt',
+                    'sharedAge', 'ageSharedAt', 'sharedGender',
+                    'games', 'currentGame', 'mode', 'playstyles',
+                    'communication', 'rank', 'gameRanks', 'availability', 'photoPath'
+                  ]) && validPublicProfile(data)
+                )
               )
             )
-          );
+          )
+        );
       }
       allow update: if validProfileUpdate();
 
