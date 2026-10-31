@@ -68,10 +68,18 @@ class RatingService {
       throw StateError('Choose another teammate and sign in again.');
     }
     final review = _reviews(target).doc('${partyId}_$uid');
+    final summary = _db.collection('player_rating_summaries').doc(target);
     await _db.runTransaction((tx) async {
       if ((await tx.get(review)).exists) {
         throw StateError('You already rated this teammate for this party.');
       }
+      final totals = (await tx.get(summary)).data();
+      tx.set(summary, {
+        'total': ((totals?['total'] as num?)?.toInt() ?? 0) + draft.stars,
+        'count': ((totals?['count'] as num?)?.toInt() ?? 0) + 1,
+        'lastReviewId': review.id,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
       tx.set(review, {
         'partyId': partyId,
         'raterId': uid,

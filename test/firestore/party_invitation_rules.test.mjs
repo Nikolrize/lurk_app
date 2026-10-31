@@ -9,10 +9,10 @@ test('chat invitations grant private access only to recipients and require valid
   await env.clearFirestore();
   await env.withSecurityRulesDisabled(async c=>{
    const db=c.firestore();
-   for(const uid of ['alice','bob','eve']) await setDoc(doc(db,'players/'+uid),{username:uid});
+   for(const uid of ['alice','bob','eve']) await setDoc(doc(db,'players/'+uid),{username:uid,region:'Asia'});
    await setDoc(doc(db,'chats/direct'),{type:'direct',userIds:['alice','bob'],createdAt:new Date(),updatedAt:new Date(),lastMessageId:'',lastMessagePreview:'',lastSenderId:''});
    for(const [id,visibility,status,count] of [['private','private','open',1],['public','public','open',1],['full','private','open',5],['closed','private','closed',0],['member','private','open',2]]) {
-    await setDoc(doc(db,'parties/'+id),{hostId:'alice',visibility,status,memberCount:count,maxPlayers:5});
+    await setDoc(doc(db,'parties/'+id),{region:'asia',hostId:'alice',visibility,status,memberCount:count,maxPlayers:5});
    }
    await setDoc(doc(db,'parties/member/members/bob'),{role:'member',joinedAt:new Date(),leftAt:null});
   });

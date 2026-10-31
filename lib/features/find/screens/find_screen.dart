@@ -1,3 +1,4 @@
+import '../../../providers/rating_provider.dart';
 import '../../parties/screens/create_party_screen.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../providers/party_provider.dart';
@@ -104,7 +105,34 @@ class _FindSreenState extends ConsumerState<FindSreen> {
               ),
         )
         .toList();
-    final playerState = ref.watch(discoverablePlayersProvider);
+    final sourcePlayers = ref.watch(discoverablePlayersProvider);
+    var playerState = sourcePlayers;
+    final ratings = <String, double?>{};
+    if (_showPlayers &&
+        _playerFilters.minimumRating > 0 &&
+        sourcePlayers.asData != null) {
+      Object? error;
+      StackTrace? stack;
+      var loading = false;
+      for (final player in sourcePlayers.asData!.value) {
+        final summary = ref.watch(ratingSummaryProvider(player.id));
+        if (summary.hasError) {
+          error = summary.error;
+          stack = summary.stackTrace;
+        } else if (summary.asData == null) {
+          loading = true;
+        }
+        final value = summary.asData?.value;
+        ratings[player.id] = value != null && value.count > 0
+            ? value.average
+            : null;
+      }
+      if (error != null) {
+        playerState = AsyncError(error, stack ?? StackTrace.current);
+      } else if (loading) {
+        playerState = const AsyncLoading();
+      }
+    }
     final players = (playerState.asData?.value ?? [])
         .where(
           (p) =>
@@ -113,13 +141,14 @@ class _FindSreenState extends ConsumerState<FindSreen> {
               ) &&
               _playerFilters.matches(
                 gameName: p.currentGame,
+                games: p.games,
                 regionName: p.region,
                 gameMode: p.mode,
                 styleOptions: p.playstyles,
-                rank: p.rank,
+                rank: p.rankForGame(_playerFilters.game ?? p.currentGame),
                 style: p.style,
                 comms: p.communication,
-                rating: p.rating,
+                rating: ratings[p.id],
                 playerAvailability: p.availability,
                 hasAvailability: p.isActive == true,
               ),
@@ -225,8 +254,13 @@ class _FindSreenState extends ConsumerState<FindSreen> {
                   ? Center(
                       child: PlayerLoadError(
                         error: playerState.error!,
-                        onRetry: () =>
-                            ref.invalidate(discoverablePlayersProvider),
+                        onRetry: () {
+                          ref.invalidate(discoverablePlayersProvider);
+                          for (final player
+                              in sourcePlayers.asData?.value ?? []) {
+                            ref.invalidate(ratingSummaryProvider(player.id));
+                          }
+                        },
                       ),
                     )
                   : !_showPlayers && partyState.isLoading

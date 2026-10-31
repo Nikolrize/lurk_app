@@ -1,3 +1,4 @@
+import '../core/data/gaming_regions.dart';
 import '../features/parties/models/party_history_entry.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../features/parties/models/party_draft.dart';
@@ -111,6 +112,30 @@ class PartyService {
       }
       if ((data['memberCount'] as num) >= (data['maxPlayers'] as num)) {
         throw StateError('This party is full.');
+      }
+      final profile = await transaction.get(
+        _firestore.collection('players').doc(expectedUid),
+      );
+      final partyRegion = GamingRegions.idFor(data['region'] as String?);
+      if (partyRegion == null ||
+          GamingRegions.idFor(profile.data()?['region'] as String?) !=
+              partyRegion) {
+        throw StateError(
+          'Your profile region must match this party’s region to join.',
+        );
+      }
+      final minimum = (data['minimumRating'] as num?)?.toDouble() ?? 0;
+      if (minimum > 0) {
+        final summary = (await transaction.get(
+          _firestore.collection('player_rating_summaries').doc(expectedUid),
+        )).data();
+        final count = (summary?['count'] as num?)?.toInt() ?? 0;
+        final total = (summary?['total'] as num?)?.toDouble() ?? 0;
+        if (count == 0 || total < minimum * count) {
+          throw StateError(
+            'This party requires a player rating of ${minimum.toStringAsFixed(1)} or above.',
+          );
+        }
       }
       if (membership.data()?['removedBy'] != null) {
         final invitation = await transaction.get(

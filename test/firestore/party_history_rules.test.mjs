@@ -30,6 +30,7 @@ test("history is private and only records verified atomic participation with aut
     },
   });
   try {
+    await env.withSecurityRulesDisabled(c => setDoc(doc(c.firestore(), 'players/bob'), {username:'Bob',region:'Asia'}));
     const alice = env.authenticatedContext("alice").firestore(),
       bob = env.authenticatedContext("bob").firestore(),
       eve = env.authenticatedContext("eve").firestore();

@@ -1,3 +1,4 @@
+import '../../../providers/rating_provider.dart';
 import '../../../core/widgets/game_icon.dart';
 import '../../../core/data/game_catalog.dart';
 import '../widgets/party_preview_drawer.dart';
@@ -479,6 +480,7 @@ class _PartyLobbyScreenState extends ConsumerState<PartyLobbyScreen> {
                           rank: member.rank,
                           photoPath: member.photoPath,
                           rating: member.rating,
+                          ratingLabel: member.ratingLabel,
                           micEnabled:
                               voice.connected && voice.partyId == party.id
                               ? (member.uid == viewerUid
@@ -719,6 +721,8 @@ class _HostCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final profile = ref.watch(playerProfileProvider(uid));
+    final rating = ref.watch(ratingSummaryProvider(uid));
+    final summary = rating.asData?.value;
     final game = GameCatalog.find(partyGame);
     final preferences = game?.supportsRanks == true
         ? ref.watch(gamingPreferencesProvider(uid))
@@ -746,6 +750,12 @@ class _HostCard extends ConsumerWidget {
           uid: uid,
           rank: rank,
           photoPath: profile?.photoPath,
+          rating: summary != null && summary.count > 0 ? summary.average : null,
+          ratingLabel: rating.isLoading
+              ? 'Loading rating…'
+              : rating.hasError
+              ? 'Rating unavailable'
+              : null,
           micEnabled: micEnabled,
           isSpeaking: isSpeaking,
           name: profile?.username.trim().isNotEmpty == true

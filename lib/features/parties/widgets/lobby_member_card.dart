@@ -112,7 +112,9 @@ class LobbyMemberCard extends StatelessWidget {
                             ),
                             const SizedBox(width: 4),
                             Text(
-                              member.rating?.toStringAsFixed(1) ?? 'Not rated',
+                              member.rating?.toStringAsFixed(1) ??
+                                  member.ratingLabel ??
+                                  'Not rated',
                               style: theme.textTheme.bodySmall,
                             ),
                           ],

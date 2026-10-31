@@ -7,6 +7,7 @@ class LobbyMember {
     this.rank,
     this.photoPath,
     this.rating,
+    this.ratingLabel,
     this.micEnabled,
     this.isSpeaking = false,
   });
@@ -14,6 +15,7 @@ class LobbyMember {
   final String? rank;
   final String? photoPath;
   final double? rating;
+  final String? ratingLabel;
   final bool? micEnabled;
   final bool isSpeaking;
 }

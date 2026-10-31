@@ -21,6 +21,38 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
+    // Totals change only together with one new, independently validated review.
+    function validRatingSummary(uid, reviewId, stars) {
+      let path = /databases/$(database)/documents/player_rating_summaries/$(uid);
+      let before = exists(path) ? get(path).data : {'total': 0, 'count': 0};
+      let after = getAfter(path).data;
+      return after.keys().hasAll(['total', 'count', 'lastReviewId', 'updatedAt'])
+        && after.keys().hasOnly(['total', 'count', 'lastReviewId', 'updatedAt'])
+        && after.total is int && after.count is int
+        && after.total == before.total + stars && after.count == before.count + 1
+        && after.lastReviewId == reviewId && after.updatedAt == request.time;
+    }
+    match /player_rating_summaries/{uid} {
+      allow get: if signedIn();
+      allow list, delete: if false;
+      allow create, update: if signedIn() && request.auth.uid != uid
+        && !exists(/databases/$(database)/documents/player_reviews/$(uid)/reviews/$(request.resource.data.lastReviewId))
+        && getAfter(/databases/$(database)/documents/player_reviews/$(uid)/reviews/$(request.resource.data.lastReviewId)).data.raterId == request.auth.uid
+        && validRatingSummary(uid, request.resource.data.lastReviewId,
+          getAfter(/databases/$(database)/documents/player_reviews/$(uid)/reviews/$(request.resource.data.lastReviewId)).data.stars);
+    }
+    function normalizedRegion(region) {
+      return {'Asia': 'asia', 'Europe': 'europe', 'North America': 'north_america',
+        'South America': 'south_america', 'Africa': 'africa', 'Oceania': 'oceania'}.get(region, region);
+    }
+    function meetsPartyRequirements(data) {
+      let profile = /databases/$(database)/documents/players/$(request.auth.uid);
+      let summary = /databases/$(database)/documents/player_rating_summaries/$(request.auth.uid);
+      let minimum = data.get('minimumRating', 0);
+      return normalizedRegion(get(profile).data.region) == data.region
+        && (minimum == 0 || (exists(summary) && get(summary).data.count > 0
+          && get(summary).data.total >= minimum * get(summary).data.count));
+    }
     match /player_reviews/{targetUid}/reviews/{reviewId} {
       function participatedTogether(partyId) {
         let party = get(/databases/$(database)/documents/parties/$(partyId)).data;
@@ -51,7 +83,8 @@ service cloud.firestore {
         && request.resource.data.comment is string && request.resource.data.comment.size() <= 500
         && request.resource.data.createdAt == request.time
         && exists(/databases/$(database)/documents/players/$(targetUid))
-        && participatedTogether(request.resource.data.partyId);
+        && participatedTogether(request.resource.data.partyId)
+        && validRatingSummary(targetUid, reviewId, request.resource.data.stars);
       allow update, delete: if false;
     }
     match /notification_preferences/{uid} {
@@ -933,12 +966,9 @@ service cloud.firestore {
           && (!existsAfter(/databases/$(database)/documents/party_host_slots/$(request.auth.uid))
             || getAfter(/databases/$(database)/documents/party_host_slots/$(request.auth.uid)).data.activeCount == 0)
           && resource.data.memberCount < resource.data.maxPlayers
+          && meetsPartyRequirements(resource.data)
           && (resource.data.visibility == 'public'
             || exists(/databases/$(database)/documents/parties/$(partyId)/invitations/$(request.auth.uid)))
-          && (!exists(member) || (get(member).data.leftAt != null
-            && (get(member).data.get('removedBy', null) == null
-              || (exists(/databases/$(database)/documents/parties/$(partyId)/invitations/$(request.auth.uid))
-                && get(/databases/$(database)/documents/parties/$(partyId)/invitations/$(request.auth.uid)).data.createdAt > get(member).data.leftAt))))
           && unblocked([resource.data.hostId, request.auth.uid])
           && joined.keys().hasAll(['role', 'joinedAt', 'leftAt'])
           && joined.keys().hasOnly(['role', 'joinedAt', 'leftAt'])
@@ -979,9 +1009,8 @@ service cloud.firestore {
             && get(/databases/$(database)/documents/parties/$(partyId)/members/$(request.resource.data.lastRemovedMemberId)).data.leftAt == null
             && getAfter(/databases/$(database)/documents/parties/$(partyId)/members/$(request.resource.data.lastRemovedMemberId)).data.leftAt == request.time
             && getAfter(/databases/$(database)/documents/parties/$(partyId)/members/$(request.resource.data.lastRemovedMemberId)).data.removedBy == request.auth.uid)
-          || (canJoin()
-            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['memberCount', 'updatedAt'])
-            && request.resource.data.memberCount == resource.data.memberCount + 1)
+          || (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['memberCount', 'updatedAt'])
+            && request.resource.data.memberCount == resource.data.memberCount + 1 && canJoin())
           || (leftSelf()
             && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'memberCount', 'updatedAt'])
             && (resource.data.hostId == request.auth.uid
@@ -1027,6 +1056,9 @@ service cloud.firestore {
         function joining() {
           let data = request.resource.data;
           return uid != parent().hostId && parent().status == 'open'
+            && (resource == null || resource.data.get('removedBy', null) == null
+              || (exists(/databases/$(database)/documents/parties/$(partyId)/invitations/$(uid))
+                && get(/databases/$(database)/documents/parties/$(partyId)/invitations/$(uid)).data.createdAt > resource.data.leftAt))
             && parent().memberCount < parent().maxPlayers
             && (parent().visibility == 'public' || exists(/databases/$(database)/documents/parties/$(partyId)/invitations/$(uid)))
             && data.keys().hasAll(['role', 'joinedAt', 'leftAt']) && data.keys().hasOnly(['role', 'joinedAt', 'leftAt'])

@@ -1,7 +1,7 @@
 import {readFileSync} from 'node:fs';
 import test from 'node:test';
 import {initializeTestEnvironment, assertSucceeds, assertFails} from '@firebase/rules-unit-testing';
-import {doc, setDoc, getDoc, updateDoc, deleteDoc, serverTimestamp, Timestamp} from 'firebase/firestore';
+import {doc, setDoc, getDoc, updateDoc, deleteDoc, serverTimestamp, Timestamp, runTransaction} from 'firebase/firestore';
 
 test('ratings require overlapping participation, reject self/duplicate/forged reviews, and remain immutable', async () => {
   const env = await initializeTestEnvironment({projectId: 'demo-lurk-ratings', firestore: {
@@ -24,6 +24,12 @@ test('ratings require overlapping participation, reject self/duplicate/forged re
     const alice = env.authenticatedContext('alice').firestore();
     const outsider = env.authenticatedContext('outsider').firestore();
     const guest = env.unauthenticatedContext().firestore();
+    const submit = (db, path, data) => runTransaction(db, async tx => {
+      const summary = doc(db, 'player_rating_summaries/'+path.split('/')[1]);
+      const before = (await tx.get(summary)).data() ?? {total:0,count:0};
+      tx.set(summary,{total:before.total+data.stars,count:before.count+1,lastReviewId:path.split('/')[3],updatedAt:serverTimestamp()});
+      tx.set(doc(db,path),data);
+    });
     const base = {partyId: 'squad', raterId: 'alice', stars: 5, tags: ['Friendly'], comment: 'Good teamwork', createdAt: serverTimestamp()};
     const path = 'player_reviews/bob/reviews/squad_alice';
     for (const patch of [{stars: 0}, {stars: 6}, {stars: 3.5}, {tags: ['fake']},
@@ -37,12 +43,16 @@ test('ratings require overlapping participation, reject self/duplicate/forged re
     await assertFails(setDoc(doc(outsider, 'player_reviews/bob/reviews/squad_outsider'), {...base, raterId: 'outsider'}));
     await assertFails(setDoc(doc(guest, path), base));
     await assertFails(setDoc(doc(alice, 'player_reviews/bob/reviews/arbitrary-id'), base));
-    await assertSucceeds(setDoc(doc(alice, path), base));
+    await assertSucceeds(submit(alice, path, base));
     await assertSucceeds(getDoc(doc(outsider, path)));
     await assertFails(getDoc(doc(guest, path)));
     await assertFails(setDoc(doc(alice, path), base));
     await assertFails(updateDoc(doc(alice, path), {stars: 1}));
     await assertFails(deleteDoc(doc(alice, path)));
-    await assertSucceeds(setDoc(doc(alice, 'player_reviews/bob/reviews/closed_alice'), {...base, partyId: 'closed', stars: 4, tags: [], comment: ''}));
+    await assertSucceeds(submit(alice, 'player_reviews/bob/reviews/closed_alice', {...base, partyId: 'closed', stars: 4, tags: [], comment: ''}));
+    const summary = (await getDoc(doc(alice,'player_rating_summaries/bob'))).data();
+    if(summary.total!==9||summary.count!==2)throw Error('Review totals did not update');
+    await assertFails(updateDoc(doc(alice,'player_rating_summaries/bob'),{total:100,count:1,updatedAt:serverTimestamp()}));
+    await assertFails(deleteDoc(doc(alice,'player_rating_summaries/bob')));
   } finally { await env.cleanup(); }
 });

@@ -1,3 +1,5 @@
+import 'package:lurk_app/providers/rating_provider.dart';
+import 'package:lurk_app/features/ratings/models/teammate_rating.dart';
 import 'package:lurk_app/models/gaming_preferences.dart';
 import 'package:lurk_app/providers/voice_provider.dart';
 import 'package:lurk_app/services/party_voice_service.dart';
@@ -115,6 +117,8 @@ void main() {
   testWidgets('Lobby ranks follow the party game and update live', (
     tester,
   ) async {
+    final ratings = StreamController<RatingSummary>();
+    addTearDown(ratings.close);
     final preferences = StreamController<GamingPreferences>();
     final parties = StreamController<Party?>();
     addTearDown(preferences.close);
@@ -122,6 +126,7 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
+          ratingSummaryProvider('host').overrideWith((ref) => ratings.stream),
           partyByIdProvider('party').overrideWith((ref) => parties.stream),
           partyMemberIdsProvider(
             'party',
@@ -172,6 +177,19 @@ void main() {
     );
     await tester.pumpAndSettle();
     expect(find.text('Epic'), findsOneWidget);
+    expect(find.text('Loading rating…'), findsOneWidget);
+    ratings.add(const RatingSummary(total: 9, count: 2));
+    await tester.pumpAndSettle();
+    expect(find.text('4.5'), findsOneWidget);
+    ratings.add(const RatingSummary(total: 15, count: 3));
+    await tester.pumpAndSettle();
+    expect(find.text('5.0'), findsOneWidget);
+    ratings.add(const RatingSummary());
+    await tester.pumpAndSettle();
+    expect(find.text('Not rated'), findsOneWidget);
+    ratings.addError(StateError('Ratings unavailable'));
+    await tester.pumpAndSettle();
+    expect(find.text('Rating unavailable'), findsOneWidget);
     expect(find.text('Diamond'), findsNothing);
     preferences.add(
       const GamingPreferences(gameRanks: {'mobile_legends': 'legend'}),

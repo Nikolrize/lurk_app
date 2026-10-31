@@ -29,6 +29,7 @@ test("switching leaves the previous squad atomically and failures preserve membe
   try {
     await env.withSecurityRulesDisabled(async (c) => {
       const db = c.firestore();
+      for (const uid of ["bob"]) await setDoc(doc(db, 'players/'+uid), {username:uid,region:'Asia'});
       for (const [id, visibility, count, max] of [
         ["old", "public", 2, 5],
         ["next", "public", 1, 5],
@@ -37,6 +38,7 @@ test("switching leaves the previous squad atomically and failures preserve membe
       ]) {
         await setDoc(doc(db, "parties/" + id), {
           hostId: "host-" + id,
+          region: "asia",
           title: "Squad " + id,
           gameId: "valorant",
           mode: "competitive",

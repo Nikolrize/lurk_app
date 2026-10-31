@@ -9,8 +9,9 @@ test('joins are atomic, bounded, private, idempotent and keep member rosters pro
   await env.clearFirestore();
   await env.withSecurityRulesDisabled(async c=>{
    const db=c.firestore();
+      for (const uid of ["alice","bob","eve","r1","r2","blocked","extra"]) await setDoc(doc(db, 'players/'+uid), {username:uid,region:'Asia'});
    for(const [id,visibility,status,size] of [['public','public','open',3],['private','private','open',3],['race','public','open',2],['ended','public','closed',3]]){
-    await setDoc(doc(db,'parties/'+id),{hostId:'alice',visibility,status,memberCount:1,maxPlayers:size});
+    await setDoc(doc(db,'parties/'+id),{region:'asia',hostId:'alice',visibility,status,memberCount:1,maxPlayers:size});
     await setDoc(doc(db,'parties/'+id+'/members/alice'),{role:'host',joinedAt:new Date(),leftAt:null});
    }
    await setDoc(doc(db,'parties/private/invitations/bob'),{hostId:'alice',chatId:'direct',messageId:'invite',createdAt:new Date()});
