@@ -1,3 +1,4 @@
+import 'party_history_screen.dart';
 import '../models/party.dart';
 import 'party_lobby_screen.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -8,9 +9,14 @@ import 'package:flutter/material.dart';
 import '../../../core/widgets/action_card.dart';
 
 class PartiesScreen extends ConsumerWidget {
-  const PartiesScreen({super.key, this.onQuickMatch, this.onOpenLobby});
+  const PartiesScreen({
+    super.key,
+    this.onQuickMatch,
+    this.onOpenLobby,
+    this.onHistory,
+  });
   final ValueChanged<Party>? onOpenLobby;
-  final VoidCallback? onQuickMatch;
+  final VoidCallback? onQuickMatch, onHistory;
 
   void _preview(BuildContext context, String title, String message) {
     showModalBottomSheet<void>(
@@ -82,11 +88,17 @@ class PartiesScreen extends ConsumerWidget {
                       icon: Icons.history_rounded,
                       title: 'Party History',
                       subtitle: 'List of completed party sessions',
-                      onTap: () => _preview(
-                        context,
-                        'Party History',
-                        'Completed sessions will appear here once party history is connected.',
-                      ),
+                      onTap:
+                          onHistory ??
+                          () => Navigator.of(context).push(
+                            MaterialPageRoute<void>(
+                              builder: (context) => Scaffold(
+                                body: PartyHistoryScreen(
+                                  onBack: () => Navigator.pop(context),
+                                ),
+                              ),
+                            ),
+                          ),
                     ),
                     const SizedBox(height: 32),
                     const Spacer(),
