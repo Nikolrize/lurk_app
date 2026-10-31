@@ -1,3 +1,4 @@
+import '../../../core/widgets/party_sound_scope.dart';
 import 'package:flutter/material.dart';
 import '../../../core/widgets/notification_gate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -53,7 +54,10 @@ class AuthGate extends ConsumerWidget {
               uid: user.uid,
               child: NotificationGate(
                 uid: user.uid,
-                child: AppShell(uid: user.uid),
+                child: PartySoundScope(
+                  uid: user.uid,
+                  child: AppShell(uid: user.uid),
+                ),
               ),
             ),
           ),

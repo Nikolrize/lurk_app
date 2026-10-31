@@ -1,3 +1,4 @@
+import 'party_membership_events.dart';
 import '../core/data/gaming_regions.dart';
 import '../features/parties/models/party_history_entry.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -86,6 +87,7 @@ class PartyService {
         'updatedAt': FieldValue.serverTimestamp(),
       });
     });
+    PartyMembershipEvents.emit(expectedUid, party.id, PartySound.join);
     return party.id;
   }
 
@@ -98,7 +100,10 @@ class PartyService {
     final party = _firestore.collection('parties').doc(id);
     final member = party.collection('members').doc(expectedUid);
     final current = _firestore.collection('party_memberships').doc(expectedUid);
-    await _firestore.runTransaction((transaction) async {
+    final switchedFrom = await _firestore.runTransaction<String?>((
+      transaction,
+    ) async {
+      String? previousActiveParty;
       final snapshot = await transaction.get(party);
       final membership = await transaction.get(member);
       final pointer = await transaction.get(current);
@@ -108,7 +113,7 @@ class PartyService {
       }
       if (data['hostId'] == expectedUid ||
           (membership.exists && membership.data()?['leftAt'] == null)) {
-        return;
+        return null;
       }
       if ((data['memberCount'] as num) >= (data['maxPlayers'] as num)) {
         throw StateError('This party is full.');
@@ -178,6 +183,7 @@ class PartyService {
               'End your hosted party session before joining another party.',
             );
           }
+          previousActiveParty = previousId;
           transaction.update(previousParty, {
             'memberCount':
                 (previous!.data()!['memberCount'] as num).toInt() - 1,
@@ -208,7 +214,14 @@ class PartyService {
         'partyId': id,
         'updatedAt': FieldValue.serverTimestamp(),
       });
+      return previousActiveParty ?? '';
     });
+    if (switchedFrom != null) {
+      if (switchedFrom.isNotEmpty) {
+        PartyMembershipEvents.emit(expectedUid, switchedFrom, PartySound.leave);
+      }
+      PartyMembershipEvents.emit(expectedUid, id, PartySound.join);
+    }
   }
 
   Stream<String?> watchJoinedPartyId(String uid) => _firestore
@@ -419,16 +432,16 @@ class PartyService {
     _checkAccount(expectedUid);
     final party = _firestore.collection('parties').doc(id);
     final member = party.collection('members').doc(expectedUid);
-    await _firestore.runTransaction((transaction) async {
+    final left = await _firestore.runTransaction<bool>((transaction) async {
       final snapshot = await transaction.get(party);
       final membership = await transaction.get(member);
       final data = snapshot.data();
       if (data == null || data['status'] != 'open') {
-        if (onlyIfActive) return;
+        if (onlyIfActive) return false;
         throw StateError('This party is already closed.');
       }
       if (!membership.exists || membership.data()?['leftAt'] != null) {
-        if (onlyIfActive) return;
+        if (onlyIfActive) return false;
         throw StateError('You are no longer in this party.');
       }
       final current = _firestore
@@ -456,7 +469,9 @@ class PartyService {
       });
       transaction.update(member, {'leftAt': FieldValue.serverTimestamp()});
       if (pointer.data()?['partyId'] == id) transaction.delete(current);
+      return true;
     });
+    if (left) PartyMembershipEvents.emit(expectedUid, id, PartySound.leave);
   }
 
   Stream<Party?> watchLatestHostedParty(String uid) {

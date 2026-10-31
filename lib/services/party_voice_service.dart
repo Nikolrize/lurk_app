@@ -52,6 +52,27 @@ class PartyVoiceService with WidgetsBindingObserver {
   Set<int> get _speaking => _activity.activeAt(DateTime.now());
   Timer? _speakingExpiry;
   void _refresh() => _emit(state);
+  Future<bool> playPartyEffect(String path, int soundId) async {
+    final engine = _engine;
+    if (engine == null || !state.connected) return false;
+    try {
+      await engine.playEffect(
+        soundId: soundId,
+        filePath: path,
+        loopCount: 0,
+        pitch: 1,
+        pan: 0,
+        gain: 40,
+        publish: false,
+      );
+      return true;
+    } catch (_) {
+      // Keep Agora's audio session intact even if this nonessential effect fails.
+      debugPrint('Party chime could not mix into voice.');
+      return true;
+    }
+  }
+
   Future<void> _resolveAccount(int uid, int generation) async {
     try {
       final info = await _engine?.getUserInfoByUid(uid);
