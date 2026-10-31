@@ -1,4 +1,5 @@
 import 'dart:convert';
+import '../features/chat/models/chat_receipt.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../features/chat/models/chat.dart';
 import '../features/chat/models/chat_message.dart';
@@ -10,6 +11,67 @@ class ChatService {
   ChatService({FirebaseFirestore? firestore})
     : _db = firestore ?? FirebaseFirestore.instance;
   final FirebaseFirestore _db;
+
+  static int countUnread(
+    Iterable<ChatMessage> messages,
+    String uid,
+    DateTime? after,
+  ) => messages
+      .where(
+        (message) =>
+            message.senderId != uid &&
+            !message.pending &&
+            message.createdAt != null &&
+            (after == null || message.createdAt!.isAfter(after)),
+      )
+      .length;
+
+  Stream<int> watchUnreadCount(String chatId, String uid, DateTime? after) {
+    Query<Map<String, dynamic>> query = _db
+        .collection('chats')
+        .doc(chatId)
+        .collection('messages');
+    if (after != null) {
+      query = query.where(
+        'createdAt',
+        isGreaterThan: Timestamp.fromDate(after),
+      );
+    }
+    return query
+        .snapshots(includeMetadataChanges: true)
+        .map(
+          (snapshot) => countUnread(
+            snapshot.docs.map(ChatMessage.fromDocument),
+            uid,
+            after,
+          ),
+        );
+  }
+
+  Stream<ChatReceipt> watchReceipt(String chatId, String uid) => _db
+      .collection('chats')
+      .doc(chatId)
+      .collection('receipts')
+      .doc(uid)
+      .snapshots()
+      .map((doc) => ChatReceipt.fromData(doc.data()));
+
+  Future<void> markRead(String chatId, String uid, ChatMessage message) async {
+    if (message.pending || message.createdAt == null) return;
+    final receipt = _db
+        .collection('chats')
+        .doc(chatId)
+        .collection('receipts')
+        .doc(uid);
+    await _db.runTransaction((tx) async {
+      final previous = ChatReceipt.fromData((await tx.get(receipt)).data());
+      if (previous.covers(message.createdAt)) return;
+      tx.set(receipt, {
+        'messageId': message.id,
+        'readThrough': Timestamp.fromDate(message.createdAt!),
+      });
+    });
+  }
 
   Stream<ChatSettings> watchSettings(String chatId, String uid) => _db
       .collection('chats')

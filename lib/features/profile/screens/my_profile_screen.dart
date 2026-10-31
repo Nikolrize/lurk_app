@@ -1,4 +1,5 @@
 import 'blocked_players_screen.dart';
+import 'notification_settings_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -49,11 +50,10 @@ class _MyProfileScreenState extends ConsumerState<MyProfileScreen> {
     if (_isBusy) return;
 
     Navigator.of(context).push<void>(
-      MaterialPageRoute(
-        builder: (_) => AvailabilityScreen(uid: widget.uid),
-      ),
+      MaterialPageRoute(builder: (_) => AvailabilityScreen(uid: widget.uid)),
     );
   }
+
   Future<void> _openGamingPreferences() async {
     if (_isBusy) return;
 
@@ -287,7 +287,8 @@ class _MyProfileScreenState extends ConsumerState<MyProfileScreen> {
                           uid: widget.uid,
                           onEdit: _isBusy
                               ? null
-                              : widget.onGamingPreferences ?? _openGamingPreferences,
+                              : widget.onGamingPreferences ??
+                                    _openGamingPreferences,
                         ),
                         const SizedBox(height: 24),
                         Text(
@@ -342,7 +343,9 @@ class _MyProfileScreenState extends ConsumerState<MyProfileScreen> {
                                   (
                                     icon: Icons.schedule_outlined,
                                     title: 'Availability',
-                                    onTap: widget.onAvailability ?? _openAvailability,
+                                    onTap:
+                                        widget.onAvailability ??
+                                        _openAvailability,
                                   ),
                                   (
                                     icon: Icons.history,
@@ -375,7 +378,14 @@ class _MyProfileScreenState extends ConsumerState<MyProfileScreen> {
                                   (
                                     icon: Icons.settings_outlined,
                                     title: 'Settings',
-                                    onTap: widget.onSettings,
+                                    onTap:
+                                        widget.onSettings ??
+                                        () => Navigator.of(context).push(
+                                          MaterialPageRoute<void>(
+                                            builder: (_) =>
+                                                const NotificationSettingsScreen(),
+                                          ),
+                                        ),
                                   ),
                                 ];
 

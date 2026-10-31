@@ -132,6 +132,8 @@ class _ChatTile extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final settings = ref.watch(chatSettingsProvider(chat.id));
     final clearedAt = settings.asData?.value.clearedAt;
+    final unreadCount =
+        ref.watch(unreadCountProvider(chat.id)).asData?.value ?? 0;
     final cleared =
         clearedAt != null &&
         chat.updatedAt != null &&
@@ -145,6 +147,7 @@ class _ChatTile extends ConsumerWidget {
         : chat.preview.isEmpty
         ? 'Say hello 👋'
         : '${chat.lastSenderId == uid ? 'You: ' : ''}${chat.preview}';
+    final unread = unreadCount > 0;
     return ListTile(
       contentPadding: const EdgeInsets.symmetric(vertical: 8),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -153,17 +156,58 @@ class _ChatTile extends ConsumerWidget {
         name,
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
-        style: Theme.of(context).textTheme.titleMedium,
+        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+          fontWeight: unread ? FontWeight.bold : FontWeight.w500,
+        ),
       ),
       subtitle: Text(
         preview,
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
-        style: const TextStyle(color: AppColors.textSecondary),
+        style: TextStyle(
+          color: unread ? AppColors.text : AppColors.textSecondary,
+        ),
       ),
-      trailing: Text(
-        chatTime(chat.updatedAt),
-        style: Theme.of(context).textTheme.bodySmall,
+      trailing: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            chatTime(chat.updatedAt),
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+          if (unread)
+            Padding(
+              padding: const EdgeInsets.only(top: 6),
+              child: Semantics(
+                label:
+                    '$unreadCount unread ${unreadCount == 1 ? 'message' : 'messages'}',
+                excludeSemantics: true,
+                child: Container(
+                  constraints: const BoxConstraints(
+                    minWidth: 22,
+                    minHeight: 22,
+                  ),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 2,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    unreadCount > 99 ? '99+' : '$unreadCount',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+        ],
       ),
       onTap: () => Navigator.of(context).push(
         MaterialPageRoute<void>(

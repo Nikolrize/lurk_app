@@ -7,6 +7,8 @@ import 'package:lurk_app/core/theme/app_theme.dart';
 
 import 'package:lurk_app/features/authentication/widgets/auth_gate.dart';
 import 'firebase_options.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
+import 'services/notification_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -15,6 +17,9 @@ Future<void> main() async {
 
   if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
     await GoogleSignIn.instance.initialize();
+  }
+  if (NotificationService.supported) {
+    FirebaseMessaging.onBackgroundMessage(notificationBackgroundHandler);
   }
   runApp(const ProviderScope(child: MyApp()));
 }

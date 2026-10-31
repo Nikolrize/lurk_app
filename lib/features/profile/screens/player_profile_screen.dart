@@ -186,15 +186,30 @@ class _PlayerProfileScreenState extends ConsumerState<PlayerProfileScreen> {
                     ],
                   ),
                   const SizedBox(height: 24),
-                  Text('About Me', style: text.titleLarge),
+                  Text(
+                    'About Me',
+                    style: text.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
                   const SizedBox(height: 8),
                   Text(player.bio.isEmpty ? 'No bio added yet.' : player.bio),
                   const SizedBox(height: 24),
-                  Text('Gaming Preferences', style: text.titleLarge),
+                  Text(
+                    'Gaming Preferences',
+                    style: text.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
                   const SizedBox(height: 8),
                   GamingPreferencesCard(uid: widget.uid),
                   const SizedBox(height: 24),
-                  Text('Availability', style: text.titleLarge),
+                  Text(
+                    'Availability',
+                    style: text.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
                   const SizedBox(height: 8),
                   AvailabilitySummaryCard(uid: widget.uid),
                   if (!own) ...[

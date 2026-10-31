@@ -24,17 +24,7 @@ class ChatMessageBubble extends StatelessWidget {
             ? Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 mainAxisSize: MainAxisSize.min,
-                children: [
-                  PartyInviteCard(partyId: message.partyId!),
-                  if (message.pending)
-                    const Text(
-                      'Sending…',
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: AppColors.textSecondary,
-                      ),
-                    ),
-                ],
+                children: [PartyInviteCard(partyId: message.partyId!)],
               )
             : Container(
                 padding: const EdgeInsets.symmetric(
@@ -51,17 +41,7 @@ class ChatMessageBubble extends StatelessWidget {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    SelectableText(message.text),
-                    if (message.pending)
-                      const Padding(
-                        padding: EdgeInsets.only(top: 4),
-                        child: Text(
-                          'Sending…',
-                          style: TextStyle(fontSize: 11, color: Colors.white70),
-                        ),
-                      ),
-                  ],
+                  children: [SelectableText(message.text)],
                 ),
               ),
       ),

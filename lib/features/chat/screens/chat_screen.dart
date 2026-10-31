@@ -1,3 +1,4 @@
+import 'dart:async';
 import '../../profile/screens/player_profile_screen.dart';
 import '../../../services/player_safety_service.dart';
 import 'package:flutter/material.dart';
@@ -17,8 +18,66 @@ class ChatScreen extends ConsumerStatefulWidget {
   ConsumerState<ChatScreen> createState() => _ChatScreenState();
 }
 
-class _ChatScreenState extends ConsumerState<ChatScreen> {
+class _ChatScreenState extends ConsumerState<ChatScreen>
+    with WidgetsBindingObserver {
   final _composer = TextEditingController();
+  final _scroll = ScrollController();
+  String? _lastReadId;
+  bool _markingRead = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _scroll.addListener(_tryMarkRead);
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) _tryMarkRead();
+  }
+
+  void _tryMarkRead() {
+    if (!mounted ||
+        _markingRead ||
+        _searching ||
+        ModalRoute.of(context)?.isCurrent != true ||
+        (WidgetsBinding.instance.lifecycleState != null &&
+            WidgetsBinding.instance.lifecycleState !=
+                AppLifecycleState.resumed) ||
+        (_scroll.hasClients && _scroll.offset > 80)) {
+      return;
+    }
+    final uid = ref.read(authStateProvider).asData?.value?.uid;
+    final items = ref
+        .read(messagesProvider((id: widget.chatId, limit: _limit)))
+        .asData
+        ?.value;
+    if (uid == null || items == null) return;
+    final committed = items
+        .where((m) => !m.pending && m.createdAt != null)
+        .toList();
+    if (committed.isEmpty) return;
+    final latest = committed.first;
+    if (_lastReadId == latest.id) return;
+    _markingRead = true;
+    unawaited(
+      ref
+          .read(chatServiceProvider)
+          .markRead(widget.chatId, uid, latest)
+          .then((_) {
+            _lastReadId = latest.id;
+          })
+          .catchError((Object error) {
+            debugPrint('Could not update read status: $error');
+          })
+          .whenComplete(() {
+            _markingRead = false;
+            if (mounted && _lastReadId == latest.id) _tryMarkRead();
+          }),
+    );
+  }
+
   bool _sending = false;
   String? _sendError;
   int _limit = 50;
@@ -80,6 +139,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _scroll.dispose();
     _composer.dispose();
     super.dispose();
   }
@@ -252,6 +313,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                     onRetry: () => ref.invalidate(messagesProvider(key)),
                   ),
                   data: (allItems) {
+                    WidgetsBinding.instance.addPostFrameCallback(
+                      (_) => _tryMarkRead(),
+                    );
                     final items = _query.isEmpty
                         ? allItems
                         : allItems
@@ -284,6 +348,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                     return Align(
                       alignment: Alignment.topCenter,
                       child: ListView.builder(
+                        controller: _scroll,
                         reverse: true,
                         shrinkWrap: true,
                         itemCount: items.length + 1,

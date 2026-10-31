@@ -1,6 +1,7 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'notification_service.dart';
 
 class FirebaseService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
@@ -65,7 +66,8 @@ class FirebaseService {
   }
 
   //sign out
-  Future<void> signOut() {
-    return _auth.signOut();
+  Future<void> signOut() async {
+    await NotificationService.instance.unregister();
+    await _auth.signOut();
   }
 }
