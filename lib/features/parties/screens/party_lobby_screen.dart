@@ -1,3 +1,4 @@
+import '../widgets/party_preview_drawer.dart';
 import '../../../providers/voice_provider.dart';
 import '../../../services/party_voice_service.dart';
 import 'package:flutter/material.dart';
@@ -39,6 +40,40 @@ class PartyLobbyScreen extends ConsumerStatefulWidget {
 class _PartyLobbyScreenState extends ConsumerState<PartyLobbyScreen> {
   bool _leaving = false;
   String? _removing;
+  @override
+  void initState() {
+    super.initState();
+    _scheduleVoiceConnection();
+  }
+
+  @override
+  void didUpdateWidget(covariant PartyLobbyScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.party.id != widget.party.id ||
+        oldWidget.viewerUid != widget.viewerUid) {
+      _scheduleVoiceConnection();
+    }
+  }
+
+  void _scheduleVoiceConnection() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted &&
+          viewerUid != null &&
+          widget.onToggleMic == null &&
+          ref.read(partyVoiceServiceProvider).configured) {
+        _connectVoice();
+      }
+    });
+  }
+
+  Future<void> _connectVoice() async {
+    try {
+      await ref.read(partyVoiceServiceProvider).connect(party.id);
+    } catch (_) {
+      /* The voice panel shows the connection error and retry. */
+    }
+  }
+
   Party get party =>
       ref.read(partyByIdProvider(widget.party.id)).asData?.value ??
       widget.party;
@@ -152,35 +187,11 @@ class _PartyLobbyScreenState extends ConsumerState<PartyLobbyScreen> {
   }
 
   void _details(BuildContext context) {
-    showModalBottomSheet<void>(
-      context: context,
-      showDragHandle: true,
-      builder: (context) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                party.title,
-                style: Theme.of(context).textTheme.headlineSmall,
-              ),
-              const SizedBox(height: 12),
-              Text('${party.gameName} · ${party.playStyle}'),
-              if (party.region != null) Text(party.region!),
-              const SizedBox(height: 8),
-              Text(
-                '${party.currentPlayers} / ${party.maxPlayers} players · ${party.visibility == 'private' ? 'Private' : 'Public'} party',
-              ),
-              if (party.description.isNotEmpty) ...[
-                const SizedBox(height: 16),
-                Text(party.description),
-              ],
-            ],
-          ),
-        ),
-      ),
+    showPartyPreview(
+      context,
+      party,
+      showJoinButton: false,
+      onEdit: viewerUid == party.hostId ? () => _edit(context) : null,
     );
   }
 
@@ -318,56 +329,78 @@ class _PartyLobbyScreenState extends ConsumerState<PartyLobbyScreen> {
                         ),
                       ),
                     ),
-                    PopupMenuButton<String>(
-                      tooltip: 'Party options',
-                      icon: const Icon(Icons.more_horiz),
-                      onSelected: (value) {
-                        if (value == 'voice') {
-                          ref.read(partyVoiceServiceProvider).disconnect();
-                        } else if (value == 'details') {
-                          if (viewerUid == party.hostId) {
-                            _edit(context);
-                          } else {
-                            _details(context);
-                          }
-                        } else {
-                          _leave(context);
-                        }
-                      },
-                      itemBuilder: (_) => [
-                        if (voice.connected && voice.partyId == party.id)
-                          const PopupMenuItem(
-                            value: 'voice',
-                            child: Text('Leave voice chat'),
-                          ),
-                        PopupMenuItem(
-                          value: 'details',
-                          child: Text(
-                            viewerUid == party.hostId
-                                ? 'Edit party'
-                                : 'Party details',
-                          ),
-                        ),
-                        PopupMenuItem(
-                          value: 'leave',
-                          child: Text('Leave party'),
-                        ),
-                      ],
-                    ),
                   ],
                 ),
                 const SizedBox(height: 22),
-                Text(
-                  party.title,
-                  style: text.headlineSmall?.copyWith(
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  '${party.currentPlayers} / ${party.maxPlayers} players · ${party.visibility == 'private' ? 'Private' : 'Public'} party',
-                  style: text.bodyMedium?.copyWith(
-                    color: colors.onSurfaceVariant,
+                Semantics(
+                  button: true,
+                  label: 'Party details',
+                  child: Card(
+                    margin: EdgeInsets.zero,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(24),
+                      side: BorderSide(
+                        color: colors.primary.withValues(alpha: .45),
+                      ),
+                    ),
+                    clipBehavior: Clip.antiAlias,
+                    child: Ink(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [
+                            colors.primary.withValues(alpha: .28),
+                            colors.secondary.withValues(alpha: .09),
+                            colors.surface,
+                          ],
+                        ),
+                      ),
+                      child: InkWell(
+                        onTap: () => _details(context),
+                        child: Padding(
+                          padding: const EdgeInsets.all(20),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      party.title,
+                                      style: text.headlineSmall?.copyWith(
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Text(
+                                      '${party.currentPlayers} / ${party.maxPlayers} players · ${party.visibility == 'private' ? 'Private' : 'Public'} party',
+                                      style: text.bodyMedium?.copyWith(
+                                        color: colors.onSurfaceVariant,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(width: 16),
+                              Container(
+                                width: 52,
+                                height: 52,
+                                decoration: BoxDecoration(
+                                  color: colors.primary.withValues(alpha: .28),
+                                  borderRadius: BorderRadius.circular(16),
+                                ),
+                                child: Icon(
+                                  Icons.sports_esports_rounded,
+                                  size: 28,
+                                  color: colors.onSurface,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
                   ),
                 ),
                 const SizedBox(height: 30),
@@ -388,7 +421,21 @@ class _PartyLobbyScreenState extends ConsumerState<PartyLobbyScreen> {
                     Padding(
                       padding: const EdgeInsets.only(bottom: 12),
                       child: LobbyMemberCard(
-                        member: member,
+                        member: LobbyMember(
+                          uid: member.uid,
+                          name: member.name,
+                          rank: member.rank,
+                          rating: member.rating,
+                          micEnabled:
+                              voice.connected && voice.partyId == party.id
+                              ? (member.uid == viewerUid
+                                    ? micEnabled
+                                    : voice.remoteMics[member.uid])
+                              : member.micEnabled,
+                          isSpeaking: voice.speakingPlayers.contains(
+                            member.uid,
+                          ),
+                        ),
                         isHost: member.uid == party.hostId,
                         onViewProfile: () => _profile(context, member.uid),
                         onRemove:
@@ -410,6 +457,7 @@ class _PartyLobbyScreenState extends ConsumerState<PartyLobbyScreen> {
                       padding: const EdgeInsets.only(bottom: 12),
                       child: _HostCard(
                         uid: uid,
+                        isSpeaking: voice.speakingPlayers.contains(uid),
                         isHost: uid == party.hostId,
                         micEnabled: uid == viewerUid
                             ? micEnabled
@@ -428,6 +476,7 @@ class _PartyLobbyScreenState extends ConsumerState<PartyLobbyScreen> {
                   if (party.hostId.isNotEmpty)
                     _HostCard(
                       uid: party.hostId,
+                      isSpeaking: voice.speakingPlayers.contains(party.hostId),
                       micEnabled: party.hostId == viewerUid
                           ? micEnabled
                           : voice.remoteMics[party.hostId],
@@ -442,20 +491,20 @@ class _PartyLobbyScreenState extends ConsumerState<PartyLobbyScreen> {
                     ),
                   const SizedBox(height: 12),
                 ],
-                OutlinedButton.icon(
-                  onPressed:
-                      party.isFull || viewerUid != party.hostId || _leaving
-                      ? null
-                      : onInvite ?? () => _invite(context),
-                  style: OutlinedButton.styleFrom(
-                    alignment: Alignment.centerLeft,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
+                if (viewerUid != null && viewerUid == party.hostId)
+                  OutlinedButton.icon(
+                    onPressed: party.isFull || _leaving
+                        ? null
+                        : onInvite ?? () => _invite(context),
+                    style: OutlinedButton.styleFrom(
+                      alignment: Alignment.centerLeft,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                     ),
+                    icon: const Icon(Icons.add),
+                    label: Text(party.isFull ? 'Party full' : 'Invite player'),
                   ),
-                  icon: const Icon(Icons.add),
-                  label: Text(party.isFull ? 'Party full' : 'Invite player'),
-                ),
               ],
             ),
           ),
@@ -481,6 +530,16 @@ class _PartyLobbyScreenState extends ConsumerState<PartyLobbyScreen> {
                       style: Theme.of(context).textTheme.bodySmall,
                     ),
                   ),
+                if (!voiceBusy &&
+                    !(voice.connected && voice.partyId == party.id))
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: TextButton.icon(
+                      onPressed: _connectVoice,
+                      icon: const Icon(Icons.headset_rounded, size: 18),
+                      label: const Text('Join voice'),
+                    ),
+                  ),
                 if (voice.error != null)
                   Padding(
                     padding: const EdgeInsets.only(bottom: 10),
@@ -493,7 +552,11 @@ class _PartyLobbyScreenState extends ConsumerState<PartyLobbyScreen> {
                   children: [
                     Expanded(
                       child: OutlinedButton.icon(
-                        onPressed: voiceBusy
+                        onPressed:
+                            voiceBusy ||
+                                (onToggleMic == null &&
+                                    !(voice.connected &&
+                                        voice.partyId == party.id))
                             ? null
                             : onToggleMic ?? () => _toggleVoice(context),
                         icon: Icon(
@@ -543,10 +606,12 @@ class _HostCard extends ConsumerWidget {
     required this.onViewProfile,
     this.isHost = true,
     this.micEnabled,
+    this.isSpeaking = false,
     this.onRemove,
   });
   final bool isHost;
   final bool? micEnabled;
+  final bool isSpeaking;
   final ValueChanged<String>? onRemove;
   final String uid;
   final VoidCallback onViewProfile;
@@ -570,6 +635,7 @@ class _HostCard extends ConsumerWidget {
         member: LobbyMember(
           uid: uid,
           micEnabled: micEnabled,
+          isSpeaking: isSpeaking,
           name: profile?.username.trim().isNotEmpty == true
               ? profile!.username
               : isHost

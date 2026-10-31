@@ -81,7 +81,11 @@ class PartyService {
     return party.id;
   }
 
-  Future<void> joinParty(String id, {required String expectedUid}) async {
+  Future<void> joinParty(
+    String id, {
+    required String expectedUid,
+    String? switchFromPartyId,
+  }) async {
     _checkAccount(expectedUid);
     final party = _firestore.collection('parties').doc(id);
     final member = party.collection('members').doc(expectedUid);
@@ -132,8 +136,24 @@ class PartyService {
             ? await transaction.get(previousParty)
             : null;
         if (previous?.data()?['status'] == 'open') {
-          throw StateError(
-            'Leave your current squad before joining another party.',
+          if (switchFromPartyId != previousId) {
+            throw StateError(
+              'Your current party changed. Reopen the preview and confirm switching parties.',
+            );
+          }
+          if (previousMember.data()?['role'] != 'member') {
+            throw StateError(
+              'End your hosted party session before joining another party.',
+            );
+          }
+          transaction.update(previousParty, {
+            'memberCount':
+                (previous!.data()!['memberCount'] as num).toInt() - 1,
+            'updatedAt': FieldValue.serverTimestamp(),
+          });
+          transaction.update(
+            previousParty.collection('members').doc(expectedUid),
+            {'leftAt': FieldValue.serverTimestamp()},
           );
         }
       }

@@ -8,24 +8,39 @@ import '../../profile/screens/player_profile_screen.dart';
 import '../actions/join_party.dart';
 import '../models/party.dart';
 
-Future<void> showPartyPreview(BuildContext context, Party party) =>
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      showDragHandle: true,
-      builder: (_) => DraggableScrollableSheet(
-        expand: false,
-        initialChildSize: .85,
-        minChildSize: .5,
-        maxChildSize: .95,
-        builder: (_, controller) =>
-            _PartyPreview(party: party, controller: controller),
-      ),
-    );
+Future<void> showPartyPreview(
+  BuildContext context,
+  Party party, {
+  bool showJoinButton = true,
+  VoidCallback? onEdit,
+}) => showModalBottomSheet<void>(
+  context: context,
+  isScrollControlled: true,
+  useSafeArea: true,
+  showDragHandle: true,
+  builder: (_) => DraggableScrollableSheet(
+    expand: false,
+    initialChildSize: .85,
+    minChildSize: .5,
+    maxChildSize: .95,
+    builder: (_, controller) => _PartyPreview(
+      party: party,
+      controller: controller,
+      showJoinButton: showJoinButton,
+      onEdit: onEdit,
+    ),
+  ),
+);
 
 class _PartyPreview extends ConsumerStatefulWidget {
-  const _PartyPreview({required this.party, required this.controller});
+  const _PartyPreview({
+    required this.party,
+    required this.controller,
+    required this.showJoinButton,
+    this.onEdit,
+  });
+  final bool showJoinButton;
+  final VoidCallback? onEdit;
   final Party party;
   final ScrollController controller;
   @override
@@ -63,6 +78,18 @@ class _PartyPreviewState extends ConsumerState<_PartyPreview> {
             controller: widget.controller,
             padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
             children: [
+              if (widget.onEdit != null)
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton.icon(
+                    onPressed: () {
+                      Navigator.of(context).pop();
+                      widget.onEdit!();
+                    },
+                    icon: const Icon(Icons.edit_outlined, size: 18),
+                    label: const Text('Edit party'),
+                  ),
+                ),
               Container(
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
@@ -259,44 +286,47 @@ class _PartyPreviewState extends ConsumerState<_PartyPreview> {
             ],
           ),
         ),
-        DecoratedBox(
-          decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.surface,
-            border: Border(
-              top: BorderSide(color: AppColors.outline.withValues(alpha: .65)),
+        if (widget.showJoinButton)
+          DecoratedBox(
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.surface,
+              border: Border(
+                top: BorderSide(
+                  color: AppColors.outline.withValues(alpha: .65),
+                ),
+              ),
             ),
-          ),
-          child: SafeArea(
-            top: false,
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(24, 12, 24, 16),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  if (_error != null && _error!.isNotEmpty)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 12),
-                      child: Text(
-                        _error!,
-                        style: TextStyle(
-                          color: Theme.of(context).colorScheme.error,
+            child: SafeArea(
+              top: false,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(24, 12, 24, 16),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    if (_error != null && _error!.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: Text(
+                          _error!,
+                          style: TextStyle(
+                            color: Theme.of(context).colorScheme.error,
+                          ),
                         ),
                       ),
+                    PartyJoinButton(
+                      party: party,
+                      preview: false,
+                      disabled: !ready || members.asData == null,
+                      onError: (message) {
+                        if (mounted) setState(() => _error = message);
+                      },
                     ),
-                  PartyJoinButton(
-                    party: party,
-                    preview: false,
-                    disabled: !ready || members.asData == null,
-                    onError: (message) {
-                      if (mounted) setState(() => _error = message);
-                    },
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),
-        ),
       ],
     );
   }

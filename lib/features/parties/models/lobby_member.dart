@@ -7,9 +7,11 @@ class LobbyMember {
     this.rank,
     this.rating,
     this.micEnabled,
+    this.isSpeaking = false,
   });
   final String uid, name;
   final String? rank;
   final double? rating;
   final bool? micEnabled;
+  final bool isSpeaking;
 }

@@ -17,6 +17,34 @@ import 'package:lurk_app/providers/party_provider.dart';
 import 'package:lurk_app/providers/player_provider.dart';
 import 'package:lurk_app/providers/profile_provider.dart';
 
+class LobbyVoiceService extends PartyVoiceService {
+  final events = StreamController<VoiceState>.broadcast();
+  int connections = 0, toggles = 0;
+  @override
+  bool get configured => true;
+  @override
+  Stream<VoiceState> get changes => events.stream;
+  @override
+  Future<void> connect(String partyId) async {
+    connections++;
+    state = VoiceState(partyId: partyId, connected: true, muted: true);
+    events.add(state);
+  }
+
+  @override
+  Future<void> toggle(String partyId) async {
+    toggles++;
+    state = VoiceState(partyId: partyId, connected: true, muted: !state.muted);
+    events.add(state);
+  }
+
+  @override
+  Future<void> dispose() async {
+    await events.close();
+    await super.dispose();
+  }
+}
+
 class LobbyPartyService extends Fake implements PartyService {
   int leaves = 0;
   int removals = 0;
@@ -71,6 +99,66 @@ const members = [
   ),
 ];
 void main() {
+  for (final viewer in ['host', 'alex']) {
+    testWidgets('Lobby auto-connects muted and restricts invites for $viewer', (
+      tester,
+    ) async {
+      final voice = LobbyVoiceService();
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            partyVoiceServiceProvider.overrideWithValue(voice),
+            partyByIdProvider(
+              'party',
+            ).overrideWith((ref) => Stream.value(party)),
+            myPartyMembershipProvider('party').overrideWith(
+              (ref) => Stream.value({'leftAt': null, 'role': 'member'}),
+            ),
+          ],
+          child: MaterialApp(
+            theme: AppTheme.dark,
+            home: Scaffold(
+              body: PartyLobbyScreen(
+                party: party,
+                viewerUid: viewer,
+                members: members,
+                onBack: () {},
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(voice.connections, 1);
+      expect(voice.state.muted, isTrue);
+      expect(voice.toggles, 0);
+      if (viewer == 'host') {
+        await tester.scrollUntilVisible(
+          find.text('Invite player'),
+          100,
+          scrollable: find.byType(Scrollable).first,
+        );
+        expect(
+          tester
+              .widget<OutlinedButton>(
+                find.widgetWithText(OutlinedButton, 'Invite player'),
+              )
+              .onPressed,
+          isNotNull,
+        );
+      } else {
+        expect(find.text('Invite player'), findsNothing);
+      }
+      await tester.tap(find.text('Mic: OFF'));
+      await tester.pumpAndSettle();
+      expect(voice.connections, 1);
+      expect(voice.toggles, 1);
+      expect(find.text('Mic: ON'), findsOneWidget);
+      await tester.pumpWidget(const SizedBox());
+      await voice.dispose();
+    });
+  }
+
   testWidgets(
     'Lobby shows roster and controls on a narrow phone without fake actions',
     (tester) async {
@@ -112,7 +200,15 @@ void main() {
         200,
         scrollable: find.byType(Scrollable).first,
       );
-      await tester.tap(find.text('Mic: OFF'));
+      expect(
+        tester
+            .widget<OutlinedButton>(
+              find.widgetWithText(OutlinedButton, 'Mic: OFF'),
+            )
+            .onPressed,
+        isNull,
+      );
+      await tester.tap(find.text('Join voice'));
       await tester.pumpAndSettle();
       expect(
         find.text(
@@ -275,10 +371,29 @@ void main() {
         connected: true,
         remoteCount: 1,
         remoteMics: {'alex': true},
+        speakingPlayers: {'alex'},
       ),
     );
     await tester.pumpAndSettle();
-    expect(find.text('· Mic on'), findsOneWidget);
+    expect(find.byTooltip('Unmuted'), findsOneWidget);
+    final activeCard = tester.widget<AnimatedContainer>(
+      find.byKey(const ValueKey('voice-card-alex')),
+    );
+    expect((activeCard.decoration! as BoxDecoration).boxShadow, isNotEmpty);
+    voice.add(
+      const VoiceState(
+        partyId: 'party',
+        connected: true,
+        remoteCount: 1,
+        remoteMics: {'alex': true},
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.byTooltip('Unmuted'), findsOneWidget);
+    final quietCard = tester.widget<AnimatedContainer>(
+      find.byKey(const ValueKey('voice-card-alex')),
+    );
+    expect((quietCard.decoration! as BoxDecoration).boxShadow, isEmpty);
     expect(find.textContaining('1 others in voice'), findsOneWidget);
     voice.add(
       const VoiceState(
@@ -289,14 +404,16 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    expect(find.text('· Mic on'), findsNothing);
-    expect(find.text('· Mic off'), findsNWidgets(2));
+    expect(find.byTooltip('Unmuted'), findsNothing);
+    expect(find.byTooltip('Muted'), findsNWidgets(2));
     await tester.tap(find.byTooltip('Options for Nicole'));
     await tester.pumpAndSettle();
     expect(find.text('Remove player'), findsNothing);
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
     await tester.ensureVisible(find.byTooltip('Options for Alex'));
+    await tester.ensureVisible(find.byTooltip('Options for Alex'));
+    await tester.pumpAndSettle();
     await tester.tap(find.byTooltip('Options for Alex'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Remove player'));
@@ -305,6 +422,8 @@ void main() {
     await tester.tap(find.text('Cancel'));
     await tester.pumpAndSettle();
     expect(service.removals, 0);
+    await tester.ensureVisible(find.byTooltip('Options for Alex'));
+    await tester.pumpAndSettle();
     await tester.tap(find.byTooltip('Options for Alex'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Remove player'));
