@@ -15,50 +15,63 @@ class RatePartyTeammatesScreen extends ConsumerWidget {
   final String partyId, partyTitle;
   @override
   Widget build(BuildContext context, WidgetRef ref) => Scaffold(
-    appBar: AppBar(title: const Text('Rate teammates')),
-    body: ref
-        .watch(ratingCandidatesProvider(partyId))
-        .when(
-          loading: () => const Center(child: CircularProgressIndicator()),
-          error: (_, stack) => Center(
-            child: TextButton(
-              onPressed: () =>
-                  ref.invalidate(ratingCandidatesProvider(partyId)),
-              child: const Text('Unable to load teammates. Tap to retry.'),
+    appBar: AppBar(
+      title: const Text(
+        'Rate teammates',
+        style: TextStyle(fontWeight: FontWeight.bold),
+      ),
+    ),
+    body: SafeArea(
+      top: false,
+      child: ref
+          .watch(ratingCandidatesProvider(partyId))
+          .when(
+            loading: () => const Center(child: CircularProgressIndicator()),
+            error: (_, stack) => Center(
+              child: TextButton(
+                onPressed: () =>
+                    ref.invalidate(ratingCandidatesProvider(partyId)),
+                child: const Text('Unable to load teammates. Tap to retry.'),
+              ),
             ),
-          ),
-          data: (players) => RefreshIndicator(
-            onRefresh: () async {
-              ref.invalidate(ratingCandidatesProvider(partyId));
-              try {
-                await ref.read(ratingCandidatesProvider(partyId).future);
-              } catch (_) {
-                /* The provider displays the retry state. */
-              }
-            },
-            child: ListView(
-              physics: const AlwaysScrollableScrollPhysics(),
-              padding: const EdgeInsets.all(24),
-              children: [
-                Text(partyTitle, style: Theme.of(context).textTheme.titleLarge),
-                const SizedBox(height: 8),
-                const Text(
-                  'Rate the teammates you played with. Feedback is optional for each player.',
-                ),
-                const SizedBox(height: 20),
-                if (players.isEmpty)
-                  const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 32),
-                    child: Text(
-                      'No eligible teammates for this session. Ratings become available after your participation ends.',
+            data: (players) => RefreshIndicator(
+              onRefresh: () async {
+                ref.invalidate(ratingCandidatesProvider(partyId));
+                try {
+                  await ref.read(ratingCandidatesProvider(partyId).future);
+                } catch (_) {
+                  /* The provider displays the retry state. */
+                }
+              },
+              child: ListView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.all(24),
+                children: [
+                  Text(
+                    partyTitle,
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.bold,
                     ),
                   ),
-                for (final player in players)
-                  _CandidateTile(partyId: partyId, player: player),
-              ],
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Rate the teammates you played with. Feedback is optional for each player.',
+                  ),
+                  const SizedBox(height: 20),
+                  if (players.isEmpty)
+                    const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 32),
+                      child: Text(
+                        'No eligible teammates for this session. Ratings become available after your participation ends.',
+                      ),
+                    ),
+                  for (final player in players)
+                    _CandidateTile(partyId: partyId, player: player),
+                ],
+              ),
             ),
           ),
-        ),
+    ),
   );
 }
 
@@ -71,6 +84,7 @@ class _CandidateTile extends ConsumerWidget {
     final profile = ref.watch(playerProfileProvider(player.uid));
     final name = profile.asData?.value?.username ?? 'Teammate';
     return Card(
+      margin: const EdgeInsets.only(bottom: 12),
       child: ListTile(
         minTileHeight: 88,
         minVerticalPadding: 16,
