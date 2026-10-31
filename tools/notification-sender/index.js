@@ -2,7 +2,7 @@ const {readFileSync} = require('node:fs');
 const {initializeApp, cert} = require('firebase-admin/app');
 const {getFirestore, FieldValue} = require('firebase-admin/firestore');
 const {getMessaging} = require('firebase-admin/messaging');
-const {createSender} = require('./sender');
+const {createSender, createPartySender} = require('./sender');
 const {watchMessages} = require('./watcher');
 
 async function main() {
@@ -30,6 +30,9 @@ async function main() {
   const db = getFirestore();
   const dryRun = args.includes('--dry-run');
   const store = {
+    party: async id => (await db.doc(`parties/${id}`).get()).data(),
+    partyMembers: async id => (await db.collection(`parties/${id}/members`).get()).docs
+      .map(doc => ({...doc.data(), id: doc.id})),
     preferences: async uid => (await db.doc(`notification_preferences/${uid}`).get()).data() ?? {},
     chat: async id => (await db.doc(`chats/${id}`).get()).data(),
     blocked: async (sender, recipient) => {
@@ -53,8 +56,9 @@ async function main() {
     },
   };
   const send = createSender({store, messaging: getMessaging(), dryRun});
+  const sendParty = createPartySender({store, messaging: getMessaging(), dryRun});
   let stopping = false;
-  const stopWatching = await watchMessages({db, send, onError: error => {
+  const stopWatching = await watchMessages({db, send, sendParty, onError: error => {
     console.error(`Firestore listener stopped (${error.code || 'unknown'}). Fix the connection/permissions and restart.`);
     process.exitCode = 1;
     void stop();

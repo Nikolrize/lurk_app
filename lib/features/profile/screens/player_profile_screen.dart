@@ -9,6 +9,7 @@ import '../../../providers/profile_provider.dart';
 import '../../../services/player_safety_service.dart';
 
 import 'report_player_screen.dart';
+import '../../ratings/widgets/player_rating_summary.dart';
 
 class PlayerProfileScreen extends ConsumerStatefulWidget {
   const PlayerProfileScreen({super.key, required this.uid});
@@ -185,6 +186,8 @@ class _PlayerProfileScreenState extends ConsumerState<PlayerProfileScreen> {
                       ),
                     ],
                   ),
+                  const SizedBox(height: 16),
+                  PlayerRatingSummary(uid: widget.uid),
                   const SizedBox(height: 24),
                   Text(
                     'About Me',

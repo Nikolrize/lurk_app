@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import '../../features/chat/screens/chat_screen.dart';
+import '../../features/chat/screens/party_chat_screen.dart';
 import '../../services/notification_service.dart';
 
 /// Mounted only after authentication and profile setup are complete.
@@ -53,7 +54,7 @@ class _NotificationGateState extends State<NotificationGate> {
 
   Future<void> _show(RemoteMessage message) async {
     if (!mounted || !_forThisUser(message)) return;
-    if (message.data['chatId'] != null) {
+    if (message.data['chatId'] != null || message.data['partyId'] != null) {
       try {
         final preferences = await FirebaseFirestore.instance
             .collection('notification_preferences')
@@ -71,7 +72,10 @@ class _NotificationGateState extends State<NotificationGate> {
     final notification = message.notification;
     if (notification == null) return;
     _dismissBanner();
-    final canOpen = message.data['chatId'] is String;
+    final canOpen =
+        message.data['chatId'] is String ||
+        (message.data['type'] == 'party_message' &&
+            message.data['partyId'] is String);
     final theme = Theme.of(context);
     _banner = OverlayEntry(
       builder: (_) => Positioned(
@@ -150,6 +154,10 @@ class _NotificationGateState extends State<NotificationGate> {
 
   Future<void> _open(RemoteMessage message) async {
     if (!mounted || _opening || !_forThisUser(message)) return;
+    if (message.data['type'] == 'party_message') {
+      await _openParty(message);
+      return;
+    }
     final chatId = message.data['chatId'];
     if (chatId is! String || chatId.isEmpty || chatId.contains('/')) return;
     _opening = true;
@@ -178,6 +186,41 @@ class _NotificationGateState extends State<NotificationGate> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('This conversation is no longer available.'),
+          ),
+        );
+      }
+    } finally {
+      _opening = false;
+    }
+  }
+
+  Future<void> _openParty(RemoteMessage message) async {
+    final id = message.data['partyId'];
+    if (id is! String || id.isEmpty || id.contains('/')) return;
+    _opening = true;
+    try {
+      final party = FirebaseFirestore.instance.collection('parties').doc(id);
+      final documents = await Future.wait([
+        party.get(const GetOptions(source: Source.server)),
+        party
+            .collection('members')
+            .doc(widget.uid)
+            .get(const GetOptions(source: Source.server)),
+      ]);
+      if (!mounted || !_forThisUser(message)) return;
+      if (documents[0].data()?['status'] != 'open' ||
+          !documents[1].exists ||
+          documents[1].data()?['leftAt'] != null) {
+        throw StateError('Party chat unavailable');
+      }
+      await Navigator.of(context).push(
+        MaterialPageRoute<void>(builder: (_) => PartyChatScreen(partyId: id)),
+      );
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('This party chat is no longer available.'),
           ),
         );
       }

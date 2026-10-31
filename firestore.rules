@@ -21,6 +21,39 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
+    match /player_reviews/{targetUid}/reviews/{reviewId} {
+      function participatedTogether(partyId) {
+        let party = get(/databases/$(database)/documents/parties/$(partyId)).data;
+        let me = get(/databases/$(database)/documents/parties/$(partyId)/members/$(request.auth.uid)).data;
+        let peer = get(/databases/$(database)/documents/parties/$(partyId)/members/$(targetUid)).data;
+        let sessionEnd = party.get('completedAt', null) is timestamp ? party.completedAt : party.updatedAt;
+        let myEnd = me.leftAt is timestamp ? me.leftAt : sessionEnd;
+        let peerEnd = peer.leftAt is timestamp ? peer.leftAt : (party.status == 'closed' ? sessionEnd : request.time);
+        return hasPartyHistory(partyId)
+          && (me.leftAt is timestamp || party.status == 'closed')
+          && me.joinedAt is timestamp && peer.joinedAt is timestamp
+          && myEnd is timestamp && peerEnd is timestamp
+          && me.joinedAt < myEnd && peer.joinedAt < peerEnd
+          && me.joinedAt < peerEnd && peer.joinedAt < myEnd;
+      }
+      allow read: if signedIn();
+      allow create: if signedIn() && request.auth.uid != targetUid
+        && request.resource.data.keys().hasOnly(['partyId', 'raterId', 'stars', 'tags', 'comment', 'createdAt'])
+        && request.resource.data.partyId is string
+        && request.resource.data.partyId.matches('[^/]+')
+        && reviewId == request.resource.data.partyId + '_' + request.auth.uid
+        && request.resource.data.raterId == request.auth.uid
+        && request.resource.data.stars is int
+        && request.resource.data.stars >= 1 && request.resource.data.stars <= 5
+        && request.resource.data.tags is list && request.resource.data.tags.size() <= 4
+        && request.resource.data.tags.toSet().size() == request.resource.data.tags.size()
+        && request.resource.data.tags.hasOnly(['Good communication', 'Team player', 'Friendly', 'Skilled'])
+        && request.resource.data.comment is string && request.resource.data.comment.size() <= 500
+        && request.resource.data.createdAt == request.time
+        && exists(/databases/$(database)/documents/players/$(targetUid))
+        && participatedTogether(request.resource.data.partyId);
+      allow update, delete: if false;
+    }
     match /notification_preferences/{uid} {
       allow read: if owns(uid);
       allow create, update: if owns(uid)
@@ -603,6 +636,24 @@ service cloud.firestore {
       function activeMember(uid) {
         return exists(/databases/$(database)/documents/parties/$(partyId)/members/$(uid))
           && get(/databases/$(database)/documents/parties/$(partyId)/members/$(uid)).data.leftAt == null;
+      }
+      // Party chat is separate from direct messages and requires live membership.
+      match /messages/{messageId} {
+        function chatAccess() {
+          return signedIn() && activeMember(request.auth.uid)
+            && get(/databases/$(database)/documents/parties/$(partyId)).data.status == 'open';
+        }
+        allow read: if chatAccess();
+        allow create: if chatAccess()
+          && request.resource.data.keys().hasOnly(['senderId', 'senderUsername', 'type', 'text', 'createdAt'])
+          && request.resource.data.senderId == request.auth.uid
+          && request.resource.data.senderUsername == get(/databases/$(database)/documents/players/$(request.auth.uid)).data.username
+          && request.resource.data.type == 'text'
+          && request.resource.data.text is string
+          && request.resource.data.text.size() > 0 && request.resource.data.text.size() <= 2000
+          && request.resource.data.text.matches('[\\s\\S]*[^\\s][\\s\\S]*')
+          && request.resource.data.createdAt == request.time;
+        allow update, delete: if false;
       }
       function canJoin() {
         let member = /databases/$(database)/documents/parties/$(partyId)/members/$(request.auth.uid);

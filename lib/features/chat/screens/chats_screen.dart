@@ -9,6 +9,7 @@ import '../widgets/chat_widgets.dart';
 import '../widgets/chat_error.dart';
 import 'chat_screen.dart';
 import 'new_message_screen.dart';
+import '../../profile/screens/player_profile_screen.dart';
 
 class ChatsScreen extends ConsumerStatefulWidget {
   const ChatsScreen({super.key});
@@ -151,7 +152,18 @@ class _ChatTile extends ConsumerWidget {
     return ListTile(
       contentPadding: const EdgeInsets.symmetric(vertical: 8),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      leading: ChatAvatar(name: name),
+      leading: Tooltip(
+        message: 'View $name profile',
+        child: InkWell(
+          onTap: () => Navigator.of(context).push(
+            MaterialPageRoute<void>(
+              builder: (_) => PlayerProfileScreen(uid: chat.otherUid(uid)),
+            ),
+          ),
+          borderRadius: BorderRadius.circular(24),
+          child: ChatAvatar(name: name),
+        ),
+      ),
       title: Text(
         name,
         maxLines: 1,

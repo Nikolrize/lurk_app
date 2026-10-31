@@ -212,7 +212,14 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
                     icon: const Icon(Icons.chevron_left),
                   ),
                   const SizedBox(width: 8),
-                  ChatAvatar(name: name),
+                  Tooltip(
+                    message: 'View player profile',
+                    child: InkWell(
+                      onTap: () => _menuAction('profile'),
+                      borderRadius: BorderRadius.circular(24),
+                      child: ChatAvatar(name: name),
+                    ),
+                  ),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Column(

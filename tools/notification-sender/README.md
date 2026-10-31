@@ -47,6 +47,25 @@ For a read-only test, run `npm run dry-run` instead of `npm start`, then send ne
 messages. Dry run reports eligible devices but does not send FCM, create claims,
 or delete tokens. Messages tested in dry run are not replayed when live mode starts.
 
+## Party chat notifications
+
+The sender watches messages in open parties as well as direct chats. Party messages
+do not need to update the parent party document. Active members receive **New party
+message**, excluding the author, departed/removed members, and people who joined
+after the message. Closed parties and authors without current membership are skipped.
+Both-direction blocks and the recipient's **Chat messages** switch apply.
+Message contents stay out of lock-screen previews.
+
+Restart the sender and Android app after updating. Join the same party with two
+accounts, put the receiving phone in the background, and send a new party message.
+Tap the push to open that party chat. If the member has left or the session ended,
+the app refuses to open the conversation. No new Firebase deployment or index is
+required beyond the rules already added for party chat.
+
+The watcher loads open parties and starts one message listener per open party.
+Firestore listener reads, member lookups and duplicate-prevention writes consume
+Spark quotas; monitor usage for larger groups. Old messages are not replayed.
+
 ## Behavior and limits
 
 - Starts with server time and processes messages committed after startup. Messages

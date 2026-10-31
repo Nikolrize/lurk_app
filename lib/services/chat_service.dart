@@ -238,34 +238,44 @@ class ChatService {
   }) async {
     final chat = _db.collection('chats').doc(chatId);
     final message = chat.collection('messages').doc();
-    final batch = _db.batch();
-    batch.set(message, {
-      'senderId': uid,
-      'text': text,
-      ...extra,
-      'createdAt': FieldValue.serverTimestamp(),
+    await _db.runTransaction((transaction) async {
+      final snapshot = await transaction.get(chat);
+      final ids = List<String>.from(snapshot.data()!['userIds'] as List);
+      final names = <String, String>{};
+      for (final id in ids) {
+        final player = await transaction.get(_db.collection('players').doc(id));
+        names[id] = player.data()!['username'] as String;
+      }
+      transaction.set(message, {
+        'senderId': uid,
+        'senderUsername': names[uid],
+        'text': text,
+        ...extra,
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+      if (inviteRecipient != null) {
+        transaction.set(
+          _db
+              .collection('parties')
+              .doc(extra['partyId'] as String)
+              .collection('invitations')
+              .doc(inviteRecipient),
+          {
+            'hostId': uid,
+            'chatId': chatId,
+            'messageId': message.id,
+            'createdAt': FieldValue.serverTimestamp(),
+          },
+        );
+      }
+      transaction.update(chat, {
+        'lastMessageId': message.id,
+        'lastMessagePreview': text,
+        'lastSenderId': uid,
+        'lastSenderUsername': names[uid],
+        'participantUsernames': names,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
     });
-    if (inviteRecipient != null) {
-      batch.set(
-        _db
-            .collection('parties')
-            .doc(extra['partyId'] as String)
-            .collection('invitations')
-            .doc(inviteRecipient),
-        {
-          'hostId': uid,
-          'chatId': chatId,
-          'messageId': message.id,
-          'createdAt': FieldValue.serverTimestamp(),
-        },
-      );
-    }
-    batch.update(chat, {
-      'lastMessageId': message.id,
-      'lastMessagePreview': text,
-      'lastSenderId': uid,
-      'updatedAt': FieldValue.serverTimestamp(),
-    });
-    await batch.commit();
   }
 }

@@ -88,7 +88,7 @@ class _NotificationSettingsScreenState
                   SwitchListTile(
                     title: const Text('Chat messages'),
                     subtitle: const Text(
-                      'Get notified when a player messages you.',
+                      'Get notified about direct and party chat messages.',
                     ),
                     value: data['messages'] != false,
                     onChanged: _saving
