@@ -1,3 +1,4 @@
+import 'voice_activity_tracker.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'package:agora_rtc_engine/agora_rtc_engine.dart';
@@ -18,10 +19,12 @@ class VoiceState {
     this.remoteMics = const {},
     this.remoteCount = 0,
     this.inputLevel = 0,
+    this.speakingPlayers = const {},
   });
   final String? partyId, error;
   final bool connecting, connected, muted;
   final Map<String, bool> remoteMics;
+  final Set<String> speakingPlayers;
   final int remoteCount, inputLevel;
 }
 
@@ -32,6 +35,7 @@ class PartyVoiceService with WidgetsBindingObserver {
     defaultValue: '8e12f857aa6641dc894b3a7b241d0b21',
   );
   static const tokenUrl = String.fromEnvironment('VOICE_TOKEN_URL');
+  bool get configured => tokenUrl.isNotEmpty;
   final _changes = StreamController<VoiceState>.broadcast();
   final List<StreamSubscription<dynamic>> _subscriptions = [];
   VoiceState state = const VoiceState();
@@ -45,6 +49,9 @@ class PartyVoiceService with WidgetsBindingObserver {
   final _accounts = <int, String>{};
   final _remoteMics = <int, bool>{};
   int _inputLevel = 0;
+  final _activity = VoiceActivityTracker();
+  Set<int> get _speaking => _activity.activeAt(DateTime.now());
+  Timer? _speakingExpiry;
   void _refresh() => _emit(state);
   Future<void> _resolveAccount(int uid, int generation) async {
     try {
@@ -67,6 +74,16 @@ class PartyVoiceService with WidgetsBindingObserver {
       error: next.error,
       remoteCount: _remoteMics.length,
       inputLevel: _inputLevel,
+      speakingPlayers: Set.unmodifiable({
+        if (_uid != null &&
+            next.connected &&
+            !next.muted &&
+            _speaking.contains(0))
+          _uid!,
+        for (final uid in _speaking)
+          if (uid != 0 && _accounts[uid] != null && _remoteMics[uid] == true)
+            _accounts[uid]!,
+      }),
       remoteMics: Map.unmodifiable({
         for (final entry in _remoteMics.entries)
           if (_accounts[entry.key] != null) _accounts[entry.key]!: entry.value,
@@ -106,22 +123,58 @@ class PartyVoiceService with WidgetsBindingObserver {
     return data;
   }
 
+  /// Mic controls never join a channel or start capture without permission.
   Future<void> toggle(String partyId) async {
-    if (_busy || _disposed) return;
+    if (_busy || _disposed || !state.connected || state.partyId != partyId) {
+      return;
+    }
+    _busy = true;
+    final generation = _generation;
+    try {
+      final muted = !state.muted;
+      if (!muted) {
+        final permission = await Permission.microphone.request();
+        if (_generation != generation || _disposed) return;
+        if (!permission.isGranted) {
+          _emit(
+            VoiceState(
+              partyId: partyId,
+              connected: true,
+              muted: true,
+              error:
+                  'Allow microphone access in phone settings to unmute. You can still listen.',
+            ),
+          );
+          return;
+        }
+      }
+      final engine = _engine;
+      if (engine == null || _generation != generation) return;
+      if (muted) {
+        await engine.muteLocalAudioStream(true);
+        await engine.enableLocalAudio(false);
+      } else {
+        await engine.enableLocalAudio(true);
+        await engine.updateChannelMediaOptions(
+          const ChannelMediaOptions(publishMicrophoneTrack: true),
+        );
+        await engine.muteLocalAudioStream(false);
+      }
+      if (_generation == generation) {
+        _emit(VoiceState(partyId: partyId, connected: true, muted: muted));
+      }
+    } finally {
+      _busy = false;
+    }
+  }
+
+  /// Join as a listener. Capture remains disabled until the player unmutes.
+  Future<void> connect(String partyId) async {
+    if (_busy || _disposed || (state.connected && state.partyId == partyId)) {
+      return;
+    }
     _busy = true;
     try {
-      if (state.connected && state.partyId == partyId) {
-        final muted = !state.muted;
-        if (muted) {
-          await _engine!.muteLocalAudioStream(true);
-          await _engine!.enableLocalAudio(false);
-        } else {
-          await _engine!.enableLocalAudio(true);
-          await _engine!.muteLocalAudioStream(false);
-        }
-        _emit(VoiceState(partyId: partyId, connected: true, muted: muted));
-        return;
-      }
       final endpoint = Uri.tryParse(tokenUrl);
       if (endpoint == null ||
           !endpoint.hasAuthority ||
@@ -144,13 +197,6 @@ class PartyVoiceService with WidgetsBindingObserver {
       }
       await disconnect();
       final generation = _generation;
-      final permission = await Permission.microphone.request();
-      if (!permission.isGranted) {
-        throw StateError(
-          'Allow microphone access in phone settings to use voice chat.',
-        );
-      }
-      if (_generation != generation || _disposed) return;
       final uid = FirebaseAuth.instance.currentUser?.uid;
       if (uid == null) throw StateError('Sign in to use voice chat.');
       _uid = uid;
@@ -166,12 +212,12 @@ class PartyVoiceService with WidgetsBindingObserver {
         ),
       );
       if (_generation != generation) return;
+      await engine.enableLocalAudio(false);
+      await engine.muteLocalAudioStream(true);
       await engine.enableAudio();
       await engine.disableVideo();
-      await engine.enableLocalAudio(true);
-      await engine.muteLocalAudioStream(false);
       await engine.enableAudioVolumeIndication(
-        interval: 500,
+        interval: 200,
         smooth: 3,
         reportVad: true,
       );
@@ -204,14 +250,14 @@ class PartyVoiceService with WidgetsBindingObserver {
                 connectionState == ConnectionStateType.connectionStateFailed) {
               unawaited(
                 disconnect(
-                  error: 'Voice connection lost. Tap Mic to reconnect.',
+                  error: 'Voice connection lost. Tap Join voice to reconnect.',
                 ),
               );
             }
           },
           onUserJoined: (_, uid, elapsed) {
             if (_generation != generation) return;
-            _remoteMics[uid] = true;
+            _remoteMics.putIfAbsent(uid, () => false);
             _refresh();
             unawaited(_resolveAccount(uid, generation));
           },
@@ -222,6 +268,7 @@ class PartyVoiceService with WidgetsBindingObserver {
           },
           onUserOffline: (_, uid, reason) {
             if (_generation != generation) return;
+            _activity.remove(uid);
             _remoteMics.remove(uid);
             _accounts.remove(uid);
             _refresh();
@@ -229,6 +276,7 @@ class PartyVoiceService with WidgetsBindingObserver {
           onUserMuteAudio: (_, uid, muted) {
             if (_generation != generation) return;
             _remoteMics[uid] = !muted;
+            if (muted) _activity.remove(uid);
             _refresh();
             unawaited(_resolveAccount(uid, generation));
           },
@@ -236,6 +284,7 @@ class PartyVoiceService with WidgetsBindingObserver {
             if (_generation != generation) return;
             if (reason == RemoteAudioStateReason.remoteAudioReasonRemoteMuted) {
               _remoteMics[uid] = false;
+              _activity.remove(uid);
             } else if (audioState ==
                     RemoteAudioState.remoteAudioStateDecoding ||
                 reason ==
@@ -259,10 +308,31 @@ class PartyVoiceService with WidgetsBindingObserver {
           },
           onAudioVolumeIndication: (_, speakers, speakerCount, total) {
             if (_generation != generation) return;
-            _inputLevel = 0;
+            final levels = <int, int>{};
             for (final speaker in speakers) {
-              if (speaker.uid == 0) _inputLevel = speaker.volume ?? 0;
+              final uid = speaker.uid;
+              if (uid == null) continue;
+              final volume = speaker.volume ?? 0;
+              levels[uid] = volume;
+              if (uid == 0) {
+                _inputLevel = volume;
+              } else if (volume > 10) {
+                // Received audio confirms publishing even if a mute event was missed.
+                _remoteMics[uid] = true;
+                if (!_accounts.containsKey(uid)) {
+                  unawaited(_resolveAccount(uid, generation));
+                }
+              }
             }
+            _activity.update(levels, DateTime.now());
+            _speakingExpiry ??= Timer.periodic(
+              const Duration(milliseconds: 200),
+              (_) {
+                if (_generation != generation || _disposed) return;
+                if (!_speaking.contains(0)) _inputLevel = 0;
+                _refresh();
+              },
+            );
             _refresh();
           },
           onRequestToken: (_) => unawaited(_renew()),
@@ -281,7 +351,7 @@ class PartyVoiceService with WidgetsBindingObserver {
         options: const ChannelMediaOptions(
           autoSubscribeAudio: true,
           enableAudioRecordingOrPlayout: true,
-          publishMicrophoneTrack: true,
+          publishMicrophoneTrack: false,
           publishCameraTrack: false,
         ),
       );
@@ -289,7 +359,7 @@ class PartyVoiceService with WidgetsBindingObserver {
       if (_generation != generation) return;
       await engine.muteAllRemoteAudioStreams(false);
       await engine.setEnableSpeakerphone(true);
-      _emit(VoiceState(partyId: partyId, connected: true, muted: false));
+      _emit(VoiceState(partyId: partyId, connected: true, muted: true));
       _renewTimer = Timer.periodic(
         const Duration(seconds: 60),
         (_) => unawaited(_renew()),
@@ -361,6 +431,9 @@ class PartyVoiceService with WidgetsBindingObserver {
 
   Future<void> disconnect({String? error}) async {
     _generation++;
+    _speakingExpiry?.cancel();
+    _speakingExpiry = null;
+    _activity.clear();
     _accounts.clear();
     _remoteMics.clear();
     _inputLevel = 0;
@@ -402,7 +475,7 @@ class PartyVoiceService with WidgetsBindingObserver {
       unawaited(
         disconnect(
           error:
-              'Voice paused while the app is in the background. Tap Mic to reconnect.',
+              'Voice paused while the app is in the background. Tap Join voice to reconnect.',
         ),
       );
     }

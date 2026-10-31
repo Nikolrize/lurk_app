@@ -1,3 +1,4 @@
+import '../../../providers/voice_provider.dart';
 import '../widgets/party_preview_drawer.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
@@ -27,9 +28,10 @@ class _PartyJoinButtonState extends ConsumerState<PartyJoinButton> {
   Widget build(BuildContext context) {
     final uid = ref.watch(authStateProvider).asData?.value?.uid;
     final joined = ref.watch(joinedPartyIdProvider).asData?.value;
-    final membership = joined == widget.party.id
-        ? ref.watch(myPartyMembershipProvider(widget.party.id)).asData?.value
+    final membership = joined != null
+        ? ref.watch(myPartyMembershipProvider(joined)).asData?.value
         : null;
+    if (joined != null) ref.watch(partyByIdProvider(joined));
     final alreadyJoined =
         (uid != null && uid == widget.party.hostId) ||
         (joined == widget.party.id &&
@@ -38,7 +40,7 @@ class _PartyJoinButtonState extends ConsumerState<PartyJoinButton> {
     return FilledButton(
       onPressed:
           widget.disabled ||
-              (widget.preview && uid != null && uid == widget.party.hostId) ||
+              alreadyJoined ||
               _joining ||
               (!widget.preview && widget.party.isFull && !alreadyJoined)
           ? null
@@ -89,7 +91,47 @@ Future<void> joinPartyAndOpen(
     return;
   }
   try {
-    await ref.read(partyServiceProvider).joinParty(party.id, expectedUid: uid);
+    String? switchFrom;
+    final currentId = await ref.read(joinedPartyIdProvider.future);
+    if (currentId != null && currentId != party.id) {
+      final membership = await ref.read(
+        myPartyMembershipProvider(currentId).future,
+      );
+      if (membership != null && membership['leftAt'] == null) {
+        final current = await ref.read(partyByIdProvider(currentId).future);
+        if (current != null && current.status == 'open') {
+          if (!context.mounted) return;
+          final confirmed = await showDialog<bool>(
+            context: context,
+            builder: (dialogContext) => AlertDialog(
+              title: const Text('Switch parties?'),
+              content: Text(
+                'You will leave "${current.title}" and join "${party.title}". Your current voice chat will disconnect.',
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(dialogContext, false),
+                  child: const Text('Cancel'),
+                ),
+                FilledButton(
+                  onPressed: () => Navigator.pop(dialogContext, true),
+                  child: const Text('Switch Party'),
+                ),
+              ],
+            ),
+          );
+          if (confirmed != true || !context.mounted) return;
+          switchFrom = currentId;
+        }
+      }
+    }
+    await ref
+        .read(partyServiceProvider)
+        .joinParty(party.id, expectedUid: uid, switchFromPartyId: switchFrom);
+    final voice = ref.read(partyVoiceServiceProvider);
+    if (switchFrom != null && voice.state.partyId == switchFrom) {
+      await voice.disconnect();
+    }
     if (!context.mounted) return;
     ref.read(lobbyNavigationProvider.notifier).open(party);
     Navigator.of(context).popUntil((route) => route.isFirst);
