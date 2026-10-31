@@ -60,10 +60,6 @@ class _AppShellState extends ConsumerState<AppShell> {
           index: _selectedIndex,
           children: [
             HomeScreen(
-              onFindParties: () => setState(() {
-                _findGame = null;
-                _selectedIndex = 1;
-              }),
               onFindGame: (game) => setState(() {
                 _findGame = game;
                 _selectedIndex = 1;
@@ -77,7 +73,6 @@ class _AppShellState extends ConsumerState<AppShell> {
                         )
                       : PartiesScreen(
                           onHistory: () => setState(() => _showHistory = true),
-                          onQuickMatch: () => _selectTab(1),
                           onOpenLobby: (party) {
                             setState(() {
                               _lobbyParty = party;

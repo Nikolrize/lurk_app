@@ -1,6 +1,6 @@
+import '../../parties/widgets/quick_match_card.dart';
 import '../widgets/home_games.dart';
 import '../../../providers/profile_provider.dart';
-import '../../../core/widgets/action_card.dart';
 import '../../../providers/player_provider.dart';
 import '../../player/widgets/player_load_error.dart';
 import '../../profile/screens/player_profile_screen.dart';
@@ -14,30 +14,8 @@ import '../../../core/theme/app_colors.dart';
 import '../../../providers/auth_provider.dart';
 
 class HomeScreen extends ConsumerWidget {
-  const HomeScreen({super.key, this.onFindParties, this.onFindGame});
-  final VoidCallback? onFindParties;
+  const HomeScreen({super.key, this.onFindGame});
   final ValueChanged<String>? onFindGame;
-
-  void _preview(BuildContext context, String title, String description) {
-    showModalBottomSheet<void>(
-      context: context,
-      showDragHandle: true,
-      builder: (context) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(title, style: Theme.of(context).textTheme.headlineSmall),
-              const SizedBox(height: 12),
-              Text(description),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -80,18 +58,7 @@ class HomeScreen extends ConsumerWidget {
             style: text.bodyLarge?.copyWith(color: AppColors.textSecondary),
           ),
           const SizedBox(height: 20),
-          ActionCard(
-            icon: Icons.bolt_rounded,
-            title: 'Quick Match',
-            subtitle: 'Join a party or find players now',
-            onTap:
-                onFindParties ??
-                () => _preview(
-                  context,
-                  'Quick Match',
-                  'Matching is not connected yet.',
-                ),
-          ),
+          const QuickMatchCard(),
           const SizedBox(height: 28),
           Text(
             'Games you play',
