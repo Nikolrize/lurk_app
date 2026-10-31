@@ -1,6 +1,7 @@
+import 'voice_token_client.dart';
+import '../core/config/voice_config.dart';
 import 'voice_activity_tracker.dart';
 import 'dart:async';
-import 'dart:convert';
 import 'package:agora_rtc_engine/agora_rtc_engine.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -13,6 +14,7 @@ class VoiceState {
   const VoiceState({
     this.partyId,
     this.connecting = false,
+    this.serverWaking = false,
     this.connected = false,
     this.muted = true,
     this.error,
@@ -22,7 +24,7 @@ class VoiceState {
     this.speakingPlayers = const {},
   });
   final String? partyId, error;
-  final bool connecting, connected, muted;
+  final bool connecting, connected, muted, serverWaking;
   final Map<String, bool> remoteMics;
   final Set<String> speakingPlayers;
   final int remoteCount, inputLevel;
@@ -30,11 +32,8 @@ class VoiceState {
 
 /// Foreground-only voice for the free local-server demo. No certificate belongs in this client.
 class PartyVoiceService with WidgetsBindingObserver {
-  static const appId = String.fromEnvironment(
-    'AGORA_APP_ID',
-    defaultValue: '8e12f857aa6641dc894b3a7b241d0b21',
-  );
-  static const tokenUrl = String.fromEnvironment('VOICE_TOKEN_URL');
+  static String get appId => VoiceConfig.current.appId;
+  static String get tokenUrl => VoiceConfig.current.tokenUrl;
   bool get configured => tokenUrl.isNotEmpty;
   final _changes = StreamController<VoiceState>.broadcast();
   final List<StreamSubscription<dynamic>> _subscriptions = [];
@@ -69,6 +68,7 @@ class PartyVoiceService with WidgetsBindingObserver {
     state = VoiceState(
       partyId: next.partyId,
       connecting: next.connecting,
+      serverWaking: next.serverWaking,
       connected: next.connected,
       muted: next.muted,
       error: next.error,
@@ -92,27 +92,27 @@ class PartyVoiceService with WidgetsBindingObserver {
     if (!_changes.isClosed) _changes.add(state);
   }
 
-  Future<Map<String, dynamic>> _token(String partyId, String uid) async {
+  Future<Map<String, dynamic>> _token(
+    String partyId,
+    String uid, {
+    bool warmUp = false,
+    void Function(bool waiting)? onServerWaitChanged,
+  }) async {
     final user = FirebaseAuth.instance.currentUser;
     if (user?.uid != uid) throw StateError('Sign in again to use voice chat.');
     final idToken = await user!.getIdToken();
-    final response = await http
-        .post(
-          Uri.parse(tokenUrl),
-          headers: {
-            'Authorization': 'Bearer $idToken',
-            'Content-Type': 'application/json',
-          },
-          body: jsonEncode({'partyId': partyId}),
-        )
-        .timeout(const Duration(seconds: 10));
-    final data = jsonDecode(response.body) as Map<String, dynamic>;
-    if (response.statusCode != 200) {
-      throw StateError(
-        data['error'] is String
-            ? data['error'] as String
-            : 'Unable to join voice chat.',
+    final client = http.Client();
+    late Map<String, dynamic> data;
+    try {
+      data = await VoiceTokenClient(client: client).request(
+        endpoint: Uri.parse(tokenUrl),
+        idToken: idToken!,
+        partyId: partyId,
+        warmUp: warmUp,
+        onServerWaitChanged: onServerWaitChanged,
       );
+    } finally {
+      client.close();
     }
     if (data['appId'] != appId ||
         data['account'] != uid ||
@@ -180,7 +180,7 @@ class PartyVoiceService with WidgetsBindingObserver {
           !endpoint.hasAuthority ||
           !['http', 'https'].contains(endpoint.scheme)) {
         throw StateError(
-          'Voice chat is not configured. Run with config/voice.local.json.',
+          'Voice chat is not configured. Set VOICE_TOKEN_URL in config/voice.local.json and restart the app.',
         );
       }
       if (kReleaseMode && endpoint.scheme != 'https') {
@@ -201,12 +201,30 @@ class PartyVoiceService with WidgetsBindingObserver {
       if (uid == null) throw StateError('Sign in to use voice chat.');
       _uid = uid;
       _emit(VoiceState(partyId: partyId, connecting: true));
-      final token = await _token(partyId, uid);
+      final token = await _token(
+        partyId,
+        uid,
+        warmUp: true,
+        onServerWaitChanged: (waiting) {
+          if (_generation == generation && !_disposed) {
+            _emit(
+              VoiceState(
+                partyId: partyId,
+                connecting: true,
+                serverWaking: waiting,
+              ),
+            );
+          }
+        },
+      );
+      if (FirebaseAuth.instance.currentUser?.uid != uid) {
+        throw StateError('Sign in again to use voice chat.');
+      }
       if (_generation != generation) return;
       final engine = createAgoraRtcEngine();
       _engine = engine;
       await engine.initialize(
-        const RtcEngineContext(
+        RtcEngineContext(
           appId: appId,
           channelProfile: ChannelProfileType.channelProfileCommunication,
         ),
@@ -367,7 +385,7 @@ class PartyVoiceService with WidgetsBindingObserver {
     } catch (error) {
       final message = error is StateError
           ? error.message.toString()
-          : 'Unable to connect voice chat. Check the local server and your connection.';
+          : 'Unable to connect voice chat. Check your connection and try Join voice again.';
       await disconnect(error: message);
       throw StateError(message);
     } finally {

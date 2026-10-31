@@ -521,6 +521,29 @@ class _PartyLobbyScreenState extends ConsumerState<PartyLobbyScreen> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
+                if (voiceBusy)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            voice.serverWaking
+                                ? 'Waiting for voice server… It may be waking up. This can take about a minute.'
+                                : 'Connecting to voice…',
+                            style: Theme.of(context).textTheme.bodySmall,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 if (voice.connected && voice.partyId == party.id)
                   Padding(
                     padding: const EdgeInsets.only(bottom: 10),
