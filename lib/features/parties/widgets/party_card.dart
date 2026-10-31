@@ -1,12 +1,13 @@
+import '../actions/join_party.dart';
 import 'package:flutter/material.dart';
 
 import '../models/party.dart';
 
 class PartyCard extends StatelessWidget {
   final Party party;
-  final VoidCallback onJoin;
+  final VoidCallback? onJoin;
 
-  const PartyCard({super.key, required this.party, required this.onJoin});
+  const PartyCard({super.key, required this.party, this.onJoin});
 
   @override
   Widget build(BuildContext context) {
@@ -34,10 +35,12 @@ class PartyCard extends StatelessWidget {
             const SizedBox(height: 16),
             SizedBox(
               width: double.infinity,
-              child: FilledButton(
-                onPressed: party.isFull ? null : onJoin,
-                child: Text(party.isFull ? 'Party Full' : 'Join Party'),
-              ),
+              child: onJoin == null
+                  ? PartyJoinButton(party: party)
+                  : FilledButton(
+                      onPressed: party.isFull ? null : onJoin,
+                      child: Text(party.isFull ? 'Party Full' : 'Join Party'),
+                    ),
             ),
           ],
         ),

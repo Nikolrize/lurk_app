@@ -13,6 +13,7 @@ import 'package:lurk_app/features/chat/widgets/chat_error.dart';
 import 'package:lurk_app/models/player_profile.dart';
 import 'package:lurk_app/providers/auth_provider.dart';
 import 'package:lurk_app/providers/chat_provider.dart';
+import 'package:lurk_app/providers/party_provider.dart';
 import 'package:lurk_app/providers/profile_provider.dart';
 import 'package:lurk_app/services/chat_service.dart';
 import 'package:lurk_app/features/chat/models/chat_receipt.dart';
@@ -339,7 +340,7 @@ void main() {
       final service = _ChatService();
       const party = Party(
         id: 'party1',
-        hostId: 'alice',
+        hostId: 'bob',
         title: 'Ranked tonight',
         gameName: 'Valorant',
         playStyle: 'Ranked',
@@ -386,6 +387,11 @@ void main() {
               ),
             ),
             chatPartyProvider.overrideWith((ref, id) => Stream.value(party)),
+            partyByIdProvider.overrideWith((ref, id) => Stream.value(party)),
+            partyMemberIdsProvider.overrideWith(
+              (ref, id) => Stream.value(['bob']),
+            ),
+            joinedPartyIdProvider.overrideWith((ref) => Stream.value(null)),
             messagesProvider.overrideWith(
               (ref, key) => Stream.value([
                 ChatMessage(
@@ -416,11 +422,11 @@ void main() {
       expect(find.text('Valorant · Rank 3 · 4.8 rating'), findsOneWidget);
       expect(find.textContaining('TODAY ·'), findsOneWidget);
       expect(find.text('PARTY INVITE'), findsOneWidget);
-      await tester.tap(find.text('View party'));
+      await tester.tap(find.text('Join'));
       await tester.pumpAndSettle();
       expect(find.text('Ranked tonight'), findsOneWidget);
-      expect(find.text('3 / 5 players'), findsOneWidget);
-      await tester.tap(find.text('Close'));
+      expect(find.textContaining('3 / 5 players'), findsOneWidget);
+      await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
       expect(find.byTooltip('Invite to party'), findsNothing);
       expect(find.byIcon(Icons.group_add_outlined), findsNothing);

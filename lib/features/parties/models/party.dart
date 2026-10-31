@@ -1,3 +1,4 @@
+import '../../../core/data/game_catalog.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 class Party {
@@ -8,7 +9,7 @@ class Party {
   final List<String> playstyles;
   final int? minRank, maxRank;
   final double minimumRating;
-  final DateTime? createdAt;
+  final DateTime? createdAt, completedAt;
   final String id;
   final String title;
   final String gameName;
@@ -27,6 +28,7 @@ class Party {
     this.maxRank,
     this.minimumRating = 0,
     this.createdAt,
+    this.completedAt,
     this.region,
     this.mode,
     this.rank,
@@ -74,11 +76,7 @@ class Party {
       gameId: gameId,
       title: string('title') ?? 'Untitled party',
       gameName:
-          const {
-            'valorant': 'Valorant',
-            'mobile_legends': 'Mobile Legends',
-            'fortnite': 'Fortnite',
-          }[gameId] ??
+          GameCatalog.find(gameId)?.name ??
           string('gameName') ??
           label(gameId) ??
           'Unknown game',
@@ -105,6 +103,11 @@ class Party {
       visibility: string('visibility') ?? 'public',
       status: string('status') ?? 'open',
       createdAt: created is Timestamp ? created.toDate() : null,
+      completedAt: data['completedAt'] is Timestamp
+          ? (data['completedAt'] as Timestamp).toDate()
+          : data['status'] == 'closed' && data['updatedAt'] is Timestamp
+          ? (data['updatedAt'] as Timestamp).toDate()
+          : null,
     );
   }
   bool get isFull => currentPlayers >= maxPlayers;

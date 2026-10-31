@@ -1,3 +1,4 @@
+import '../../parties/screens/create_party_screen.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../providers/party_provider.dart';
 import '../../parties/widgets/party_load_error.dart';
@@ -17,7 +18,9 @@ import 'package:lurk_app/core/data/gaming_regions.dart';
 import 'package:lurk_app/core/data/game_catalog.dart';
 
 class FindSreen extends ConsumerStatefulWidget {
-  const FindSreen({super.key});
+  const FindSreen({super.key, this.onCreateParty, this.initialGame});
+  final VoidCallback? onCreateParty;
+  final String? initialGame;
 
   @override
   ConsumerState<FindSreen> createState() => _FindSreenState();
@@ -29,6 +32,12 @@ class _FindSreenState extends ConsumerState<FindSreen> {
   String _query = '';
   FilterPreferences _partyFilters = const FilterPreferences();
   FilterPreferences _playerFilters = const FilterPreferences();
+
+  @override
+  void initState() {
+    super.initState();
+    _partyFilters = FilterPreferences(game: widget.initialGame);
+  }
 
   @override
   void dispose() {
@@ -54,14 +63,7 @@ class _FindSreenState extends ConsumerState<FindSreen> {
           initial: forPlayers ? _playerFilters : _partyFilters,
           games: games,
           forPlayers: forPlayers,
-          regions: forPlayers
-              ? ((ref.read(discoverablePlayersProvider).asData?.value ?? [])
-                    .map((p) => p.region)
-                    .whereType<String>()
-                    .toSet()
-                    .toList()
-                  ..sort())
-              : GamingRegions.values,
+          regions: GamingRegions.values,
         ),
       ),
     );
@@ -132,11 +134,36 @@ class _FindSreenState extends ConsumerState<FindSreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text(
-              'Find',
-              style: Theme.of(
-                context,
-              ).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.w700),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'Find',
+                    style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                FilledButton.icon(
+                  style: FilledButton.styleFrom(
+                    minimumSize: const Size(0, 34),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 6,
+                    ),
+                    textStyle: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
+                    visualDensity: VisualDensity.compact,
+                  ),
+                  onPressed:
+                      widget.onCreateParty ?? () => openCreateParty(context),
+                  icon: const Icon(Icons.add, size: 16),
+                  label: const Text('Create'),
+                ),
+              ],
             ),
             const SizedBox(height: 16),
             DefaultTabController(
@@ -236,18 +263,7 @@ class _FindSreenState extends ConsumerState<FindSreen> {
                                 ),
                               ),
                             )
-                          : PartyCard(
-                              party: parties[index],
-                              onJoin: () {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text(
-                                      'Party joining is not connected yet.',
-                                    ),
-                                  ),
-                                );
-                              },
-                            ),
+                          : PartyCard(party: parties[index]),
                     ),
             ),
           ],

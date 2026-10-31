@@ -1,11 +1,16 @@
+import '../../parties/actions/join_party.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_colors.dart';
-import '../../../features/parties/models/party.dart';
 import '../../../providers/chat_provider.dart';
 
 class PartyInviteCard extends ConsumerWidget {
-  const PartyInviteCard({super.key, required this.partyId});
+  const PartyInviteCard({
+    super.key,
+    required this.partyId,
+    this.sentByMe = false,
+  });
+  final bool sentByMe;
   final String partyId;
 
   @override
@@ -50,7 +55,7 @@ class PartyInviteCard extends ConsumerWidget {
                 ),
               ],
             ),
-            data: (party) => party == null
+            data: (party) => party == null || party.status != 'open'
                 ? const Text('This party is no longer available.')
                 : Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -59,10 +64,7 @@ class PartyInviteCard extends ConsumerWidget {
                         '${party.gameName} · ${party.playStyle} · ${party.currentPlayers} players',
                       ),
                       const SizedBox(height: 12),
-                      FilledButton(
-                        onPressed: () => showPartyDetails(context, party),
-                        child: const Text('View party'),
-                      ),
+                      PartyJoinButton(party: party, disabled: sentByMe),
                     ],
                   ),
           ),
@@ -70,46 +72,4 @@ class PartyInviteCard extends ConsumerWidget {
       ),
     );
   }
-}
-
-void showPartyDetails(BuildContext context, Party party) {
-  showModalBottomSheet<void>(
-    context: context,
-    showDragHandle: true,
-    isScrollControlled: true,
-    builder: (context) => SafeArea(
-      child: SingleChildScrollView(
-        padding: EdgeInsets.fromLTRB(
-          24,
-          24,
-          24,
-          24 + MediaQuery.viewInsetsOf(context).bottom,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(party.title, style: Theme.of(context).textTheme.headlineSmall),
-            const SizedBox(height: 12),
-            Text('${party.gameName} · ${party.playStyle}'),
-            const SizedBox(height: 8),
-            Text('${party.currentPlayers} / ${party.maxPlayers} players'),
-            if (party.region != null) ...[
-              const SizedBox(height: 8),
-              Text(party.region!),
-            ],
-            if (party.description.isNotEmpty) ...[
-              const SizedBox(height: 16),
-              Text(party.description),
-            ],
-            const SizedBox(height: 24),
-            OutlinedButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Close'),
-            ),
-          ],
-        ),
-      ),
-    ),
-  );
 }

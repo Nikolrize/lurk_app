@@ -1,9 +1,22 @@
+import 'party_history_screen.dart';
+import '../models/party.dart';
+import 'party_lobby_screen.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../providers/party_provider.dart';
+import '../widgets/party_load_error.dart';
+import 'create_party_screen.dart';
 import 'package:flutter/material.dart';
 import '../../../core/widgets/action_card.dart';
 
-class PartiesScreen extends StatelessWidget {
-  const PartiesScreen({super.key, this.onQuickMatch});
-  final VoidCallback? onQuickMatch;
+class PartiesScreen extends ConsumerWidget {
+  const PartiesScreen({
+    super.key,
+    this.onQuickMatch,
+    this.onOpenLobby,
+    this.onHistory,
+  });
+  final ValueChanged<Party>? onOpenLobby;
+  final VoidCallback? onQuickMatch, onHistory;
 
   void _preview(BuildContext context, String title, String message) {
     showModalBottomSheet<void>(
@@ -27,7 +40,8 @@ class PartiesScreen extends StatelessWidget {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final currentParty = ref.watch(currentPartyProvider);
     return SafeArea(
       child: LayoutBuilder(
         builder: (context, constraints) {
@@ -67,35 +81,61 @@ class PartiesScreen extends StatelessWidget {
                       icon: Icons.add_rounded,
                       title: 'Create Party',
                       subtitle: 'Create a new party for players to join',
-                      onTap: () => _preview(
-                        context,
-                        'Create Party',
-                        'Party creation is coming next. No party has been created.',
-                      ),
+                      onTap: () => openCreateParty(context),
                     ),
                     const SizedBox(height: 14),
                     ActionCard(
                       icon: Icons.history_rounded,
                       title: 'Party History',
                       subtitle: 'List of completed party sessions',
-                      onTap: () => _preview(
-                        context,
-                        'Party History',
-                        'Completed sessions will appear here once party history is connected.',
-                      ),
+                      onTap:
+                          onHistory ??
+                          () => Navigator.of(context).push(
+                            MaterialPageRoute<void>(
+                              builder: (context) => Scaffold(
+                                body: PartyHistoryScreen(
+                                  onBack: () => Navigator.pop(context),
+                                ),
+                              ),
+                            ),
+                          ),
                     ),
                     const SizedBox(height: 32),
                     const Spacer(),
-                    ActionCard(
-                      icon: Icons.groups_rounded,
-                      title: 'Back to Current Party',
-                      subtitle: '3 / 5 players · Private party',
-                      highlighted: true,
-                      onTap: () => _preview(
-                        context,
-                        'Current Party',
-                        'Sample party: 3 / 5 players · Private party.\n\nLive membership and the lobby are not connected yet.',
+                    currentParty.when(
+                      loading: () => const SizedBox.shrink(),
+                      error: (error, _) => PartyLoadError(
+                        error: error,
+                        onRetry: () {
+                          ref.invalidate(currentHostedPartyProvider);
+                          ref.invalidate(joinedPartyIdProvider);
+                        },
                       ),
+                      data: (party) => party == null
+                          ? const SizedBox.shrink()
+                          : ActionCard(
+                              icon: Icons.groups_rounded,
+                              title: 'Back to Current Party',
+                              subtitle:
+                                  '${party.currentPlayers} / ${party.maxPlayers} players · ${party.visibility == "private" ? "Private" : "Public"} party',
+                              highlighted: true,
+                              onTap: () {
+                                if (onOpenLobby != null) {
+                                  onOpenLobby!(party);
+                                } else {
+                                  Navigator.of(context).push(
+                                    MaterialPageRoute<void>(
+                                      builder: (context) => Scaffold(
+                                        body: PartyLobbyScreen(
+                                          party: party,
+                                          onBack: () => Navigator.pop(context),
+                                        ),
+                                      ),
+                                    ),
+                                  );
+                                }
+                              },
+                            ),
                     ),
                   ],
                 ),

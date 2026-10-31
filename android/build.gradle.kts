@@ -1,3 +1,6 @@
+// Agora reads this root property; match the app SDK instead of its API 31 fallback.
+extra["compileSdkVersion"] = 36
+
 allprojects {
     repositories {
         google()

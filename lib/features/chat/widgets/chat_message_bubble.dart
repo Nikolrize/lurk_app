@@ -24,7 +24,9 @@ class ChatMessageBubble extends StatelessWidget {
             ? Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 mainAxisSize: MainAxisSize.min,
-                children: [PartyInviteCard(partyId: message.partyId!)],
+                children: [
+                  PartyInviteCard(partyId: message.partyId!, sentByMe: mine),
+                ],
               )
             : Container(
                 padding: const EdgeInsets.symmetric(

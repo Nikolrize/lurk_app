@@ -14,7 +14,7 @@ test('direct chat privacy, sender identity, immutable history and atomic preview
       for (const [id, hostId, visibility, status] of [
         ['owned', 'alice', 'public', 'open'], ['other', 'bob', 'public', 'open'],
         ['private', 'alice', 'private', 'open'], ['ended', 'alice', 'public', 'completed']]) {
-        await setDoc(doc(context.firestore(), `parties/${id}`), {hostId, visibility, status});
+        await setDoc(doc(context.firestore(), `parties/${id}`), {hostId, visibility, status, memberCount:1, maxPlayers:5});
       }
     });
     const alice = env.authenticatedContext('alice').firestore();
@@ -83,8 +83,8 @@ test('direct chat privacy, sender identity, immutable history and atomic preview
     if ((await getDocs(collection(bob, `${path}/messages`))).size <= 1) throw new Error('Other player lost history');
 
     await env.withSecurityRulesDisabled(context => setDoc(doc(context.firestore(), 'player_blocks/alice/users/bob'), {createdAt: new Date()}));
-    await assertSucceeds(send(alice, 'legacy-block-ignored'));
-    await assertSucceeds(send(bob, 'legacy-block-peer', 'bob'));
+    await assertFails(send(alice, 'blocked-sender'));
+    await assertFails(send(bob, 'blocked-peer', 'bob'));
     await assertFails(setDoc(doc(alice, 'player_blocks/alice/users/bob'), {createdAt: serverTimestamp()}));
     await assertFails(setDoc(doc(alice, 'player_status/alice'), {updatedAt: serverTimestamp()}));
   } finally { await env.cleanup(); }
