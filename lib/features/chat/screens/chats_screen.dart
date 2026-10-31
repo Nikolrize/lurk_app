@@ -161,7 +161,7 @@ class _ChatTile extends ConsumerWidget {
             ),
           ),
           borderRadius: BorderRadius.circular(24),
-          child: ChatAvatar(name: name),
+          child: ChatAvatar(name: name, uid: chat.otherUid(uid)),
         ),
       ),
       title: Text(

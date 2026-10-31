@@ -89,7 +89,7 @@ class _CandidateTile extends ConsumerWidget {
         minTileHeight: 88,
         minVerticalPadding: 16,
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        leading: ChatAvatar(name: name),
+        leading: ChatAvatar(name: name, uid: player.uid),
         title: Text(name, maxLines: 2, overflow: TextOverflow.ellipsis),
         trailing: player.rated
             ? const Chip(

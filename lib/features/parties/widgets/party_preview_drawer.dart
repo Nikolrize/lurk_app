@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/data/game_catalog.dart';
+import '../../../core/widgets/player_avatar.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../providers/party_provider.dart';
 import '../../../providers/profile_provider.dart';
@@ -404,13 +405,9 @@ class _PreviewMember extends ConsumerWidget {
             horizontal: 16,
             vertical: 8,
           ),
-          leading: CircleAvatar(
-            backgroundColor: (isHost ? AppColors.primary : AppColors.secondary)
-                .withValues(alpha: .18),
-            child: Icon(
-              isHost ? Icons.workspace_premium_outlined : Icons.person_outline,
-              color: isHost ? AppColors.primary : AppColors.secondary,
-            ),
+          leading: PlayerAvatar(
+            photoPath: profile.asData?.value?.photoPath,
+            radius: 20,
           ),
           title: Text(
             name != null && name.trim().isNotEmpty

@@ -104,7 +104,9 @@ class _RateTeammateScreenState extends ConsumerState<RateTeammateScreen> {
                   child: SizedBox(
                     width: 88,
                     height: 88,
-                    child: FittedBox(child: ChatAvatar(name: name)),
+                    child: FittedBox(
+                      child: ChatAvatar(name: name, uid: widget.targetUid),
+                    ),
                   ),
                 ),
                 const SizedBox(height: 16),

@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:lurk_app/core/widgets/player_avatar.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:lurk_app/features/chat/models/chat_message.dart';
@@ -169,16 +170,23 @@ void main() {
   testWidgets('lobby avatar invokes existing profile action', (tester) async {
     var tapped = false;
     await tester.pumpWidget(
-      MaterialApp(
-        home: Scaffold(
-          body: LobbyMemberCard(
-            member: const LobbyMember(uid: 'bob', name: 'Bob'),
-            onViewProfile: () => tapped = true,
+      ProviderScope(
+        overrides: [
+          playerProfileProvider(
+            'bob',
+          ).overrideWith((ref) => Stream.value(null)),
+        ],
+        child: MaterialApp(
+          home: Scaffold(
+            body: LobbyMemberCard(
+              member: const LobbyMember(uid: 'bob', name: 'Bob'),
+              onViewProfile: () => tapped = true,
+            ),
           ),
         ),
       ),
     );
-    await tester.tap(find.byType(CircleAvatar));
+    await tester.tap(find.byType(PlayerAvatar));
     expect(tapped, true);
   });
 }

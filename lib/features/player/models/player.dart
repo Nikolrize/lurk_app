@@ -16,6 +16,7 @@ class Player {
     required this.name,
     required this.isActive,
     this.currentGame,
+    this.photoPath,
   });
 
   final String? region, mode, style, communication;
@@ -28,6 +29,7 @@ class Player {
   final String name;
   final bool? isActive;
   final String? currentGame;
+  final String? photoPath;
 
   /// Reads public profile data only. Missing presence is unknown, not offline.
   factory Player.fromFirestoreData(String uid, Map<String, dynamic> data) {
@@ -85,6 +87,7 @@ class Player {
     return Player(
       id: uid,
       name: string('username') ?? '',
+      photoPath: string('photoPath'),
       bio: string('bio') ?? '',
       region: string('region') == null ? null : label(string('region')!),
       currentGame:

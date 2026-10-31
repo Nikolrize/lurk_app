@@ -123,7 +123,10 @@ class _NewMessageScreenState extends ConsumerState<NewMessageScreen> {
                           contentPadding: const EdgeInsets.symmetric(
                             vertical: 8,
                           ),
-                          leading: ChatAvatar(name: name),
+                          leading: ChatAvatar(
+                            name: name,
+                            photoPath: player.photoPath,
+                          ),
                           title: Text(name),
                           subtitle: Text(
                             widget.invitePartyId == null
