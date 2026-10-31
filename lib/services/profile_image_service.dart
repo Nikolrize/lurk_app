@@ -67,6 +67,26 @@ class ProfileImageService {
     return path;
   }
 
+  //old-photo cleanup
+  Future<void> deletePhoto({
+    required String expectedUid,
+    required String path,
+  }) async {
+    _checkAccount(expectedUid);
+
+    final parts = path.split('/');
+
+    if (parts.length != 2 ||
+        parts.first != expectedUid ||
+        !RegExp(
+          r'^[a-f0-9-]{36}\.(jpg|png|webp)$',
+        ).hasMatch(parts.last)) {
+      throw ArgumentError('Invalid profile photo path.');
+    }
+
+    await _supabase.storage.from(bucketName).remove([path]);
+  }
+
   String publicUrl(String path) {
     return _supabase.storage.from(bucketName).getPublicUrl(path);
   }

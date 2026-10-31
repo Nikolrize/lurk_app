@@ -259,6 +259,20 @@ service cloud.firestore {
       );
   }
 
+  // Optional Supabase path, scoped to the signed-in player.
+  function validPhotoPath(data) {
+    let path = data.get('photoPath', null);
+
+    return path == null || (
+      path is string
+      && path.size() <= 200
+      && path.split('/').size() == 2
+      && path.split('/')[0] == request.auth.uid
+      && path.split('/')[1].matches(
+        '[a-f0-9-]{36}[.](jpg|png|webp)'
+      )
+    );
+  }
     function validPublicProfile(data) {
       return data.keys().hasAll([
           'username', 'bio', 'region', 'createdAt', 'updatedAt'
@@ -267,7 +281,8 @@ service cloud.firestore {
           'username', 'bio', 'region', 'createdAt', 'updatedAt',
           'sharedAge', 'ageSharedAt', 'sharedGender',
           'games', 'currentGame', 'mode', 'playstyles',
-          'communication', 'rank', 'gameRanks', 'availability'
+          'communication', 'rank', 'gameRanks', 'availability',
+          'photoPath'
         ])
         && data.username is string
         && (
@@ -283,7 +298,8 @@ service cloud.firestore {
         && data.updatedAt is timestamp
         && validSharing(data)
         && validGamingPreferences(data)
-        && validAvailability(data);
+        && validAvailability(data)
+        && validPhotoPath(data);
     }
 
     function validPrivateInfo(data) {
@@ -528,7 +544,8 @@ service cloud.firestore {
       function canReplace() {
         return resource == null
           || get(/databases/$(database)/documents/parties/$(resource.data.partyId)).data.status != 'open'
-          || get(/databases/$(database)/documents/parties/$(resource.data.partyId)/members/$(uid)).data.leftAt != null;
+          || get(/databases/$(database)/documents/parties/$(resource.data.partyId)/members/$(uid)).data.leftAt != null
+          || getAfter(/databases/$(database)/documents/parties/$(resource.data.partyId)/members/$(uid)).data.leftAt != null;
       }
       allow create, update: if owns(uid) && canReplace()
         && request.resource.data.keys().hasAll(['partyId', 'updatedAt'])
@@ -714,17 +731,33 @@ service cloud.firestore {
       function validProfileUpdate() {
         let data = request.resource.data;
         let changed = data.diff(resource.data).affectedKeys();
-        return owns(uid) && data.updatedAt == request.time && (
-          (changed.hasOnly(['availability', 'updatedAt']) && validAvailability(data))
-          || (changed.hasOnly([
-          'username', 'bio', 'region', 'updatedAt',
-          'sharedAge', 'ageSharedAt', 'sharedGender',
-          'games', 'currentGame', 'mode', 'playstyles',
-          'communication', 'rank', 'gameRanks', 'availability'
-        ])
-            && validPublicProfile(data)
-            && (!changed.hasAny(['availability']) || validAvailability(data)))
-        );
+
+        return owns(uid)
+          && data.updatedAt == request.time
+          && (
+            (
+              changed.hasOnly(['photoPath', 'updatedAt'])
+              && validPhotoPath(data)
+            )
+            || (
+              changed.hasOnly(['availability', 'updatedAt'])
+              && validAvailability(data)
+            )
+            || (
+              changed.hasOnly([
+                'username', 'bio', 'region', 'updatedAt',
+                'sharedAge', 'ageSharedAt', 'sharedGender',
+                'games', 'currentGame', 'mode', 'playstyles',
+                'communication', 'rank', 'gameRanks',
+                'availability', 'photoPath'
+              ])
+              && validPublicProfile(data)
+              && (
+                !changed.hasAny(['availability'])
+                || validAvailability(data)
+              )
+            )
+          );
       }
       allow update: if validProfileUpdate();
 

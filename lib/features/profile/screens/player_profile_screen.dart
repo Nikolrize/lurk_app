@@ -9,6 +9,8 @@ import 'package:lurk_app/features/availability/widgets/availability_summary_card
 
 import 'package:lurk_app/core/widgets/player_status_badge.dart';
 
+import 'package:lurk_app/core/widgets/player_avatar.dart';
+
 class PlayerProfileScreen extends ConsumerWidget {
   const PlayerProfileScreen({super.key, required this.uid});
 
@@ -65,16 +67,9 @@ class PlayerProfileScreen extends ConsumerWidget {
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
                             Center(
-                              child: CircleAvatar(
+                              child: PlayerAvatar(
+                                photoPath: profile.photoPath,
                                 radius: 40,
-                                backgroundColor: colors.primary.withValues(
-                                  alpha: 0.18,
-                                ),
-                                child: Icon(
-                                  Icons.person_outline,
-                                  size: 44,
-                                  color: colors.secondary,
-                                ),
                               ),
                             ),
                             const SizedBox(height: 20),
