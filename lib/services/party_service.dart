@@ -403,11 +403,15 @@ class PartyService {
       .snapshots()
       .map((snapshot) => snapshot.docs.map((doc) => doc.id).toList());
 
-  Future<List<Party>> findQuickMatchParties(String gameId) async {
+  Future<List<Party>> findQuickMatchParties(
+    String gameId, {
+    required String regionId,
+  }) async {
     // Bounded, game-specific pool; joining is still validated transactionally.
     final snapshot = await _firestore
         .collection('parties')
         .where('gameId', isEqualTo: gameId)
+        .where('region', isEqualTo: regionId)
         .where('visibility', isEqualTo: 'public')
         .where('status', isEqualTo: 'open')
         .limit(100)

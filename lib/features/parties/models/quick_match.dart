@@ -1,3 +1,4 @@
+import '../../../core/data/gaming_regions.dart';
 import 'dart:math';
 import '../../../core/data/game_catalog.dart';
 import 'party.dart';
@@ -5,6 +6,7 @@ import 'party.dart';
 Party? pickQuickMatchParty(
   Iterable<Party> parties, {
   required String mainGameId,
+  required String regionId,
   required String viewerUid,
   String? currentPartyId,
   Random? random,
@@ -15,6 +17,7 @@ Party? pickQuickMatchParty(
             (GameCatalog.find(party.gameId)?.id ??
                     GameCatalog.find(party.gameName)?.id) ==
                 mainGameId &&
+            GamingRegions.idFor(party.region) == regionId &&
             party.status == 'open' &&
             party.visibility == 'public' &&
             !party.isFull &&

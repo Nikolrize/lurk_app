@@ -1,3 +1,5 @@
+import 'package:lurk_app/models/player_profile.dart';
+import 'package:lurk_app/core/data/gaming_regions.dart';
 import 'dart:async';
 import 'dart:math';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -17,6 +19,7 @@ Party candidate(
   String id, {
   String game = 'valorant',
   String host = 'host',
+  String region = 'Asia',
   String status = 'open',
   String visibility = 'public',
   int size = 1,
@@ -27,6 +30,7 @@ Party candidate(
   gameName: game,
   playStyle: 'Competitive',
   hostId: host,
+  region: region,
   currentPlayers: size,
   maxPlayers: 5,
   status: status,
@@ -41,21 +45,41 @@ class QuickUser extends Fake implements User {
 class QuickService extends Fake implements PartyService {
   final response = Completer<List<Party>>();
   int calls = 0;
-  String? game;
+  String? game, matchedRegion;
   @override
-  Future<List<Party>> findQuickMatchParties(String gameId) {
+  Future<List<Party>> findQuickMatchParties(
+    String gameId, {
+    required String regionId,
+  }) {
     calls++;
     game = gameId;
+    matchedRegion = regionId;
     return response.future;
   }
 }
 
-Widget app(QuickService service, {String? game = 'valorant'}) => ProviderScope(
+Widget app(
+  QuickService service, {
+  String? game = 'valorant',
+  String region = 'Asia',
+}) => ProviderScope(
   overrides: [
     authStateProvider.overrideWith((ref) => Stream.value(QuickUser())),
     gamingPreferencesProvider(
       'viewer',
     ).overrideWith((ref) => Stream.value(GamingPreferences(currentGame: game))),
+    playerProfileProvider('viewer').overrideWith(
+      (ref) => Stream.value(
+        PlayerProfile(
+          uid: 'viewer',
+          username: 'Viewer',
+          bio: '',
+          region: region,
+          createdAt: null,
+          updatedAt: null,
+        ),
+      ),
+    ),
     joinedPartyIdProvider.overrideWith((ref) => Stream.value('current')),
     partyServiceProvider.overrideWithValue(service),
     partyByIdProvider.overrideWith((ref, id) => Stream.value(candidate(id))),
@@ -65,6 +89,23 @@ Widget app(QuickService service, {String? game = 'valorant'}) => ProviderScope(
 );
 
 void main() {
+  test('Profile labels and database region IDs normalize consistently', () {
+    expect(GamingRegions.idFor(' North America '), 'north_america');
+    expect(GamingRegions.idFor('north_america'), 'north_america');
+    expect(GamingRegions.idFor('Malaysia'), isNull);
+  });
+  testWidgets('Missing region prevents an unfiltered match', (tester) async {
+    final service = QuickService();
+    await tester.pumpWidget(app(service, region: ''));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Quick Match'));
+    await tester.pumpAndSettle();
+    expect(
+      find.text('Set your region in your profile before using Quick Match.'),
+      findsOneWidget,
+    );
+    expect(service.calls, 0);
+  });
   test(
     'Random pool excludes current, hosted, full, closed, private and other games',
     () {
@@ -77,6 +118,7 @@ void main() {
         candidate('closed', status: 'closed'),
         candidate('private', visibility: 'private'),
         candidate('other', game: 'fortnite'),
+        candidate('other-region', region: 'Europe'),
       ];
       final picks = <String>{};
       for (var seed = 0; seed < 30; seed++) {
@@ -84,6 +126,7 @@ void main() {
           pickQuickMatchParty(
             parties,
             mainGameId: 'valorant',
+            regionId: 'asia',
             viewerUid: 'viewer',
             currentPartyId: 'current',
             random: Random(seed),
@@ -95,6 +138,7 @@ void main() {
         pickQuickMatchParty(
           parties.skip(2),
           mainGameId: 'valorant',
+          regionId: 'asia',
           viewerUid: 'viewer',
           currentPartyId: 'current',
         ),
@@ -113,6 +157,7 @@ void main() {
       await tester.tap(find.text('Finding party…'));
       expect(service.calls, 1);
       expect(service.game, 'valorant');
+      expect(service.matchedRegion, 'asia');
       service.response.complete([candidate('Selected squad')]);
       await tester.pumpAndSettle();
       expect(find.text('Selected squad'), findsOneWidget);
