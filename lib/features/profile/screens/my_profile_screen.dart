@@ -18,6 +18,8 @@ import '../widgets/profile_photo_button.dart';
 
 import 'package:lurk_app/features/verification/screens/verification_screen.dart';
 
+import 'package:lurk_app/core/widgets/player_verification_badge.dart';
+
 class MyProfileScreen extends ConsumerStatefulWidget {
   const MyProfileScreen({
     super.key,
@@ -244,13 +246,21 @@ class _MyProfileScreenState extends ConsumerState<MyProfileScreen> {
                                     crossAxisAlignment:
                                         CrossAxisAlignment.start,
                                     children: [
-                                      Text(
-                                        profile.username.isEmpty
-                                            ? 'New player'
-                                            : profile.username,
-                                        style: text.titleLarge?.copyWith(
-                                          fontWeight: FontWeight.w700,
-                                        ),
+                                      Wrap(
+                                        spacing: 6,
+                                        runSpacing: 4,
+                                        crossAxisAlignment: WrapCrossAlignment.center,
+                                        children: [
+                                          Text(
+                                            profile.username.isEmpty
+                                                ? 'New player'
+                                                : profile.username,
+                                            style: text.titleLarge?.copyWith(
+                                              fontWeight: FontWeight.w700,
+                                            ),
+                                          ),
+                                          PlayerVerificationBadge(uid: widget.uid),
+                                        ],
                                       ),
                                       PlayerStatusBadge(
                                         uid: widget.uid,

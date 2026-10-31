@@ -11,6 +11,7 @@ import 'package:lurk_app/core/widgets/player_status_badge.dart';
 
 import 'package:lurk_app/core/widgets/player_avatar.dart';
 
+import 'package:lurk_app/core/widgets/player_verification_badge.dart';
 class PlayerProfileScreen extends ConsumerWidget {
   const PlayerProfileScreen({super.key, required this.uid});
 
@@ -73,12 +74,21 @@ class PlayerProfileScreen extends ConsumerWidget {
                               ),
                             ),
                             const SizedBox(height: 20),
-                            Text(
-                              profile.username.isEmpty
-                                  ? 'New player'
-                                  : profile.username,
-                              textAlign: TextAlign.center,
-                              style: text.headlineSmall,
+                            Wrap(
+                              alignment: WrapAlignment.center,
+                              spacing: 6,
+                              runSpacing: 4,
+                              crossAxisAlignment: WrapCrossAlignment.center,
+                              children: [
+                                Text(
+                                  profile.username.isEmpty
+                                      ? 'New player'
+                                      : profile.username,
+                                  textAlign: TextAlign.center,
+                                  style: text.headlineSmall,
+                                ),
+                                PlayerVerificationBadge(uid: uid),
+                              ],
                             ),
                             Center(
                               child: IntrinsicWidth( //centers read-only badge underneath username

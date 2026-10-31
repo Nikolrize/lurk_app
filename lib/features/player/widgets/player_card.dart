@@ -4,6 +4,8 @@ import '../models/player.dart';
 
 import 'package:lurk_app/core/widgets/player_status_badge.dart';
 
+import 'package:lurk_app/core/widgets/player_verification_badge.dart';
+
 class PlayerCard extends StatelessWidget {
   const PlayerCard({super.key, required this.player, this.onTap});
 
@@ -29,7 +31,18 @@ class PlayerCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(player.name, style: text.titleMedium),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 4,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    Text(
+                      player.name,
+                      style: text.titleMedium,
+                    ),
+                    PlayerVerificationBadge(uid: player.id),
+                  ],
+                ),
                 PlayerStatusBadge(uid: player.id), 
                 if (game != null && game.isNotEmpty) ...[
                   const SizedBox(height: 6),
