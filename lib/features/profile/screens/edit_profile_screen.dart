@@ -204,7 +204,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                   validator: (value) {
                     final name = value?.trim() ?? '';
                     if (name.length < 3 || name.length > 30) {
-                      return 'Use 3–30 characters.';
+                      return 'Use 3-30 characters.';
                     }
                     return null;
                   },

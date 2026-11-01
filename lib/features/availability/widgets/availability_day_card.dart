@@ -44,8 +44,8 @@ class AvailabilityDayCard extends StatelessWidget {
         minute: minutes % 60,
       ),
       helpText: pickingStart
-          ? 'Choose start time — Malaysia time'
-          : 'Choose end time — Malaysia time',
+          ? 'Choose start time - Malaysia time'
+          : 'Choose end time - Malaysia time',
     );
 
     if (!context.mounted || selected == null) return;

@@ -121,7 +121,7 @@ class AvailabilitySummaryCard extends ConsumerWidget {
                           Expanded(
                             child: Text(
                               '${_formatTime(context, slot.startMinute)}'
-                              ' – '
+                              ' - '
                               '${_formatTime(context, slot.endMinute)}'
                               '${slot.endMinute < slot.startMinute ? ' (next day)' : ''}',
                             ),

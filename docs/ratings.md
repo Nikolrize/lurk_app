@@ -1,7 +1,7 @@
 # Teammate ratings
 
 From Parties > Party History (or My Profile > Party History), tap Rate, choose a
-teammate, select 1–5 stars, optionally select feedback tags and add up to 500
+teammate, select 1-5 stars, optionally select feedback tags and add up to 500
 characters, then Submit. The teammate becomes Rated for that party. You may rate
 other eligible teammates individually or return without rating everyone.
 

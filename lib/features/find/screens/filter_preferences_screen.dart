@@ -226,7 +226,7 @@ class _FilterPreferencesScreenState extends State<FilterPreferencesScreen> {
           if (names.length > 1) ...[
             _label('Rank'),
             Text(
-              '${names[_ranks.start.round()]} — '
+              '${names[_ranks.start.round()]} - '
               '${names[_ranks.end.round()]}',
             ),
             RangeSlider(

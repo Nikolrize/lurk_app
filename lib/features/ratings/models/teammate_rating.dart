@@ -16,7 +16,7 @@ class RatingDraft {
         tags.toSet().length != tags.length ||
         tags.any((tag) => !ratingTags.contains(tag))) {
       throw ArgumentError(
-        'Choose 1–5 stars and valid feedback (up to 500 characters).',
+        'Choose 1-5 stars and valid feedback (up to 500 characters).',
       );
     }
   }

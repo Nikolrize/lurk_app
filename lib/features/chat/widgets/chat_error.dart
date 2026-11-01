@@ -14,7 +14,7 @@ String chatSendErrorDescription(Object error) {
         'Message could not be sent. Your draft has been kept. Please try again.',
     };
   }
-  if (error is ArgumentError) return 'Messages must contain 1–2000 characters.';
+  if (error is ArgumentError) return 'Messages must contain 1-2000 characters.';
   return 'Message could not be sent. Your draft has been kept. Please try again.';
 }
 

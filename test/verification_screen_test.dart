@@ -71,9 +71,9 @@ void main() {
       await tester.ensureVisible(find.text('Submit for verification'));
       await tester.tap(find.text('Submit for verification'));
       await tester.pumpAndSettle();
-      expect(find.text('Use 2–100 characters.'), findsOneWidget);
+      expect(find.text('Use 2-100 characters.'), findsOneWidget);
       expect(find.text('Select your date of birth.'), findsOneWidget);
-      expect(find.text('Use 4–40 characters.'), findsOneWidget);
+      expect(find.text('Enter 12 digits, with optional hyphens.'), findsOneWidget);
       expect(tester.takeException(), isNull);
     },
   );

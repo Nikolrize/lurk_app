@@ -21,7 +21,7 @@ class ProfileGameTile extends StatelessWidget {
       width: 104,
       child: Tooltip(
         // star on the desktop
-        message: isMainGame ? '$name — main game' : name,
+        message: isMainGame ? '$name - main game' : name,
         child: Semantics(
           button: true,
           label: isMainGame ? '$name, main game' : name,

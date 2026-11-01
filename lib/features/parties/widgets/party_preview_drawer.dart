@@ -82,7 +82,7 @@ class _PartyPreviewState extends ConsumerState<_PartyPreview> {
     final min = party.minRank, max = party.maxRank;
     final rankLabel =
         min != null && max != null && min >= 0 && max < ranks.length
-        ? '${ranks[min]} — ${ranks[max]}'
+        ? '${ranks[min]} - ${ranks[max]}'
         : null;
     final text = Theme.of(context).textTheme;
     final ids = [...?members.asData?.value];
