@@ -8,6 +8,8 @@ import 'package:lurk_app/providers/presence_provider.dart';
 import 'package:lurk_app/services/firebase_service.dart';
 import 'package:lurk_app/services/presence_service.dart';
 
+import 'package:lurk_app/providers/party_provider.dart';
+
 class PresenceScope extends ConsumerStatefulWidget {
   const PresenceScope({
     super.key,
@@ -33,6 +35,9 @@ class _PresenceScopeState extends ConsumerState<PresenceScope> {
   StreamSubscription<bool>? _connectionSubscription;
   Timer? _retryTimer;
 
+  ProviderSubscription<String?>? _partySubscription;
+  String? _gameId;
+
   Future<void> _operations = Future<void>.value(); //runs session updates in sequence
   Future<void>? _stopFuture;
 
@@ -51,6 +56,17 @@ class _PresenceScopeState extends ConsumerState<PresenceScope> {
     _service = ref.read(presenceServiceProvider);
     _authService = ref.read(firebaseServiceProvider);
     _sessionId = _service.createSessionId();
+
+    _partySubscription = ref.listenManual<String?>(
+      activePartyGameProvider,
+      (previous, gameId) {
+        if (!_running || _gameId == gameId) return;
+
+        _gameId = gameId;
+        _queueSync();
+      },
+      fireImmediately: true,
+    );
 
     final initialState = WidgetsBinding.instance.lifecycleState;
     _idle = initialState != null &&
@@ -115,6 +131,7 @@ class _PresenceScopeState extends ConsumerState<PresenceScope> {
           sessionId: _sessionId,
           idle: _idle,
           shouldContinue: isCurrent,
+          gameId: _gameId,
         );
 
         if (!isCurrent()) return;
@@ -126,6 +143,7 @@ class _PresenceScopeState extends ConsumerState<PresenceScope> {
         expectedUid: widget.uid,
         sessionId: _sessionId,
         idle: _idle,
+        gameId: _gameId,
       );
 
       if (isCurrent() && mounted && _failed) {
@@ -192,6 +210,7 @@ class _PresenceScopeState extends ConsumerState<PresenceScope> {
 
   @override
   void dispose() {
+    _partySubscription?.close();
     _lifecycle.dispose();
 
     if (_authService.beforeSignOut == _logoutCleanup) {
