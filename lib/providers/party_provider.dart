@@ -4,6 +4,8 @@ import '../features/parties/models/party.dart';
 import '../services/party_service.dart';
 import 'auth_provider.dart';
 
+import '../core/data/game_catalog.dart'; 
+
 final partyServiceProvider = Provider<PartyService>((ref) => PartyService());
 
 final partyDiscoveryPageProvider = StreamProvider.autoDispose<List<Party>>((
@@ -115,3 +117,30 @@ final partyHistoryMemberIdsProvider = StreamProvider.autoDispose
       if (uid == null) return Stream.value(const []);
       return ref.watch(partyServiceProvider).watchHistoryMemberIds(id);
     }, retry: (retryCount, error) => null);
+
+//showing active game
+final activePartyGameProvider = Provider.autoDispose<String?>((ref) {
+  final partyState = ref.watch(currentPartyProvider);
+
+  if (partyState.isLoading || partyState.hasError) return null;
+
+  final party = partyState.asData?.value;
+
+  if (party == null || party.status != 'open') return null;
+
+  final membershipState = ref.watch(
+    myPartyMembershipProvider(party.id),
+  );
+
+  if (membershipState.isLoading || membershipState.hasError) {
+    return null;
+  }
+
+  final membership = membershipState.asData?.value;
+
+  if (membership == null || membership['leftAt'] != null) {
+    return null;
+  }
+
+  return GameCatalog.find(party.gameId)?.id;
+});

@@ -111,7 +111,7 @@ class _ProfileFoundationScreenState
                       enabled: !_isSaving,
                       decoration: const InputDecoration(
                         labelText: 'New username',
-                        helperText: 'Use 3–30 characters.',
+                        helperText: 'Use 3-30 characters.',
                       ),
                     ),
                     const SizedBox(height: 16),

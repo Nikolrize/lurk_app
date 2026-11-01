@@ -7,6 +7,8 @@ import '../models/verification_summary.dart';
 //firebase auth
 import 'package:firebase_auth/firebase_auth.dart';
 
+import '../models/verification_id_validator.dart';
+
 class VerificationService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
@@ -92,18 +94,17 @@ class VerificationService {
     _checkAccount(expectedUid);
 
     final cleanName = fullName.trim();
-    final cleanNumber = idNumber.trim();
+    final cleanNumber = VerificationIdValidator.normalize(
+      idType: idType,
+      value: idNumber,
+    );
 
     if (cleanName.length < 2 || cleanName.length > 100) {
-      throw ArgumentError('Full name must contain 2–100 characters.');
+      throw ArgumentError('Full name must contain 2-100 characters.');
     }
 
     if (!const {'nric', 'passport'}.contains(idType)) {
       throw ArgumentError('Please select a supported ID type.');
-    }
-
-    if (cleanNumber.length < 4 || cleanNumber.length > 40) {
-      throw ArgumentError('ID number must contain 4–40 characters.');
     }
 
     if (!confirmed) {
@@ -221,7 +222,7 @@ class VerificationService {
 
     if (!approve && (reason.length < 3 || reason.length > 300)) {
       throw ArgumentError(
-        'Please provide a rejection reason containing 3–300 characters.',
+        'Please provide a rejection reason containing 3-300 characters.',
       );
     }
 

@@ -22,7 +22,7 @@ test('verification privacy, admin review, atomic status and resubmission', async
   const guest=env.unauthenticatedContext().firestore();
   const first='550e8400-e29b-41d4-a716-446655440000';
   const second='550e8400-e29b-41d4-a716-446655440001';
-  const payload=(uid,id=first)=>({submissionId:id,fullName:'Sample Player',idType:'nric',idNumber:'DEMO-1234',dateOfBirth:Timestamp.fromDate(new Date('2000-01-01T00:00:00Z')),idPhotoPath:uid+'/'+id+'/id.jpg',confirmed:true,status:'pending',submittedAt:serverTimestamp(),reviewedAt:null,reviewedBy:null,rejectionReason:''});
+  const payload=(uid,id=first)=>({submissionId:id,fullName:'Sample Player',idType:'nric',idNumber:'000101011234',dateOfBirth:Timestamp.fromDate(new Date('2000-01-01T00:00:00Z')),idPhotoPath:uid+'/'+id+'/id.jpg',confirmed:true,status:'pending',submittedAt:serverTimestamp(),reviewedAt:null,reviewedBy:null,rejectionReason:''});
   const submit=(db,uid,id=first,patch={},summaryPatch={})=>{
    const batch=writeBatch(db);
    batch.set(doc(db,'verification_requests/'+uid),{...payload(uid,id),...patch});

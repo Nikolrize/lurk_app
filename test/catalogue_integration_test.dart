@@ -170,7 +170,7 @@ void main() {
       await tester.tap(find.text('Mobile Legends').last);
       await tester.pumpAndSettle();
       await tester.scrollUntilVisible(
-        find.text('Warrior — Mythical Immortal'),
+        find.text('Warrior - Mythical Immortal'),
         200,
         scrollable: find
             .descendant(
@@ -179,7 +179,7 @@ void main() {
             )
             .first,
       );
-      expect(find.text('Warrior — Mythical Immortal'), findsOneWidget);
+      expect(find.text('Warrior - Mythical Immortal'), findsOneWidget);
       await tester.drag(find.byType(ListView), const Offset(0, 1200));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Mobile Legends'));

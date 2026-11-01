@@ -40,7 +40,7 @@ class _VerificationRejectDialogState
             final length = value?.trim().length ?? 0;
 
             return length < 3 || length > 300
-                ? 'Use 3–300 characters.'
+                ? 'Use 3-300 characters.'
                 : null;
           },
         ),

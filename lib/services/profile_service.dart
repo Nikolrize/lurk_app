@@ -87,7 +87,7 @@ class ProfileService {
     final cleanRegion = region.trim();
 
     if (cleanUsername.length < 3 || cleanUsername.length > 30) {
-      throw ArgumentError('Username must contain 3–30 characters.');
+      throw ArgumentError('Username must contain 3-30 characters.');
     }
 
     if (cleanBio.length > 500) {

@@ -20,7 +20,7 @@ class PartyChatService {
   Future<void> send(String partyId, String uid, String text) async {
     final clean = text.trim();
     if (clean.isEmpty || clean.length > 2000) {
-      throw ArgumentError('Messages must contain 1–2000 characters.');
+      throw ArgumentError('Messages must contain 1-2000 characters.');
     }
     if (FirebaseAuth.instance.currentUser?.uid != uid) {
       throw StateError('Please sign in again.');

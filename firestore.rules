@@ -142,6 +142,17 @@ service cloud.firestore {
         && get(/databases/$(database)/documents/verification_admins/$(request.auth.uid)).data.get('enabled', false) == true;
     }
 
+    //verification for id (IC and passport)
+    function validVerificationId(data) {
+      return data.idNumber is string && (
+        (data.idType == 'nric'
+          && data.idNumber.matches('^[0-9]{12}$'))
+        || (data.idType == 'passport'
+          && data.idNumber.matches('^[A-Z0-9]{6,20}$')
+          && data.idNumber.matches('.*[0-9].*'))
+      );
+    }
+
     function verificationText(value, minimum, maximum) {
       return value is string
         && value.size() >= minimum
@@ -212,6 +223,7 @@ service cloud.firestore {
       function validNewSubmission(data) {
         return owns(uid)
           && validVerificationRequest(data)
+          && validVerificationId(data)
           && data.status == 'pending'
           && data.submittedAt == request.time
           && matchingPublicStatus('pending');

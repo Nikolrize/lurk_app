@@ -5,6 +5,8 @@ import 'package:firebase_database/firebase_database.dart';
 import '../models/player_presence.dart';
 import '../models/player_status.dart';
 
+import '../core/data/game_catalog.dart';
+
 class PresenceService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
 
@@ -73,6 +75,7 @@ class PresenceService {
   Future<void> openSession({
     required String expectedUid,
     required String sessionId,
+    String? gameId,
     required bool idle,
     bool Function()? shouldContinue,
   }) async {
@@ -93,13 +96,21 @@ class PresenceService {
 
     final session = _sessionReference(expectedUid, sessionId);
 
+    final activity = _db.ref(
+      'presence/$expectedUid/activities/$sessionId',
+    );
+
     await session.onDisconnect().remove();
+    await activity.onDisconnect().remove();
 
     if (!canContinue()) return;
     _checkAccount(expectedUid);
 
-    await session.set(
-      idle ? PlayerStatus.idle.id : PlayerStatus.online.id,
+    await _writeSession(
+      expectedUid: expectedUid,
+      sessionId: sessionId,
+      idle: idle,
+      gameId: gameId,
     );
   }
 
@@ -107,13 +118,15 @@ class PresenceService {
     required String expectedUid,
     required String sessionId,
     required bool idle,
+    String? gameId,
   }) {
-    _checkAccount(expectedUid);
-
-    return _sessionReference(expectedUid, sessionId).set(
-      idle ? PlayerStatus.idle.id : PlayerStatus.online.id,
+    return _writeSession(
+      expectedUid: expectedUid,
+      sessionId: sessionId,
+      idle: idle,
+      gameId: gameId,
     );
-  }
+  } 
 
   Future<void> closeSession({
     required String expectedUid,
@@ -123,13 +136,43 @@ class PresenceService {
 
     final session = _sessionReference(expectedUid, sessionId);
 
-    await session.remove();
+    final activity = _db.ref(
+      'presence/$expectedUid/activities/$sessionId',
+    );
 
-    //remove the session when connection has ended
+    await session.parent!.parent!.update({
+      'sessions/$sessionId': null,
+      'activities/$sessionId': null,
+    });
+
+    //disconnects session when closed
     await session.onDisconnect().cancel();
+    await activity.onDisconnect().cancel();
   }
 
   Future<void> connect() => _db.goOnline();
 
   Future<void> disconnect() => _db.goOffline();
+
+  //include game in current session
+  Future<void> _writeSession({
+    required String expectedUid,
+    required String sessionId,
+    required bool idle,
+    String? gameId,
+  }) {
+    _checkAccount(expectedUid);
+
+    final session = _sessionReference(expectedUid, sessionId);
+
+    if (gameId != null && !GameCatalog.games.containsKey(gameId)) {
+      throw ArgumentError('Unsupported party game.');
+    }
+
+    return session.parent!.parent!.update({
+      'sessions/$sessionId':
+          idle ? PlayerStatus.idle.id : PlayerStatus.online.id,
+      'activities/$sessionId': gameId,
+  });
+}
 }

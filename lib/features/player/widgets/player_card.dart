@@ -7,17 +7,27 @@ import 'package:lurk_app/core/widgets/player_status_badge.dart';
 
 import 'package:lurk_app/core/widgets/player_verification_badge.dart';
 
-class PlayerCard extends StatelessWidget {
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:lurk_app/core/data/game_catalog.dart';
+import 'package:lurk_app/providers/presence_provider.dart';
+
+class PlayerCard extends ConsumerWidget {
   const PlayerCard({super.key, required this.player, this.onTap});
 
   final Player player;
   final VoidCallback? onTap;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final colors = Theme.of(context).colorScheme;
     final text = Theme.of(context).textTheme;
-    final game = player.currentGame?.trim();
+    final gameId = ref
+        .watch(playerPresenceProvider(player.id))
+        .asData
+        ?.value
+        ?.playingGameId;
+
+    final game = GameCatalog.games[gameId]?.name;
     final content = Padding(
       padding: const EdgeInsets.all(16),
       child: Row(

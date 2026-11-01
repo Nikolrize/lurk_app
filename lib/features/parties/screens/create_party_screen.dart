@@ -312,7 +312,7 @@ class _CreatePartyScreenState extends ConsumerState<CreatePartyScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          '${ranks[_ranks.start.round()]} — ${ranks[_ranks.end.round()]}',
+                          '${ranks[_ranks.start.round()]} - ${ranks[_ranks.end.round()]}',
                         ),
                         RangeSlider(
                           values: _ranks,

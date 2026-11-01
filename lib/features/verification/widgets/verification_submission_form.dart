@@ -7,6 +7,8 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:lurk_app/providers/verification_provider.dart';
 import '../models/verification_request.dart';
 
+import '../models/verification_id_validator.dart';
+
 class VerificationSubmissionForm extends ConsumerStatefulWidget {
   const VerificationSubmissionForm({
     super.key,
@@ -204,7 +206,7 @@ class _VerificationSubmissionFormState
               validator: (value) {
                 final length = value?.trim().length ?? 0;
                 return length < 2 || length > 100
-                    ? 'Use 2–100 characters.'
+                    ? 'Use 2-100 characters.'
                     : null;
               },
             ),
@@ -238,17 +240,25 @@ class _VerificationSubmissionFormState
             ),
             const SizedBox(height: 20),
             TextFormField(
+              key: ValueKey('id-number:$_idType'),
               controller: _number,
               enabled: !_busy,
-              maxLength: 40,
+              maxLength: _idType == 'nric' ? 14 : 20,
+              keyboardType: _idType == 'nric' ? TextInputType.number : TextInputType.text,
+              textCapitalization: _idType == 'passport' ? TextCapitalization.characters : TextCapitalization.none,
               autocorrect: false,
               enableSuggestions: false,
-              decoration: const InputDecoration(labelText: 'ID number'),
+              autovalidateMode: AutovalidateMode.onUserInteraction,
+              decoration: InputDecoration(
+                labelText: _idType == 'nric' ? 'NRIC number' : 'Passport number',
+                helperText: _idType == 'nric' ? '12 digits; hyphens are optional.': '6-20 letters/numbers, including a digit.',
+                helperMaxLines: 2,
+              ),
               validator: (value) {
-                final length = value?.trim().length ?? 0;
-                return length < 4 || length > 40
-                    ? 'Use 4–40 characters.'
-                    : null;
+                return VerificationIdValidator.validate(
+                  idType: _idType,
+                  value: value ?? '',
+                );
               },
             ),
             const SizedBox(height: 12),
@@ -256,9 +266,7 @@ class _VerificationSubmissionFormState
               onPressed: _busy ? null : _pickImage,
               icon: const Icon(Icons.add_photo_alternate_outlined),
               label: Text(
-                _picking
-                    ? 'Selecting photo...'
-                    : (_image == null ? 'Choose ID photo' : 'Change ID photo'),
+                _picking ? 'Selecting photo...' : (_image == null ? 'Choose ID photo' : 'Change ID photo'),
               ),
             ),
             const SizedBox(height: 8),

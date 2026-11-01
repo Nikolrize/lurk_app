@@ -184,7 +184,7 @@ class ChatService {
   Future<void> sendMessage(String chatId, String uid, String text) async {
     final clean = text.trim();
     if (clean.isEmpty || clean.length > 2000) {
-      throw ArgumentError('Messages must contain 1–2000 characters.');
+      throw ArgumentError('Messages must contain 1-2000 characters.');
     }
     await _send(chatId, uid, clean, {'type': 'text'});
   }

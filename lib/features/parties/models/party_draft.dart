@@ -41,7 +41,7 @@ class PartyDraft {
 
   void validate() {
     if (title.trim().isEmpty || title.trim().length > 60) {
-      throw ArgumentError('Enter a party name of 1–60 characters.');
+      throw ArgumentError('Enter a party name of 1-60 characters.');
     }
     if (!games.containsKey(gameId) ||
         !regions.containsKey(region) ||
