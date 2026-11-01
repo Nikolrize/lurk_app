@@ -1,4 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'dart:async';
+import 'notification_trigger_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../features/chat/models/chat_message.dart';
 
@@ -40,5 +42,14 @@ class PartyChatService {
         'createdAt': FieldValue.serverTimestamp(),
       });
     });
+    unawaited(
+      NotificationTriggerService.notify(
+        firestore: _db,
+        uid: uid,
+        conversationId: partyId,
+        messageId: message.id,
+        party: true,
+      ),
+    );
   }
 }

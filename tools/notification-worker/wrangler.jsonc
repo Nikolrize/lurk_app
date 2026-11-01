@@ -1,0 +1,10 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "lurk-notifications",
+  "main": "src/worker.mjs",
+  "compatibility_date": "2026-11-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": true,
+  "vars": {"FIREBASE_PROJECT_ID": "lurk-mae"},
+  "observability": {"enabled": false}
+}

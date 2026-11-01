@@ -1,6 +1,6 @@
-const test = require('node:test');
-const assert = require('node:assert/strict');
-const {createPartySender} = require('./sender');
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {createPartySender} from './src/sender.mjs';
 const time = ms => ({toMillis: () => ms});
 const member = (id, extra = {}) => ({id, leftAt: null, joinedAt: time(100), ...extra});
 const message = {senderId: 'alice', type: 'text', text: 'secret message', createdAt: time(200)};

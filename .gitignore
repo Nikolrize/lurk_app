@@ -34,7 +34,7 @@ migrate_working_dir/
 /coverage/
 **/node_modules/
 
-# Laptop sender credentials
+# Firebase server credentials
 **/service-account*.json
 **/*firebase-adminsdk*.json
 **/.secrets/
@@ -53,3 +53,6 @@ app.*.map.json
 # Local voice server secrets and device configuration
 /tools/voice-server/.env
 /config/voice.local.json
+
+# Cloudflare notification server secrets and device configuration
+/config/notification.local.json

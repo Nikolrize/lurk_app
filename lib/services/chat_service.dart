@@ -1,5 +1,7 @@
 import '../features/chat/models/chat_receipt.dart';
 import 'dart:convert';
+import 'dart:async';
+import 'notification_trigger_service.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../features/chat/models/chat.dart';
 import '../features/chat/models/chat_message.dart';
@@ -277,5 +279,13 @@ class ChatService {
         'updatedAt': FieldValue.serverTimestamp(),
       });
     });
+    unawaited(
+      NotificationTriggerService.notify(
+        firestore: _db,
+        uid: uid,
+        conversationId: chatId,
+        messageId: message.id,
+      ),
+    );
   }
 }

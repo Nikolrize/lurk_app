@@ -1,4 +1,4 @@
-const {createHash} = require('node:crypto');
+import {createHash} from 'node:crypto';
 
 function payloadFor(chatId, messageId, message, recipientId) {
   const invitation = message.type === 'party_invite';
@@ -58,7 +58,7 @@ function createDelivery({store, messaging, dryRun, log}) {
   };
 }
 
-function createPartySender({store, messaging, dryRun = false, log = console.log}) {
+function createPartySender({store, messaging, dryRun = false, log = console.log, throwOnError = false}) {
   const deliver = createDelivery({store, messaging, dryRun, log});
   return async (partyId, messageId, message) => {
     if (message.type !== 'text' || typeof message.senderId !== 'string') return;
@@ -79,9 +79,10 @@ function createPartySender({store, messaging, dryRun = false, log = console.log}
         };
         await deliver(message, member.id, payload, ['party', partyId, messageId, member.id]);
       } catch (error) {
+        if (throwOnError) throw error;
         log('Party notification attempt failed (' + (error.code || 'unknown') + ').');
       }
     }
   };
 }
-module.exports = {createSender, createPartySender, payloadFor};
+export {createSender, createPartySender, payloadFor};
