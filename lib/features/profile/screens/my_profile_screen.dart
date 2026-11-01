@@ -32,7 +32,6 @@ class MyProfileScreen extends ConsumerStatefulWidget {
     this.onAvailability,
     this.onPartyHistory,
     this.onVerification,
-    this.onPrivacyAndSafety,
     this.onBlockedPlayers,
     this.onSettings,
   });
@@ -45,7 +44,6 @@ class MyProfileScreen extends ConsumerStatefulWidget {
   final VoidCallback? onAvailability;
   final VoidCallback? onPartyHistory;
   final VoidCallback? onVerification;
-  final VoidCallback? onPrivacyAndSafety;
   final VoidCallback? onBlockedPlayers;
   final VoidCallback? onSettings;
 
@@ -395,11 +393,6 @@ class _MyProfileScreenState extends ConsumerState<MyProfileScreen> {
                                     icon: Icons.verified_user_outlined,
                                     title: 'Verification',
                                     onTap: widget.onVerification ?? _openVerification,
-                                  ),
-                                  (
-                                    icon: Icons.shield_outlined,
-                                    title: 'Privacy & Safety',
-                                    onTap: widget.onPrivacyAndSafety,
                                   ),
                                   (
                                     icon: Icons.block_outlined,
