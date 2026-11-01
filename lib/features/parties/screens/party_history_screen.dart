@@ -1,3 +1,4 @@
+import '../../../providers/discovery_limits.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/data/game_catalog.dart';
@@ -86,12 +87,13 @@ class _PartyHistoryScreenState extends ConsumerState<PartyHistoryScreen> {
             ),
           ),
           const SizedBox(height: 18),
-          if (history.asData?.value.length == 50)
+          if (history.asData?.value.length == ref.watch(historyLimitProvider))
             Padding(
               padding: const EdgeInsets.fromLTRB(24, 0, 24, 12),
-              child: Text(
-                'Showing your 50 most recently joined parties',
-                style: Theme.of(context).textTheme.bodySmall,
+              child: TextButton(
+                onPressed: () =>
+                    ref.read(historyLimitProvider.notifier).loadMore(),
+                child: const Text('Load older parties'),
               ),
             ),
           Expanded(

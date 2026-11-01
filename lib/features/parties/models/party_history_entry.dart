@@ -30,14 +30,17 @@ class PartyHistoryEntry {
     required this.record,
     required this.endedAt,
     this.party,
+    this.participationDuration,
   });
   final PartyHistoryRecord record;
   final DateTime? endedAt;
   final Party? party;
+  final Duration? participationDuration;
   String get title => party?.title ?? record.title;
   String get gameId => party?.gameId ?? record.gameId;
   String get mode => party?.mode ?? record.mode;
   Duration? get duration {
+    if (participationDuration != null) return participationDuration;
     final start = record.joinedAt, end = endedAt;
     return start == null || end == null || end.isBefore(start)
         ? null

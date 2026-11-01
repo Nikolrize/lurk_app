@@ -1,5 +1,5 @@
+import '../features/parties/models/party_join_eligibility.dart';
 import 'party_membership_events.dart';
-import '../core/data/gaming_regions.dart';
 import '../features/parties/models/party_history_entry.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../features/parties/models/party_draft.dart';
@@ -100,122 +100,167 @@ class PartyService {
     final party = _firestore.collection('parties').doc(id);
     final member = party.collection('members').doc(expectedUid);
     final current = _firestore.collection('party_memberships').doc(expectedUid);
-    final switchedFrom = await _firestore.runTransaction<String?>((
-      transaction,
-    ) async {
-      String? previousActiveParty;
-      final snapshot = await transaction.get(party);
-      final membership = await transaction.get(member);
-      final pointer = await transaction.get(current);
-      final data = snapshot.data();
-      if (data == null || data['status'] != 'open') {
-        throw StateError('This party session has ended.');
-      }
-      if (data['hostId'] == expectedUid ||
-          (membership.exists && membership.data()?['leftAt'] == null)) {
-        return null;
-      }
-      if ((data['memberCount'] as num) >= (data['maxPlayers'] as num)) {
-        throw StateError('This party is full.');
-      }
-      final profile = await transaction.get(
-        _firestore.collection('players').doc(expectedUid),
-      );
-      final partyRegion = GamingRegions.idFor(data['region'] as String?);
-      if (partyRegion == null ||
-          GamingRegions.idFor(profile.data()?['region'] as String?) !=
-              partyRegion) {
-        throw StateError(
-          'Your profile region must match this party’s region to join.',
+    final rejection = PartyJoinRejection();
+    final switchedFrom = await rejection.run(
+      () => _firestore.runTransaction<String?>((transaction) async {
+        rejection.reset();
+        String? previousActiveParty;
+        final snapshot = await transaction.get(party);
+        final membership = await transaction.get(member);
+        final pointer = await transaction.get(current);
+        final historySnapshot = await transaction.get(
+          _history(expectedUid, id),
         );
-      }
-      final minimum = (data['minimumRating'] as num?)?.toDouble() ?? 0;
-      if (minimum > 0) {
-        final summary = (await transaction.get(
-          _firestore.collection('player_rating_summaries').doc(expectedUid),
-        )).data();
-        final count = (summary?['count'] as num?)?.toInt() ?? 0;
-        final total = (summary?['total'] as num?)?.toDouble() ?? 0;
-        if (count == 0 || total < minimum * count) {
-          throw StateError(
-            'This party requires a player rating of ${minimum.toStringAsFixed(1)} or above.',
-          );
+        final data = snapshot.data();
+        if (data == null || data['status'] != 'open') {
+          rejection.reject('This party session has ended.');
         }
-      }
-      if (membership.data()?['removedBy'] != null) {
-        final invitation = await transaction.get(
-          party.collection('invitations').doc(expectedUid),
-        );
-        final sent = invitation.data()?['createdAt'] as Timestamp?;
-        final removed = membership.data()?['leftAt'] as Timestamp?;
-        if (sent == null || removed == null || sent.compareTo(removed) <= 0) {
-          throw StateError(
-            'You were removed from this party. Ask the host for a new invitation to rejoin.',
-          );
+        if (data['hostId'] == expectedUid ||
+            (membership.exists && membership.data()?['leftAt'] == null)) {
+          return null;
         }
-      }
-      final hosted = await transaction.get(
-        _firestore.collection('party_host_slots').doc(expectedUid),
-      );
-      if ((hosted.data()?['activeCount'] as num? ?? 0) > 0) {
-        throw StateError(
-          'End your hosted party session before joining another party.',
+        if ((data['memberCount'] as num) >= (data['maxPlayers'] as num)) {
+          rejection.reject('This party is full.');
+        }
+        final profile = await transaction.get(
+          _firestore.collection('players').doc(expectedUid),
         );
-      }
-      final previousId = pointer.data()?['partyId'] as String?;
-      if (previousId != null && previousId != id) {
-        final previousParty = _firestore.collection('parties').doc(previousId);
-        final previousMember = await transaction.get(
-          previousParty.collection('members').doc(expectedUid),
-        );
-        final previous =
-            previousMember.exists && previousMember.data()?['leftAt'] == null
-            ? await transaction.get(previousParty)
+        final minimum = (data['minimumRating'] as num?)?.toDouble() ?? 0;
+        final summary = minimum > 0
+            ? (await transaction.get(
+                _firestore
+                    .collection('player_rating_summaries')
+                    .doc(expectedUid),
+              )).data()
             : null;
-        if (previous?.data()?['status'] == 'open') {
-          if (switchFromPartyId != previousId) {
-            throw StateError(
-              'Your current party changed. Reopen the preview and confirm switching parties.',
+        final reason = partyRequirementMessage(
+          party: data,
+          profile: profile.data(),
+          ratingSummary: summary,
+        );
+        if (reason != null) rejection.reject(reason);
+        final needsInvite = data['visibility'] == 'private';
+        final removed = membership.data()?['removedBy'] != null;
+        if (needsInvite || removed) {
+          final invitation = await transaction.get(
+            party.collection('invitations').doc(expectedUid),
+          );
+          if (removed) {
+            final sent = invitation.data()?['createdAt'] as Timestamp?;
+            final left = membership.data()?['leftAt'] as Timestamp?;
+            if (sent == null || left == null || sent.compareTo(left) <= 0) {
+              rejection.reject(
+                'You were removed from this party. Ask the host for a new invitation to rejoin.',
+              );
+            }
+          } else if (!invitation.exists) {
+            rejection.reject(
+              'This is a private party. Ask the host to send you an invitation before joining.',
             );
           }
-          if (previousMember.data()?['role'] != 'member') {
-            throw StateError(
-              'End your hosted party session before joining another party.',
+        }
+        final hostId = data['hostId'] as String;
+        for (final pair in [(expectedUid, hostId), (hostId, expectedUid)]) {
+          for (final path in ['blocked', 'users']) {
+            final block = await transaction.get(
+              _firestore
+                  .collection('player_blocks')
+                  .doc(pair.$1)
+                  .collection(path)
+                  .doc(pair.$2),
             );
+            if (block.exists) {
+              rejection.reject(
+                pair.$1 == expectedUid
+                    ? 'You blocked this party’s host. Unblock them before joining.'
+                    : 'You cannot join this party because the host has blocked your account.',
+              );
+            }
           }
-          previousActiveParty = previousId;
-          transaction.update(previousParty, {
-            'memberCount':
-                (previous!.data()!['memberCount'] as num).toInt() - 1,
-            'updatedAt': FieldValue.serverTimestamp(),
-          });
-          transaction.update(
-            previousParty.collection('members').doc(expectedUid),
-            {'leftAt': FieldValue.serverTimestamp()},
+        }
+        final hosted = await transaction.get(
+          _firestore.collection('party_host_slots').doc(expectedUid),
+        );
+        if ((hosted.data()?['activeCount'] as num? ?? 0) > 0) {
+          rejection.reject(
+            'End your hosted party session before joining another party.',
           );
         }
-      }
-      transaction.set(member, {
-        'role': 'member',
-        'joinedAt': FieldValue.serverTimestamp(),
-        'leftAt': null,
-      });
-      transaction.update(party, {
-        'memberCount': (data['memberCount'] as num).toInt() + 1,
-        'updatedAt': FieldValue.serverTimestamp(),
-      });
-      transaction.set(_history(expectedUid, id), {
-        'title': data['title'],
-        'gameId': data['gameId'],
-        'mode': data['mode'],
-        'joinedAt': FieldValue.serverTimestamp(),
-      });
-      transaction.set(current, {
-        'partyId': id,
-        'updatedAt': FieldValue.serverTimestamp(),
-      });
-      return previousActiveParty ?? '';
-    });
+        final previousId = pointer.data()?['partyId'] as String?;
+        if (previousId != null && previousId != id) {
+          final previousParty = _firestore
+              .collection('parties')
+              .doc(previousId);
+          final previousMember = await transaction.get(
+            previousParty.collection('members').doc(expectedUid),
+          );
+          final previous =
+              previousMember.exists && previousMember.data()?['leftAt'] == null
+              ? await transaction.get(previousParty)
+              : null;
+          if (previous?.data()?['status'] == 'open') {
+            if (switchFromPartyId != previousId) {
+              rejection.reject(
+                'Your current party changed. Reopen the preview and confirm switching parties.',
+              );
+            }
+            if (previousMember.data()?['role'] != 'member') {
+              rejection.reject(
+                'End your hosted party session before joining another party.',
+              );
+            }
+            previousActiveParty = previousId;
+            transaction.update(previousParty, {
+              'memberCount':
+                  (previous!.data()!['memberCount'] as num).toInt() - 1,
+              'updatedAt': FieldValue.serverTimestamp(),
+            });
+            transaction.update(
+              previousParty.collection('members').doc(expectedUid),
+              {'leftAt': FieldValue.serverTimestamp()},
+            );
+          }
+        }
+        // Preserve the completed visit before replacing the live membership.
+        final previousVisit = membership.data();
+        if (previousVisit?['joinedAt'] is Timestamp &&
+            previousVisit?['leftAt'] is Timestamp) {
+          final joinedAt = previousVisit!['joinedAt'] as Timestamp;
+          transaction.set(
+            party
+                .collection('visits')
+                .doc('${expectedUid}_${joinedAt.millisecondsSinceEpoch}'),
+            {
+              'uid': expectedUid,
+              'joinedAt': joinedAt,
+              'leftAt': previousVisit['leftAt'],
+            },
+          );
+        }
+        transaction.set(member, {
+          'role': 'member',
+          'joinedAt': FieldValue.serverTimestamp(),
+          'leftAt': null,
+        });
+        transaction.update(party, {
+          'memberCount': (data['memberCount'] as num).toInt() + 1,
+          'updatedAt': FieldValue.serverTimestamp(),
+        });
+        if (!historySnapshot.exists) {
+          transaction.set(_history(expectedUid, id), {
+            'title': data['title'],
+            'gameId': data['gameId'],
+            'mode': data['mode'],
+            'joinedAt': FieldValue.serverTimestamp(),
+          });
+        }
+        transaction.set(current, {
+          'partyId': id,
+          'updatedAt': FieldValue.serverTimestamp(),
+        });
+        return previousActiveParty ?? '';
+      }),
+    );
     if (switchedFrom != null) {
       if (switchedFrom.isNotEmpty) {
         PartyMembershipEvents.emit(expectedUid, switchedFrom, PartySound.leave);
@@ -494,14 +539,15 @@ class PartyService {
         });
   }
 
-  Stream<List<Party>> watchDiscoverableParties() {
+  Stream<List<Party>> watchDiscoverableParties({int limit = 100}) {
     // Match security rules; private/completed parties never enter the client list.
-    // Bounded initial discovery feed. Add pagination before expanding this limit.
+    // Find increases this live query limit when another page is requested.
     return _firestore
         .collection('parties')
         .where('visibility', isEqualTo: 'public')
         .where('status', isEqualTo: 'open')
-        .limit(100)
+        .orderBy('createdAt', descending: true)
+        .limit(limit)
         .snapshots()
         .map((snapshot) {
           final parties = snapshot.docs
@@ -526,18 +572,19 @@ class PartyService {
       .collection('party_history')
       .doc(partyId);
 
-  Stream<List<PartyHistoryRecord>> watchHistory(String uid) => _firestore
-      .collection('players')
-      .doc(uid)
-      .collection('party_history')
-      .orderBy('joinedAt', descending: true)
-      .limit(50)
-      .snapshots()
-      .map(
-        (snapshot) => snapshot.docs
-            .map((doc) => PartyHistoryRecord.fromMap(doc.id, doc.data()))
-            .toList(),
-      );
+  Stream<List<PartyHistoryRecord>> watchHistory(String uid, {int limit = 50}) =>
+      _firestore
+          .collection('players')
+          .doc(uid)
+          .collection('party_history')
+          .orderBy('joinedAt', descending: true)
+          .limit(limit)
+          .snapshots()
+          .map(
+            (snapshot) => snapshot.docs
+                .map((doc) => PartyHistoryRecord.fromMap(doc.id, doc.data()))
+                .toList(),
+          );
 
   Stream<List<String>> watchHistoryMemberIds(String id) => _firestore
       .collection('parties')
@@ -550,17 +597,27 @@ class PartyService {
     String gameId, {
     required String regionId,
   }) async {
-    // Bounded, game-specific pool; joining is still validated transactionally.
-    final snapshot = await _firestore
+    // Read the game-specific pool in pages; joining is validated transactionally.
+    final query = _firestore
         .collection('parties')
         .where('gameId', isEqualTo: gameId)
         .where('region', isEqualTo: regionId)
         .where('visibility', isEqualTo: 'public')
         .where('status', isEqualTo: 'open')
-        .limit(100)
-        .get(const GetOptions(source: Source.server));
-    return snapshot.docs
-        .map((doc) => Party.fromFirestoreData(doc.id, doc.data()))
-        .toList();
+        .orderBy(FieldPath.documentId)
+        .limit(100);
+    final parties = <Party>[];
+    QueryDocumentSnapshot<Map<String, dynamic>>? cursor;
+    while (true) {
+      final page =
+          await (cursor == null ? query : query.startAfterDocument(cursor)).get(
+            const GetOptions(source: Source.server),
+          );
+      parties.addAll(
+        page.docs.map((doc) => Party.fromFirestoreData(doc.id, doc.data())),
+      );
+      if (page.docs.length < 100) return parties;
+      cursor = page.docs.last;
+    }
   }
 }

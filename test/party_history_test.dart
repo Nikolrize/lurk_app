@@ -1,3 +1,4 @@
+import 'package:lurk_app/providers/rating_provider.dart';
 import 'package:lurk_app/providers/profile_provider.dart';
 import 'package:lurk_app/models/player_profile.dart';
 import 'dart:async';
@@ -81,6 +82,10 @@ void main() {
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
+            archivedPartyVisitsProvider.overrideWith(
+              (ref, id) => Stream.value([]),
+            ),
+            ratingCandidatesProvider.overrideWith((ref, id) async => []),
             partyHistoryMemberIdsProvider.overrideWith(
               (ref, id) => Stream.value(['host', 'former']),
             ),

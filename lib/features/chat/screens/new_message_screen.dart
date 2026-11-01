@@ -94,7 +94,10 @@ class _NewMessageScreenState extends ConsumerState<NewMessageScreen> {
                     icon: Icons.cloud_off_outlined,
                     title: 'Could not load players',
                     description: 'Check your connection and try again.',
-                    onRetry: () => ref.invalidate(discoverablePlayersProvider),
+                    onRetry: () {
+                      ref.invalidate(playerDiscoveryPageProvider);
+                      ref.invalidate(discoverablePlayersProvider);
+                    },
                   ),
                   data: (items) {
                     final uid = ref.watch(authStateProvider).asData?.value?.uid;

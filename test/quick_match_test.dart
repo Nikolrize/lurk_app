@@ -1,3 +1,7 @@
+import 'package:lurk_app/providers/party_matching_provider.dart';
+import 'package:lurk_app/providers/rating_provider.dart';
+import 'package:lurk_app/services/player_safety_service.dart';
+import 'package:lurk_app/features/ratings/models/teammate_rating.dart';
 import 'package:lurk_app/models/player_profile.dart';
 import 'package:lurk_app/core/data/gaming_regions.dart';
 import 'dart:async';
@@ -62,8 +66,18 @@ Widget app(
   QuickService service, {
   String? game = 'valorant',
   String region = 'Asia',
+  bool hosting = false,
 }) => ProviderScope(
   overrides: [
+    currentHostedPartyProvider.overrideWith(
+      (ref) =>
+          Stream.value(hosting ? candidate('hosted', host: 'viewer') : null),
+    ),
+    blockedPlayersProvider.overrideWith((ref) => Stream.value({})),
+    hostBlocksViewerProvider.overrideWith((ref, host) => Stream.value(false)),
+    ratingSummaryProvider.overrideWith(
+      (ref, uid) => Stream.value(const RatingSummary()),
+    ),
     authStateProvider.overrideWith((ref) => Stream.value(QuickUser())),
     gamingPreferencesProvider(
       'viewer',
@@ -89,6 +103,21 @@ Widget app(
 );
 
 void main() {
+  testWidgets(
+    'Hosts are told to finish their party before matching another one',
+    (tester) async {
+      final service = QuickService();
+      await tester.pumpWidget(app(service, hosting: true));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Quick Match'));
+      await tester.pumpAndSettle();
+      expect(
+        find.text('End your hosted party before using Quick Match.'),
+        findsOneWidget,
+      );
+      expect(service.calls, 0);
+    },
+  );
   test('Profile labels and database region IDs normalize consistently', () {
     expect(GamingRegions.idFor(' North America '), 'north_america');
     expect(GamingRegions.idFor('north_america'), 'north_america');
@@ -192,7 +221,7 @@ void main() {
     await tester.tap(find.text('Quick Match'));
     await tester.pumpAndSettle();
     expect(
-      find.textContaining('No open Valorant parties with space'),
+      find.textContaining('No eligible Valorant parties with space'),
       findsOneWidget,
     );
     expect(find.text('Join Party'), findsNothing);

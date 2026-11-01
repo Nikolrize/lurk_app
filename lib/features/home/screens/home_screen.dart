@@ -1,3 +1,7 @@
+import '../../../providers/party_provider.dart';
+import '../../../providers/rating_provider.dart';
+import '../../../services/player_safety_service.dart';
+import '../../../providers/party_matching_provider.dart';
 import '../../parties/widgets/quick_match_card.dart';
 import '../widgets/home_games.dart';
 import '../../../providers/profile_provider.dart';
@@ -8,7 +12,6 @@ import '../../player/widgets/player_card.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lurk_app/features/parties/widgets/party_card.dart';
-import '../../../providers/party_provider.dart';
 import '../../parties/widgets/party_load_error.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../providers/auth_provider.dart';
@@ -27,7 +30,7 @@ class HomeScreen extends ConsumerWidget {
         ? displayName
         : 'Player';
     final text = Theme.of(context).textTheme;
-    final partyState = ref.watch(availablePartiesProvider);
+    final partyState = ref.watch(recommendedPartiesProvider);
     final playerState = ref.watch(discoverablePlayersProvider);
 
     return SafeArea(
@@ -81,12 +84,24 @@ class HomeScreen extends ConsumerWidget {
             ),
             error: (error, _) => PartyLoadError(
               error: error,
-              onRetry: () => ref.invalidate(availablePartiesProvider),
+              onRetry: () {
+                ref.invalidate(partyDiscoveryPageProvider);
+                ref.invalidate(availablePartiesProvider);
+                ref.invalidate(hostBlocksViewerProvider);
+                ref.invalidate(blockedPlayersProvider);
+                if (uid != null) {
+                  ref.invalidate(playerProfileProvider(uid));
+                  ref.invalidate(gamingPreferencesProvider(uid));
+                  ref.invalidate(ratingSummaryProvider(uid));
+                }
+              },
             ),
             data: (parties) => parties.isEmpty
                 ? const Padding(
                     padding: EdgeInsets.symmetric(vertical: 16),
-                    child: Text('No open parties yet. Check back soon.'),
+                    child: Text(
+                      'No matching parties yet. Set your games and region, or explore Find.',
+                    ),
                   )
                 : Column(
                     children: [
@@ -117,7 +132,10 @@ class HomeScreen extends ConsumerWidget {
             ),
             error: (error, _) => PlayerLoadError(
               error: error,
-              onRetry: () => ref.invalidate(discoverablePlayersProvider),
+              onRetry: () {
+                ref.invalidate(playerDiscoveryPageProvider);
+                ref.invalidate(discoverablePlayersProvider);
+              },
             ),
             data: (players) {
               final available = players

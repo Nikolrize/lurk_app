@@ -7,6 +7,25 @@ import '../../../providers/auth_provider.dart';
 import '../../../providers/party_provider.dart';
 import '../models/party.dart';
 
+String partyJoinErrorMessage(Object error) {
+  if (error is StateError) return error.message.toString();
+  if (error is FirebaseException) {
+    return switch (error.code) {
+      'permission-denied' =>
+        'This party is no longer accessible to your account. Refresh its details or ask the host for a new invitation.',
+      'unauthenticated' =>
+        'Your sign-in session expired. Sign in again before joining.',
+      'not-found' => 'This party no longer exists.',
+      'unavailable' || 'deadline-exceeded' =>
+        'Couldn’t check the party requirements. Check your connection and try again.',
+      'aborted' =>
+        'Party membership changed while you were joining. Please try again.',
+      _ => 'The party could not be joined. Refresh its details and try again.',
+    };
+  }
+  return 'Something went wrong while joining. Please try again.';
+}
+
 class PartyJoinButton extends ConsumerStatefulWidget {
   const PartyJoinButton({
     super.key,
@@ -137,11 +156,7 @@ Future<void> joinPartyAndOpen(
     Navigator.of(context).popUntil((route) => route.isFirst);
   } catch (error) {
     if (!context.mounted) return;
-    final message = error is StateError
-        ? error.message.toString()
-        : error is FirebaseException && error.code == 'permission-denied'
-        ? 'Unable to join. You may need an invitation, or this party is no longer available.'
-        : 'Unable to join the party. Check your connection and try again.';
+    final message = partyJoinErrorMessage(error);
     if (onError != null) {
       onError(message);
     } else {
