@@ -104,6 +104,31 @@ Widget app(JoinService service, {String? currentPartyId}) => ProviderScope(
   ),
 );
 void main() {
+  for (final message in [
+    'This party requires Valorant rank Silver–Diamond. Your rank is Bronze.',
+    'This party requires a 4.0+ player rating. You haven’t received any ratings yet.',
+    'This party requires region Asia. Your profile region is Europe.',
+    'You blocked this party’s host. Unblock them before joining.',
+    'This is a private party. Ask the host to send you an invitation before joining.',
+  ]) {
+    testWidgets(
+      'The party preview displays the exact join rejection: $message',
+      (tester) async {
+        final service = JoinService();
+        await tester.pumpWidget(app(service));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Join'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Join Party'));
+        await tester.pump();
+        service.result.completeError(StateError(message));
+        await tester.pumpAndSettle();
+        expect(find.text(message), findsOneWidget);
+        expect(find.text('Opened squad'), findsNothing);
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
   testWidgets('Current squad Join is disabled for members', (tester) async {
     final service = JoinService();
     await tester.pumpWidget(app(service, currentPartyId: 'squad'));

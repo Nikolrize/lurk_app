@@ -1,3 +1,4 @@
+import 'discovery_limits.dart';
 import '../services/player_safety_service.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../features/player/models/player.dart';
@@ -5,7 +6,7 @@ import '../services/player_service.dart';
 import 'auth_provider.dart';
 
 final playerServiceProvider = Provider<PlayerService>((ref) => PlayerService());
-final discoverablePlayersProvider = StreamProvider.autoDispose<List<Player>>((
+final playerDiscoveryPageProvider = StreamProvider.autoDispose<List<Player>>((
   ref,
 ) {
   final auth = ref.watch(authStateProvider);
@@ -19,9 +20,27 @@ final discoverablePlayersProvider = StreamProvider.autoDispose<List<Player>>((
   final ids = blocked.requireValue;
   return ref
       .watch(playerServiceProvider)
-      .watchDiscoverablePlayers(uid)
-      .map(
-        (players) =>
-            players.where((player) => !ids.contains(player.id)).toList(),
+      .watchDiscoverablePlayers(
+        uid,
+        limit: ref.watch(playerDiscoveryLimitProvider) + 1,
+        excludedIds: ids,
       );
+}, retry: (retryCount, error) => null);
+
+final hasMorePlayersProvider = Provider.autoDispose<bool>((ref) {
+  final page = ref.watch(playerDiscoveryPageProvider).asData?.value;
+  return page != null && page.length > ref.watch(playerDiscoveryLimitProvider);
+});
+
+final discoverablePlayersProvider = StreamProvider.autoDispose<List<Player>>((
+  ref,
+) {
+  final page = ref.watch(playerDiscoveryPageProvider);
+  final limit = ref.watch(playerDiscoveryLimitProvider);
+  return page.when(
+    data: (players) =>
+        Stream.value(players.take(limit).toList(growable: false)),
+    loading: () => const Stream<List<Player>>.empty(),
+    error: (error, stack) => Stream<List<Player>>.error(error, stack),
+  );
 }, retry: (retryCount, error) => null);

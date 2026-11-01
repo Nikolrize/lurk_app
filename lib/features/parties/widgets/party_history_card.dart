@@ -1,3 +1,5 @@
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../providers/rating_provider.dart';
 import '../../../core/widgets/game_icon.dart';
 import 'package:flutter/material.dart';
 import '../../../core/data/game_catalog.dart';
@@ -5,7 +7,7 @@ import '../models/party.dart';
 import '../models/party_history_entry.dart';
 import 'party_preview_drawer.dart';
 
-class PartyHistoryCard extends StatelessWidget {
+class PartyHistoryCard extends ConsumerWidget {
   const PartyHistoryCard({super.key, required this.entry, this.onRate});
   final PartyHistoryEntry entry;
   final VoidCallback? onRate;
@@ -23,7 +25,13 @@ class PartyHistoryCard extends StatelessWidget {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final candidates = ref.watch(
+      ratingCandidatesProvider(entry.record.partyId),
+    );
+    final allRated =
+        candidates.asData?.value.isNotEmpty == true &&
+        candidates.asData!.value.every((p) => p.rated);
     final colors = Theme.of(context).colorScheme;
     final text = Theme.of(context).textTheme;
     final date = entry.endedAt?.toLocal();
@@ -123,7 +131,7 @@ class PartyHistoryCard extends StatelessWidget {
                             minimumSize: const Size(64, 36),
                             padding: const EdgeInsets.symmetric(horizontal: 14),
                           ),
-                          child: const Text('Rate'),
+                          child: Text(allRated ? 'Rated' : 'Rate'),
                         ),
                       ),
                     ],

@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import { assertFails, assertSucceeds, initializeTestEnvironment } from '@firebase/rules-unit-testing';
-import { doc, setDoc, getDoc, deleteDoc, serverTimestamp, writeBatch } from 'firebase/firestore';
+import { doc, setDoc, getDoc, getDocs, collection, deleteDoc, serverTimestamp, writeBatch } from 'firebase/firestore';
 test('reports are private and blocks prevent messages in both directions', async () => {
   const env = await initializeTestEnvironment({projectId: 'demo-lurk-safety', firestore: {
     host: '127.0.0.1', port: 8080, rules: readFileSync(new URL('../../firestore.rules', import.meta.url), 'utf8')}});
@@ -23,7 +23,10 @@ test('reports are private and blocks prevent messages in both directions', async
     await assertSucceeds(setDoc(doc(alice, 'player_reports/single'), {...report, reasons: ['Other']}));
     const block = doc(alice, 'player_blocks/alice/blocked/bob');
     await assertSucceeds(setDoc(block, {createdAt: serverTimestamp()}));
-    await assertFails(getDoc(doc(bob, 'player_blocks/alice/blocked/bob')));
+    // A player may check only their own relationship, never another block list.
+    await assertSucceeds(getDoc(doc(bob, 'player_blocks/alice/blocked/bob')));
+    await assertFails(getDocs(collection(bob, 'player_blocks/alice/blocked')));
+    await assertFails(getDoc(doc(env.authenticatedContext('outsider').firestore(), 'player_blocks/alice/blocked/bob')));
     await assertFails(deleteDoc(doc(bob, 'player_blocks/alice/blocked/bob')));
     await assertFails(setDoc(doc(alice, 'player_blocks/alice/blocked/alice'), {createdAt: serverTimestamp()}));
     const send = (db, sender, id) => {
