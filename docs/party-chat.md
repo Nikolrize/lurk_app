@@ -29,12 +29,13 @@ Existing party creation, invitation, removal, and voice behavior is preserved.
    messages or display its conversation to that member.
 
 This uses the existing Spark Firestore quota. No paid backend is required.
-The laptop sender also sends FCM alerts for new party messages while it is running.
-Restart it after updating, and restart the Android app to load party-chat tap routing.
+The [Cloudflare notification Worker](../tools/notification-worker/README.md) sends
+FCM alerts for new party messages after the sending app saves them to Firestore.
+Rebuild the Android app after updating notification configuration or tap routing.
 Recipients must be current members who had joined when the message was sent; the
 sender receives no self-notification. Closed parties, departed members, blocks,
 and the account Chat messages preference are respected. Tapping opens the party
-chat only after checking live membership. Old messages are not pushed on restart.
+chat only after checking live membership. Historical messages are not replayed.
 Party-chat unread badges are not included. Direct-message counts are unchanged.
 
 ## Checks

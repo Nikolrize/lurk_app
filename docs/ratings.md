@@ -47,7 +47,7 @@ discovery/matchmaking fields are not rewritten by this profile-summary feature.
 6. Reopen the session: the same teammate must remain Rated. The other account can
    separately review you when its own participation has ended.
 
-No laptop notification/voice server or Blaze upgrade is needed for ratings. Feedback
+No notification or voice backend process or Blaze upgrade is needed for ratings. Feedback
 does not generate a push notification in this version.
 
 ## Verification

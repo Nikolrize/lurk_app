@@ -1,6 +1,6 @@
-const test = require('node:test');
-const assert = require('node:assert/strict');
-const {createSender} = require('./sender');
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {createSender} from './src/sender.mjs';
 
 function fixture(options = {}) {
   const sent = [], removed = [], logs = [], claims = new Set();

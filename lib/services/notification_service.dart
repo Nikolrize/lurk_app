@@ -12,7 +12,7 @@ Future<void> notificationBackgroundHandler(RemoteMessage message) async {
 }
 
 /// Push is enabled on Android first; other clients continue without push.
-// Token APIs support Console test sends and the laptop sender's Admin SDK.
+// Device registrations are used by the Cloudflare notification Worker.
 class NotificationService {
   NotificationService._();
   static final instance = NotificationService._();
