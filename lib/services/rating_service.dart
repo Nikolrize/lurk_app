@@ -41,10 +41,27 @@ class RatingService {
     final members = await party.collection('members').get();
     final own = members.docs.where((doc) => doc.id == uid).firstOrNull;
     if (own == null || snapshot.data() == null) return [];
+    final archives = await party.collection('visits').get();
+    final ended =
+        own.data()['leftAt'] != null || snapshot.data()!['status'] == 'closed';
+    if (!ended) return [];
+    List<Map<String, dynamic>> visits(
+      String id,
+      Map<String, dynamic> current,
+    ) => [
+      current,
+      ...archives.docs
+          .where((doc) => doc.data()['uid'] == id)
+          .map((doc) => doc.data()),
+    ];
     final eligible = members.docs.where(
       (doc) =>
           doc.id != uid &&
-          overlaps(own.data(), doc.data(), snapshot.data()!, DateTime.now()),
+          visits(uid, own.data()).any(
+            (me) => visits(doc.id, doc.data()).any(
+              (peer) => overlaps(me, peer, snapshot.data()!, DateTime.now()),
+            ),
+          ),
     );
     return Future.wait(
       eligible.map((member) async {
@@ -67,6 +84,48 @@ class RatingService {
     if (uid == target || FirebaseAuth.instance.currentUser?.uid != uid) {
       throw StateError('Choose another teammate and sign in again.');
     }
+    final party = _db.collection('parties').doc(partyId);
+    final session = (await party.get()).data();
+    final own = (await party.collection('members').doc(uid).get()).data();
+    final peer = (await party.collection('members').doc(target).get()).data();
+    if (session == null ||
+        own == null ||
+        peer == null ||
+        (own['leftAt'] == null && session['status'] != 'closed')) {
+      throw StateError(
+        'Ratings become available after your participation ends.',
+      );
+    }
+    final archives = await party.collection('visits').get();
+    final mine = <({Map<String, dynamic> data, String? id})>[
+      (data: own, id: null),
+      ...archives.docs
+          .where((d) => d.data()['uid'] == uid)
+          .map((d) => (data: d.data(), id: d.id)),
+    ];
+    final theirs = <({Map<String, dynamic> data, String? id})>[
+      (data: peer, id: null),
+      ...archives.docs
+          .where((d) => d.data()['uid'] == target)
+          .map((d) => (data: d.data(), id: d.id)),
+    ];
+    Map<String, String>? proof;
+    for (final me in mine) {
+      for (final other in theirs) {
+        if (overlaps(me.data, other.data, session, DateTime.now())) {
+          proof = {
+            if (me.id != null) 'ownVisitId': me.id!,
+            if (other.id != null) 'peerVisitId': other.id!,
+          };
+          break;
+        }
+      }
+      if (proof != null) break;
+    }
+    if (proof == null) {
+      throw StateError('You did not play together during this party.');
+    }
+    final visitProof = proof;
     final review = _reviews(target).doc('${partyId}_$uid');
     final summary = _db.collection('player_rating_summaries').doc(target);
     await _db.runTransaction((tx) async {
@@ -83,6 +142,7 @@ class RatingService {
       tx.set(review, {
         'partyId': partyId,
         'raterId': uid,
+        ...visitProof,
         'stars': draft.stars,
         'tags': draft.tags,
         'comment': draft.comment.trim(),

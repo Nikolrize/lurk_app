@@ -49,20 +49,39 @@ service cloud.firestore {
       let profile = /databases/$(database)/documents/players/$(request.auth.uid);
       let summary = /databases/$(database)/documents/player_rating_summaries/$(request.auth.uid);
       let minimum = data.get('minimumRating', 0);
+      let game = data.get('gameId', '');
+      let minRank = data.get('minRank', null);
+      let maxRank = data.get('maxRank', null);
+
       return normalizedRegion(get(profile).data.region) == data.region
+        && (minRank == null || maxRank == null
+          || (minRank == 0 && maxRank == catalogueRankNumbers(game).size() - 1)
+          || meetsPartyRank(game, minRank, maxRank, get(profile).data))
         && (minimum == 0 || (exists(summary) && get(summary).data.count > 0
           && get(summary).data.total >= minimum * get(summary).data.count));
+    }
+    function meetsPartyRank(game, minRank, maxRank, profile) {
+      let rank = rankNumber(game, profile.get('gameRanks', {}).get(game, null));
+      return rank is int && rank >= minRank && rank <= maxRank;
     }
     match /player_reviews/{targetUid}/reviews/{reviewId} {
       function participatedTogether(partyId) {
         let party = get(/databases/$(database)/documents/parties/$(partyId)).data;
-        let me = get(/databases/$(database)/documents/parties/$(partyId)/members/$(request.auth.uid)).data;
-        let peer = get(/databases/$(database)/documents/parties/$(partyId)/members/$(targetUid)).data;
+        let current = get(/databases/$(database)/documents/parties/$(partyId)/members/$(request.auth.uid)).data;
+        let meId = request.resource.data.get('ownVisitId', null);
+        let peerId = request.resource.data.get('peerVisitId', null);
+        let me = meId == null
+          ? current : get(/databases/$(database)/documents/parties/$(partyId)/visits/$(meId)).data;
+        let peer = peerId == null
+          ? get(/databases/$(database)/documents/parties/$(partyId)/members/$(targetUid)).data
+          : get(/databases/$(database)/documents/parties/$(partyId)/visits/$(peerId)).data;
         let sessionEnd = party.get('completedAt', null) is timestamp ? party.completedAt : party.updatedAt;
         let myEnd = me.leftAt is timestamp ? me.leftAt : sessionEnd;
         let peerEnd = peer.leftAt is timestamp ? peer.leftAt : (party.status == 'closed' ? sessionEnd : request.time);
         return hasPartyHistory(partyId)
-          && (me.leftAt is timestamp || party.status == 'closed')
+          && (current.leftAt is timestamp || party.status == 'closed')
+          && (meId == null || me.uid == request.auth.uid)
+          && (peerId == null || peer.uid == targetUid)
           && me.joinedAt is timestamp && peer.joinedAt is timestamp
           && myEnd is timestamp && peerEnd is timestamp
           && me.joinedAt < myEnd && peer.joinedAt < peerEnd
@@ -70,7 +89,7 @@ service cloud.firestore {
       }
       allow read: if signedIn();
       allow create: if signedIn() && request.auth.uid != targetUid
-        && request.resource.data.keys().hasOnly(['partyId', 'raterId', 'stars', 'tags', 'comment', 'createdAt'])
+        && request.resource.data.keys().hasOnly(['partyId', 'raterId', 'stars', 'tags', 'comment', 'createdAt', 'ownVisitId', 'peerVisitId'])
         && request.resource.data.partyId is string
         && request.resource.data.partyId.matches('[^/]+')
         && reviewId == request.resource.data.partyId + '_' + request.auth.uid
@@ -641,7 +660,8 @@ service cloud.firestore {
     }
 
     match /player_blocks/{uid}/blocked/{target} {
-      allow read: if owns(uid);
+      allow list: if owns(uid);
+      allow get: if owns(uid) || owns(target);
       allow create, update: if owns(uid) && uid != target
         && exists(/databases/$(database)/documents/players/$(target))
         && request.resource.data.keys().hasOnly(['createdAt'])
@@ -1063,6 +1083,24 @@ service cloud.firestore {
         allow delete: if false;
       }
 
+      // Immutable completed visits preserve history and proof of shared play on rejoin.
+      match /visits/{visitId} {
+        allow read: if signedIn() && (activeMember(request.auth.uid) || hasPartyHistory(partyId));
+        allow create: if signedIn() && validArchivedVisit();
+        function validArchivedVisit() {
+          let before = get(/databases/$(database)/documents/parties/$(partyId)/members/$(request.auth.uid)).data;
+          let after = getAfter(/databases/$(database)/documents/parties/$(partyId)/members/$(request.auth.uid)).data;
+          return request.resource.data.keys().hasAll(['uid', 'joinedAt', 'leftAt'])
+            && request.resource.data.keys().hasOnly(['uid', 'joinedAt', 'leftAt'])
+            && request.resource.data.uid == request.auth.uid
+            && before.joinedAt is timestamp && before.leftAt is timestamp
+            && visitId == request.auth.uid + '_' + string(before.joinedAt.toMillis())
+            && request.resource.data.joinedAt == before.joinedAt
+            && request.resource.data.leftAt == before.leftAt
+            && after.joinedAt == request.time && after.leftAt == null;
+        }
+        allow update, delete: if false;
+      }
       match /members/{uid} {
         function parent() { return get(/databases/$(database)/documents/parties/$(partyId)).data; }
         function joining() {

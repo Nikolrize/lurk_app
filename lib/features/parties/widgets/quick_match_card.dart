@@ -1,3 +1,6 @@
+import '../../../providers/party_matching_provider.dart';
+import '../../../providers/rating_provider.dart';
+import '../../../services/player_safety_service.dart';
 import '../../../core/data/gaming_regions.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -32,8 +35,16 @@ class _QuickMatchCardState extends ConsumerState<QuickMatchCard> {
       _notice('Sign in to use Quick Match.');
       return;
     }
+    final subscriptions = <ProviderSubscription<AsyncValue<bool>>>[];
     setState(() => _finding = true);
     try {
+      final hosted = await ref
+          .read(currentHostedPartyProvider.future)
+          .timeout(const Duration(seconds: 15));
+      if (hosted != null) {
+        _notice('End your hosted party before using Quick Match.');
+        return;
+      }
       final preferences = await ref
           .read(gamingPreferencesProvider(uid).future)
           .timeout(const Duration(seconds: 15));
@@ -81,16 +92,41 @@ class _QuickMatchCardState extends ConsumerState<QuickMatchCard> {
       if (!mounted || ref.read(authStateProvider).asData?.value?.uid != uid) {
         return;
       }
+      final summary = await ref
+          .read(ratingSummaryProvider(uid).future)
+          .timeout(const Duration(seconds: 15));
+      final blocked = {
+        ...await ref
+            .read(blockedPlayersProvider.future)
+            .timeout(const Duration(seconds: 15)),
+      };
+      for (final host in parties.map((p) => p.hostId).toSet()) {
+        subscriptions.add(
+          ref.listenManual(hostBlocksViewerProvider(host), (_, next) {}),
+        );
+        if (host != uid &&
+            await ref
+                .read(hostBlocksViewerProvider(host).future)
+                .timeout(const Duration(seconds: 15))) {
+          blocked.add(host);
+        }
+      }
+      if (!mounted || ref.read(authStateProvider).asData?.value?.uid != uid) {
+        return;
+      }
       final match = pickQuickMatchParty(
         parties,
         mainGameId: game.id,
         regionId: regionId,
         viewerUid: uid,
         currentPartyId: currentId,
+        preferences: preferences,
+        rating: summary.count > 0 ? summary.average : null,
+        blockedHosts: blocked,
       );
       if (match == null) {
         _notice(
-          'No open ${game.name} parties with space in $region right now. Try again soon.',
+          'No eligible ${game.name} parties with space in $region right now. Try again soon.',
         );
         return;
       }
@@ -98,6 +134,9 @@ class _QuickMatchCardState extends ConsumerState<QuickMatchCard> {
     } catch (_) {
       _notice('Unable to find a party. Check your connection and try again.');
     } finally {
+      for (final subscription in subscriptions) {
+        subscription.close();
+      }
       if (mounted) setState(() => _finding = false);
     }
   }
@@ -108,9 +147,14 @@ class _QuickMatchCardState extends ConsumerState<QuickMatchCard> {
     final preferences = uid == null
         ? null
         : ref.watch(gamingPreferencesProvider(uid)).asData?.value;
-    if (uid != null) ref.watch(playerProfileProvider(uid));
+    if (uid != null) {
+      ref.watch(playerProfileProvider(uid));
+      ref.watch(ratingSummaryProvider(uid));
+      ref.watch(blockedPlayersProvider);
+    }
     // Keep these streams alive while their first values are awaited on tap.
     ref.watch(joinedPartyIdProvider);
+    ref.watch(currentHostedPartyProvider);
     final game = GameCatalog.find(preferences?.currentGame);
     return Semantics(
       button: true,

@@ -1,3 +1,5 @@
+import '../../../providers/party_matching_provider.dart';
+import '../../../providers/discovery_limits.dart';
 import '../../../providers/rating_provider.dart';
 import '../../parties/screens/create_party_screen.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -81,7 +83,7 @@ class _FindSreenState extends ConsumerState<FindSreen> {
   @override
   Widget build(BuildContext context) {
     final query = _query.trim().toLowerCase();
-    final partyState = ref.watch(availablePartiesProvider);
+    final partyState = ref.watch(visiblePartiesProvider);
     final parties = (partyState.asData?.value ?? [])
         .where(
           (p) =>
@@ -154,6 +156,9 @@ class _FindSreenState extends ConsumerState<FindSreen> {
               ),
         )
         .toList();
+    final showLoadMore = _showPlayers
+        ? ref.watch(hasMorePlayersProvider)
+        : ref.watch(hasMorePartiesProvider);
     final count = _showPlayers ? players.length : parties.length;
     final filterCount = (_showPlayers ? _playerFilters : _partyFilters).count;
     return SafeArea(
@@ -255,6 +260,7 @@ class _FindSreenState extends ConsumerState<FindSreen> {
                       child: PlayerLoadError(
                         error: playerState.error!,
                         onRetry: () {
+                          ref.invalidate(playerDiscoveryPageProvider);
                           ref.invalidate(discoverablePlayersProvider);
                           for (final player
                               in sourcePlayers.asData?.value ?? []) {
@@ -269,10 +275,14 @@ class _FindSreenState extends ConsumerState<FindSreen> {
                   ? Center(
                       child: PartyLoadError(
                         error: partyState.error!,
-                        onRetry: () => ref.invalidate(availablePartiesProvider),
+                        onRetry: () {
+                          ref.invalidate(partyDiscoveryPageProvider);
+                          ref.invalidate(availablePartiesProvider);
+                          ref.invalidate(hostBlocksViewerProvider);
+                        },
                       ),
                     )
-                  : count == 0
+                  : count == 0 && !showLoadMore
                   ? Center(
                       child: Text(
                         'No ${_showPlayers ? 'players' : 'parties'} match.\nTry another search or adjust your filters.',
@@ -283,21 +293,60 @@ class _FindSreenState extends ConsumerState<FindSreen> {
                       padding: EdgeInsets.only(
                         bottom: MediaQuery.paddingOf(context).bottom,
                       ),
-                      itemCount: count,
+                      itemCount:
+                          count + (showLoadMore ? 1 : 0) + (count == 0 ? 1 : 0),
                       separatorBuilder: (_, index) =>
                           const SizedBox(height: 12),
-                      itemBuilder: (context, index) => _showPlayers
-                          ? PlayerCard(
-                              player: players[index],
-                              onTap: () => Navigator.of(context).push(
-                                MaterialPageRoute<void>(
-                                  builder: (_) => PlayerProfileScreen(
-                                    uid: players[index].id,
+                      itemBuilder: (context, index) {
+                        if (count == 0 && index == 0) {
+                          return Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 24),
+                            child: Text(
+                              'No matches in the loaded results. Try another search, adjust your filters, or load more.',
+                              textAlign: TextAlign.center,
+                            ),
+                          );
+                        }
+                        if (index == count + (count == 0 ? 1 : 0)) {
+                          return Center(
+                            child: TextButton.icon(
+                              onPressed: () {
+                                if (_showPlayers) {
+                                  ref
+                                      .read(
+                                        playerDiscoveryLimitProvider.notifier,
+                                      )
+                                      .loadMore();
+                                } else {
+                                  ref
+                                      .read(
+                                        partyDiscoveryLimitProvider.notifier,
+                                      )
+                                      .loadMore();
+                                }
+                              },
+                              icon: const Icon(Icons.expand_more),
+                              label: Text(
+                                _showPlayers
+                                    ? 'Load more players'
+                                    : 'Load more parties',
+                              ),
+                            ),
+                          );
+                        }
+                        return _showPlayers
+                            ? PlayerCard(
+                                player: players[index],
+                                onTap: () => Navigator.of(context).push(
+                                  MaterialPageRoute<void>(
+                                    builder: (_) => PlayerProfileScreen(
+                                      uid: players[index].id,
+                                    ),
                                   ),
                                 ),
-                              ),
-                            )
-                          : PartyCard(party: parties[index]),
+                              )
+                            : PartyCard(party: parties[index]);
+                      },
                     ),
             ),
           ],

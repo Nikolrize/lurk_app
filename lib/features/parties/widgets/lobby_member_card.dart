@@ -1,3 +1,4 @@
+import '../../../core/widgets/player_verification_badge.dart';
 import '../../../core/widgets/player_avatar.dart';
 import 'package:flutter/material.dart';
 import '../models/lobby_member.dart';
@@ -83,6 +84,7 @@ class LobbyMemberCard extends StatelessWidget {
                             style: theme.textTheme.titleMedium,
                           ),
                         ),
+                        PlayerVerificationBadge(uid: member.uid, size: 18),
                         if (isHost) ...[
                           const SizedBox(width: 6),
                           Tooltip(

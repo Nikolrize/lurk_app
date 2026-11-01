@@ -1,3 +1,4 @@
+import '../../../core/widgets/player_verification_badge.dart';
 import '../../../core/widgets/player_avatar.dart';
 import '../../../core/widgets/game_icon.dart';
 import 'package:flutter/material.dart';
@@ -411,12 +412,19 @@ class _PreviewMember extends ConsumerWidget {
             photoPath: profile.asData?.value?.photoPath,
             radius: 24,
           ),
-          title: Text(
-            name != null && name.trim().isNotEmpty
-                ? name
-                : profile.isLoading
-                ? 'Loading player…'
-                : 'Player',
+          title: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  name != null && name.trim().isNotEmpty
+                      ? name
+                      : profile.isLoading
+                      ? 'Loading player…'
+                      : 'Player',
+                ),
+              ),
+              PlayerVerificationBadge(uid: uid, size: 18),
+            ],
           ),
           subtitle: Text(
             isHost ? 'Party host' : 'Member',

@@ -1,3 +1,4 @@
+import 'discovery_limits.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../features/parties/models/party.dart';
 import '../services/party_service.dart';
@@ -7,12 +8,35 @@ import '../core/data/game_catalog.dart';
 
 final partyServiceProvider = Provider<PartyService>((ref) => PartyService());
 
-final availablePartiesProvider = StreamProvider.autoDispose<List<Party>>((ref) {
+final partyDiscoveryPageProvider = StreamProvider.autoDispose<List<Party>>((
+  ref,
+) {
   final auth = ref.watch(authStateProvider);
   if (auth.hasError) return Stream.error(auth.error!);
   if (auth.isLoading) return const Stream<List<Party>>.empty();
   if (auth.asData?.value == null) return Stream.value(const <Party>[]);
-  return ref.watch(partyServiceProvider).watchDiscoverableParties();
+  return ref
+      .watch(partyServiceProvider)
+      .watchDiscoverableParties(
+        limit: ref.watch(partyDiscoveryLimitProvider) + 1,
+      );
+}, retry: (retryCount, error) => null);
+
+// Fetch one extra party to determine whether another page actually exists.
+final hasMorePartiesProvider = Provider.autoDispose<bool>((ref) {
+  final page = ref.watch(partyDiscoveryPageProvider).asData?.value;
+  return page != null && page.length > ref.watch(partyDiscoveryLimitProvider);
+});
+
+final availablePartiesProvider = StreamProvider.autoDispose<List<Party>>((ref) {
+  final page = ref.watch(partyDiscoveryPageProvider);
+  final limit = ref.watch(partyDiscoveryLimitProvider);
+  return page.when(
+    data: (parties) =>
+        Stream.value(parties.take(limit).toList(growable: false)),
+    loading: () => const Stream<List<Party>>.empty(),
+    error: (error, stack) => Stream<List<Party>>.error(error, stack),
+  );
 }, retry: (retryCount, error) => null);
 
 // Host-owned parties remain available alongside the current joined squad.
