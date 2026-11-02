@@ -18,6 +18,7 @@ class LobbyMemberCard extends StatelessWidget {
   final VoidCallback? onRemove;
   final VoidCallback? onMakeHost;
 
+  // show the member rank rating and mic state and highlight their card when speaking
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);

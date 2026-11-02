@@ -6,7 +6,6 @@ import '../../providers/party_provider.dart';
 import '../../providers/party_sound_provider.dart';
 import '../../services/party_membership_events.dart';
 
-/// Mounted above every tab so roster sounds continue while browsing the app.
 class PartySoundScope extends ConsumerStatefulWidget {
   const PartySoundScope({super.key, required this.uid, required this.child});
   final String uid;
@@ -19,6 +18,7 @@ class _PartySoundScopeState extends ConsumerState<PartySoundScope>
     with WidgetsBindingObserver {
   late final PartySoundTracker _tracker;
   late final StreamSubscription<PartyMembershipEvent> _events;
+  // keep sound effects silent while the app is in the background
   void _playSound(PartySound sound) {
     final state = WidgetsBinding.instance.lifecycleState;
     if (state == null || state == AppLifecycleState.resumed) {
@@ -26,6 +26,7 @@ class _PartySoundScopeState extends ConsumerState<PartySoundScope>
     }
   }
 
+  // listen for confirmed membership events belonging to the current player
   @override
   void initState() {
     super.initState();
@@ -37,6 +38,7 @@ class _PartySoundScopeState extends ConsumerState<PartySoundScope>
     WidgetsBinding.instance.addObserver(this);
   }
 
+  // reset member tracking after resuming so missed events are not replayed
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed && mounted) {
@@ -44,6 +46,7 @@ class _PartySoundScopeState extends ConsumerState<PartySoundScope>
     }
   }
 
+  // stop membership events and lifecycle callbacks when this scope is removed
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
@@ -51,10 +54,10 @@ class _PartySoundScopeState extends ConsumerState<PartySoundScope>
     super.dispose();
   }
 
+  // keep membership and local microphone sounds working across app tabs
   @override
   Widget build(BuildContext context) {
-    // Only this device's confirmed microphone state changes trigger these cues.
-    // Remote mute events, initial connection and disconnection stay silent.
+    // only play mic sounds when the local mute state changes within the same call
     ref.listen(voiceStateProvider, (previous, next) {
       final before = previous?.asData?.value;
       final after = next.asData?.value;
@@ -74,9 +77,10 @@ class _PartySoundScopeState extends ConsumerState<PartySoundScope>
       ref.listen(partyMemberIdsProvider(id), (previous, next) {
         if (next.asData != null) _tracker.roster(id, next.asData!.value);
       });
-      // The first available roster is a silent baseline, even if already cached.
+      // start with the current member list so existing members dont trigger join sounds
       final roster = ref.watch(partyMemberIdsProvider(id)).asData?.value;
       if (roster != null) _tracker.roster(id, roster);
+      // confirm departure from party updates and not temporary loading states
       ref.listen(partyByIdProvider(id), (previous, next) {
         if (next.asData?.value?.status == 'closed') {
           setState(() => _tracker.leave(id));

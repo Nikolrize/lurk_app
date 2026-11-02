@@ -17,9 +17,11 @@ class PartyDraft {
     this.maxRank,
     this.description = '',
   });
+  // build game choices from the shared catalogue
   static Map<String, String> get games => {
     for (final game in GameCatalog.games.values) game.id: game.name,
   };
+  // map stored region IDs to the labels shown in the form
   static Map<String, String> get regions => {
     for (final region in GamingRegions.values)
       region.toLowerCase().replaceAll(' ', '_'): region,
@@ -39,6 +41,7 @@ class PartyDraft {
   final double minimumRating;
   final Set<String> playstyles;
 
+  // reject invalid party details before they are sent to Firestore
   void validate() {
     if (title.trim().isEmpty || title.trim().length > 60) {
       throw ArgumentError('Enter a party name of 1-60 characters.');
@@ -74,6 +77,7 @@ class PartyDraft {
     }
   }
 
+  // convert the form values into the fields stored in Firestore
   Map<String, dynamic> toFirestoreFields() {
     validate();
     return {

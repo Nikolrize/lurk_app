@@ -21,6 +21,7 @@ class QuickMatchCard extends ConsumerStatefulWidget {
 
 class _QuickMatchCardState extends ConsumerState<QuickMatchCard> {
   bool _finding = false;
+  // show matchmaking feedback without changing screens
   void _notice(String message) {
     if (!mounted) return;
     ScaffoldMessenger.of(
@@ -28,6 +29,7 @@ class _QuickMatchCardState extends ConsumerState<QuickMatchCard> {
     ).showSnackBar(SnackBar(content: Text(message)));
   }
 
+  // find a party for the main game and region then show its preview before joining
   Future<void> _find() async {
     if (_finding) return;
     final uid = ref.read(authStateProvider).asData?.value?.uid;
@@ -141,6 +143,7 @@ class _QuickMatchCardState extends ConsumerState<QuickMatchCard> {
     }
   }
 
+  // show the main game and prevent repeated taps while finding a match
   @override
   Widget build(BuildContext context) {
     final uid = ref.watch(authStateProvider).asData?.value?.uid;
@@ -152,7 +155,7 @@ class _QuickMatchCardState extends ConsumerState<QuickMatchCard> {
       ref.watch(ratingSummaryProvider(uid));
       ref.watch(blockedPlayersProvider);
     }
-    // Keep these streams alive while their first values are awaited on tap.
+    // keep these streams alive while their first values are awaited on tap
     ref.watch(joinedPartyIdProvider);
     ref.watch(currentHostedPartyProvider);
     final game = GameCatalog.find(preferences?.currentGame);

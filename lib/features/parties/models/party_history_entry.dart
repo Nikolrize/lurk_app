@@ -1,7 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'party.dart';
 
-/// A private reference and party summary captured when this player joined.
+// a private reference and party summary captured when this player joined
 class PartyHistoryRecord {
   const PartyHistoryRecord({
     required this.partyId,
@@ -13,6 +13,7 @@ class PartyHistoryRecord {
   final String partyId, title, gameId, mode;
   final DateTime? joinedAt;
 
+  // read the party summary saved when this player first joined
   factory PartyHistoryRecord.fromMap(String id, Map<String, dynamic> data) =>
       PartyHistoryRecord(
         partyId: id,
@@ -39,6 +40,7 @@ class PartyHistoryEntry {
   String get title => party?.title ?? record.title;
   String get gameId => party?.gameId ?? record.gameId;
   String get mode => party?.mode ?? record.mode;
+  // use the total visit time when available
   Duration? get duration {
     if (participationDuration != null) return participationDuration;
     final start = record.joinedAt, end = endedAt;

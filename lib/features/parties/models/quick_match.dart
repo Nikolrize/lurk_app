@@ -5,6 +5,7 @@ import 'dart:math';
 import '../../../core/data/game_catalog.dart';
 import 'party.dart';
 
+// randomly choose an eligible open party excluding the current party and own parties
 Party? pickQuickMatchParty(
   Iterable<Party> parties, {
   required String mainGameId,

@@ -11,8 +11,7 @@ import '../../ratings/screens/rate_party_teammates_screen.dart';
 class PartyHistoryScreen extends ConsumerStatefulWidget {
   const PartyHistoryScreen({super.key, required this.onBack, this.onRate});
   final VoidCallback onBack;
-
-  /// The ratings feature can supply this callback without changing history.
+  
   final ValueChanged<PartyHistoryEntry>? onRate;
   @override
   ConsumerState<PartyHistoryScreen> createState() => _PartyHistoryScreenState();
@@ -20,6 +19,7 @@ class PartyHistoryScreen extends ConsumerStatefulWidget {
 
 class _PartyHistoryScreenState extends ConsumerState<PartyHistoryScreen> {
   String? _game;
+  // show ended visits by game with details, rating actions and older results
   @override
   Widget build(BuildContext context) {
     final history = ref.watch(partyHistoryProvider);

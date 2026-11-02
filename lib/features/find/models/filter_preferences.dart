@@ -1,5 +1,4 @@
 import 'package:lurk_app/core/data/game_catalog.dart';
-
 import '../../player/models/player_availability.dart';
 
 class FilterPreferences {
@@ -8,7 +7,7 @@ class FilterPreferences {
     this.region,
     this.mode,
     this.minRank = 0,
-    this.maxRank, //optional
+    this.maxRank, // optional
     this.playstyles = const {},
     this.communication,
     this.minimumRating = 0,
@@ -35,6 +34,7 @@ class FilterPreferences {
   final int? maxPartySize;
   final bool onlyAvailable;
 
+  // get the rank names for the selected game
   static List<String> ranksForGame(String? game) {
     final definition = GameCatalog.find(game);
 
@@ -45,8 +45,10 @@ class FilterPreferences {
 
   List<String> get rankNames => ranksForGame(game);
 
+  // include the highest rank when no upper limit is selected
   int get effectiveMaxRank => maxRank ?? rankNames.length - 1;
 
+  // treat the full rank range as no rank restriction
   bool get hasRankFilter {
     final names = rankNames;
 
@@ -54,6 +56,7 @@ class FilterPreferences {
         (minRank != 0 || effectiveMaxRank != names.length - 1);
   }
 
+  // count active filter groups for the filter button badge
   int get count => [
     game != null,
     region != null,
@@ -69,6 +72,7 @@ class FilterPreferences {
     onlyAvailable,
   ].where((enabled) => enabled).length;
 
+  // match saved game IDs and display names through the same catalogue
   bool _matchesGame(String? gameName) {
     if (game == null) return true;
     if (game == gameName) return true;
@@ -79,6 +83,7 @@ class FilterPreferences {
     return selected != null && candidate != null && selected.id == candidate.id;
   }
 
+  // compare party rank ranges or a player rank with the selected range
   bool _matchesRank({
     required int? rank,
     required int? minAllowedRank,
@@ -93,7 +98,7 @@ class FilterPreferences {
       return false;
     }
 
-    //party rank ranges match when to the two ranges overlap
+    // party rank ranges match when to the two ranges overlap
     if (minAllowedRank != null && maxAllowedRank != null) {
       if (minAllowedRank < 0 ||
           maxAllowedRank > last ||
@@ -104,10 +109,11 @@ class FilterPreferences {
       return minAllowedRank <= upper && maxAllowedRank >= minRank;
     }
 
-    //indv players must have rank inside selected range
+    // individual players must have rank inside selected range
     return rank != null && rank >= minRank && rank <= upper;
   }
 
+  // require every enabled filter to match the party or player
   bool matches({
     required String? gameName,
     Iterable<String> games = const [],

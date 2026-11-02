@@ -7,6 +7,7 @@ final partyVoiceServiceProvider = Provider<PartyVoiceService>((ref) {
   ref.onDispose(() => unawaited(service.dispose()));
   return service;
 });
+
 final voiceStateProvider = StreamProvider<VoiceState>((ref) async* {
   final service = ref.watch(partyVoiceServiceProvider);
   yield service.state;

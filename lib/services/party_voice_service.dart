@@ -30,7 +30,7 @@ class VoiceState {
   final int remoteCount, inputLevel;
 }
 
-/// Foreground-only voice for the free local-server demo. No certificate belongs in this client.
+// manage foreground voice calls while the token server keeps the certificate private
 class PartyVoiceService with WidgetsBindingObserver {
   static String get appId => VoiceConfig.current.appId;
   static String get tokenUrl => VoiceConfig.current.tokenUrl;
@@ -42,6 +42,7 @@ class PartyVoiceService with WidgetsBindingObserver {
   RtcEngine? _engine;
   Timer? _renewTimer;
   Completer<void>? _joined;
+// ignore callbacks from an older connection after leaving or switching parties
   int _generation = 0;
   bool _busy = false, _renewing = false, _observing = false, _disposed = false;
   String? _uid;
@@ -52,6 +53,7 @@ class PartyVoiceService with WidgetsBindingObserver {
   Set<int> get _speaking => _activity.activeAt(DateTime.now());
   Timer? _speakingExpiry;
   void _refresh() => _emit(state);
+  // play party sounds locally without publishing them to other voice users
   Future<bool> playPartyEffect(String path, int soundId) async {
     final engine = _engine;
     if (engine == null || !state.connected) return false;
@@ -67,12 +69,12 @@ class PartyVoiceService with WidgetsBindingObserver {
       );
       return true;
     } catch (_) {
-      // Keep Agora's audio session intact even if this nonessential effect fails.
       debugPrint('Party chime could not mix into voice.');
       return true;
     }
   }
 
+  // map an Agora numeric ID to the player account used by lobby cards
   Future<void> _resolveAccount(int uid, int generation) async {
     try {
       final info = await _engine?.getUserInfoByUid(uid);
@@ -81,10 +83,11 @@ class PartyVoiceService with WidgetsBindingObserver {
         _refresh();
       }
     } catch (_) {
-      /* Mapping also arrives through onUserInfoUpdated. */
+      // mapping also arrives through onUserInfoUpdated
     }
   }
 
+  // send the latest connection mic and speaking states to screen listeners
   void _emit(VoiceState next) {
     state = VoiceState(
       partyId: next.partyId,
@@ -113,6 +116,7 @@ class PartyVoiceService with WidgetsBindingObserver {
     if (!_changes.isClosed) _changes.add(state);
   }
 
+  // request a server token and confirm it belongs to this app and player
   Future<Map<String, dynamic>> _token(
     String partyId,
     String uid, {
@@ -144,7 +148,7 @@ class PartyVoiceService with WidgetsBindingObserver {
     return data;
   }
 
-  /// Mic controls never join a channel or start capture without permission.
+  // change the local mute state and request permission before enabling the microphone
   Future<void> toggle(String partyId) async {
     if (_busy || _disposed || !state.connected || state.partyId != partyId) {
       return;
@@ -189,7 +193,7 @@ class PartyVoiceService with WidgetsBindingObserver {
     }
   }
 
-  /// Join as a listener. Capture remains disabled until the player unmutes.
+  // join the party voice channel muted and keep its token renewed
   Future<void> connect(String partyId) async {
     if (_busy || _disposed || (state.connected && state.partyId == partyId)) {
       return;
@@ -267,7 +271,7 @@ class PartyVoiceService with WidgetsBindingObserver {
       await engine.setDefaultAudioRouteToSpeakerphone(true);
       final joined = Completer<void>();
       _joined = joined;
-      // Attach the error handler before native callbacks can complete the future.
+
       final connected = joined.future.timeout(const Duration(seconds: 20));
       unawaited(connected.catchError((Object _) {}));
       engine.registerEventHandler(
@@ -353,10 +357,11 @@ class PartyVoiceService with WidgetsBindingObserver {
               if (uid == null) continue;
               final volume = speaker.volume ?? 0;
               levels[uid] = volume;
+              // agora uses zero for this device in volume callbacks
               if (uid == 0) {
                 _inputLevel = volume;
               } else if (volume > 10) {
-                // Received audio confirms publishing even if a mute event was missed.
+                // received audio confirms publishing even if a mute event was missed
                 _remoteMics[uid] = true;
                 if (!_accounts.containsKey(uid)) {
                   unawaited(_resolveAccount(uid, generation));
@@ -414,8 +419,10 @@ class PartyVoiceService with WidgetsBindingObserver {
     }
   }
 
+  // disconnect when the party closes the player leaves or the account changes
   void _watchParty(String id, String uid) {
     final party = FirebaseFirestore.instance.collection('parties').doc(id);
+    // disconnect when party access can no longer be checked
     void unavailable(Object error) => unawaited(
       disconnect(
         error: 'Voice disconnected because party access could not be verified.',
@@ -442,6 +449,7 @@ class PartyVoiceService with WidgetsBindingObserver {
     );
   }
 
+  // refresh the token only while the same player and party remain connected
   Future<void> _renew() async {
     if (_renewing ||
         !state.connected ||
@@ -468,6 +476,7 @@ class PartyVoiceService with WidgetsBindingObserver {
     }
   }
 
+  // cancel pending work stop listeners and release the voice connection
   Future<void> disconnect({String? error}) async {
     _generation++;
     _speakingExpiry?.cancel();
@@ -496,16 +505,17 @@ class PartyVoiceService with WidgetsBindingObserver {
         await engine.muteLocalAudioStream(true);
         await engine.leaveChannel();
       } catch (_) {
-        /* Already disconnected. */
+        // already disconnected
       }
       try {
         await engine.release();
       } catch (_) {
-        /* Engine may already be released. */
+        // engine already be released
       }
     }
   }
 
+  // stop voice when the app backgrounds because background calls are not supported
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if ((state == AppLifecycleState.paused ||
@@ -520,6 +530,7 @@ class PartyVoiceService with WidgetsBindingObserver {
     }
   }
 
+  // release voice resources when the service is no longer needed
   Future<void> dispose() async {
     _disposed = true;
     if (_observing) WidgetsBinding.instance.removeObserver(this);

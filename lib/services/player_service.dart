@@ -6,13 +6,14 @@ class PlayerService {
     : _firestore = firestore ?? FirebaseFirestore.instance;
   final FirebaseFirestore _firestore;
 
+  // load public profiles while excluding the viewer and blocked players
   Stream<List<Player>> watchDiscoverablePlayers(
     String viewerId, {
     int limit = 100,
     Set<String> excludedIds = const {},
   }) {
-    // Public profiles only. No reads from player_private.
-    // Find increases the live directory limit when another page is requested.
+    // public profiles only and no reads from player_private
+    // find page will increase the live directory limit when another page is requested
     return _firestore
         .collection('players')
         .limit(limit + excludedIds.length + 1)

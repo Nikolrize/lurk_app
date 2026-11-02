@@ -7,6 +7,7 @@ import '../../find/models/filter_preferences.dart';
 import '../models/party_draft.dart';
 import '../models/party.dart';
 
+// open the creation form and show confirmation after a party is created
 Future<void> openCreateParty(BuildContext context) async {
   final created = await Navigator.of(
     context,
@@ -43,11 +44,13 @@ class _CreatePartyScreenState extends ConsumerState<CreatePartyScreen> {
   final Set<String> _styles = {'chill'};
   bool _saving = false;
   String? _error;
+  // fill the form with the existing party details when editing
   @override
   void initState() {
     super.initState();
     final party = widget.party;
     if (party == null) return;
+    // convert a displayed preference label back to its stored ID
     String keyFor(Map<String, String> options, String? value) => options.entries
         .firstWhere(
           (entry) => entry.key == value || entry.value == value,
@@ -73,6 +76,7 @@ class _CreatePartyScreenState extends ConsumerState<CreatePartyScreen> {
       ..addAll(party.playstyles.map((v) => keyFor(PartyDraft.styles, v)));
   }
 
+  // release the party name and description controllers
   @override
   void dispose() {
     _name.dispose();
@@ -80,6 +84,7 @@ class _CreatePartyScreenState extends ConsumerState<CreatePartyScreen> {
     super.dispose();
   }
 
+  // validate the form then create a party or save changes to the existing one
   Future<void> _create() async {
     if (_saving || !_formKey.currentState!.validate()) return;
     if (_styles.isEmpty) {
@@ -150,6 +155,7 @@ class _CreatePartyScreenState extends ConsumerState<CreatePartyScreen> {
     }
   }
 
+  // group a field with its label using consistent spacing
   Widget _field(String label, Widget child) => Column(
     crossAxisAlignment: CrossAxisAlignment.stretch,
     children: [
@@ -163,6 +169,7 @@ class _CreatePartyScreenState extends ConsumerState<CreatePartyScreen> {
       child,
     ],
   );
+  // show readable options while keeping their stored IDs as values
   Widget _dropdown<T>(
     String label,
     T value,
@@ -189,6 +196,7 @@ class _CreatePartyScreenState extends ConsumerState<CreatePartyScreen> {
     );
   }
 
+  // stack fields on narrow screens or when larger text needs more space
   Widget _pair(Widget left, Widget right) => LayoutBuilder(
     builder: (context, constraints) {
       if (constraints.maxWidth < 290 ||
@@ -206,6 +214,7 @@ class _CreatePartyScreenState extends ConsumerState<CreatePartyScreen> {
     },
   );
 
+  // show the form and prevent creating another party while already in one
   @override
   Widget build(BuildContext context) {
     final ranks = FilterPreferences.ranksForGame(_game);

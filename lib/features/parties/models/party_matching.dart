@@ -3,6 +3,7 @@ import '../../../core/data/gaming_regions.dart';
 import '../../../models/gaming_preferences.dart';
 import 'party.dart';
 
+// find the player rank for this game
 int? matchmakingRank(GamingPreferences preferences, String gameId) {
   final game = GameCatalog.find(gameId);
   final saved = preferences.gameRanks[game?.id];
@@ -15,6 +16,7 @@ int? matchmakingRank(GamingPreferences preferences, String gameId) {
       : null;
 }
 
+// check region, rating, rank and blocks before recommending a party
 bool meetsMatchRequirements(
   Party party, {
   required String? region,

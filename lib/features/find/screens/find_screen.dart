@@ -8,16 +8,12 @@ import '../../parties/widgets/party_load_error.dart';
 import '../models/filter_preferences.dart';
 import 'filter_preferences_screen.dart';
 import 'package:flutter/material.dart';
-
 import '../../../providers/player_provider.dart';
 import '../../player/widgets/player_load_error.dart';
 import '../../profile/screens/player_profile_screen.dart';
 import '../../player/widgets/player_card.dart';
-
 import '../../parties/widgets/party_card.dart';
-
 import 'package:lurk_app/core/data/gaming_regions.dart';
-
 import 'package:lurk_app/core/data/game_catalog.dart';
 
 class FindSreen extends ConsumerStatefulWidget {
@@ -33,24 +29,29 @@ class _FindSreenState extends ConsumerState<FindSreen> {
   bool _showPlayers = false;
   final _searchController = TextEditingController();
   String _query = '';
+  // keep each tab selections when the user switches between Party and Player
   FilterPreferences _partyFilters = const FilterPreferences();
   FilterPreferences _playerFilters = const FilterPreferences();
 
+  // preselect a game when Find is opened from a game shortcut
   @override
   void initState() {
     super.initState();
     _partyFilters = FilterPreferences(game: widget.initialGame);
   }
 
+  // release the search controller when this screen is removed
   @override
   void dispose() {
     _searchController.dispose();
     super.dispose();
   }
 
+  // open filters for the selected tab and apply them only after confirmation
   Future<void> _openFilters() async {
     FocusManager.instance.primaryFocus?.unfocus();
     final forPlayers = _showPlayers;
+    // combine catalogue and loaded game names without duplicate options
     final games = {
       ...GameCatalog.games.values.map((game) => game.name),
       ...(ref.read(availablePartiesProvider).asData?.value ?? []).map(
@@ -80,6 +81,7 @@ class _FindSreenState extends ConsumerState<FindSreen> {
     });
   }
 
+  // apply search and filters to the loaded data for the selected tab
   @override
   Widget build(BuildContext context) {
     final query = _query.trim().toLowerCase();
@@ -110,6 +112,7 @@ class _FindSreenState extends ConsumerState<FindSreen> {
     final sourcePlayers = ref.watch(discoverablePlayersProvider);
     var playerState = sourcePlayers;
     final ratings = <String, double?>{};
+    // read live ratings only when the player minimum rating filter is enabled
     if (_showPlayers &&
         _playerFilters.minimumRating > 0 &&
         sourcePlayers.asData != null) {
@@ -129,6 +132,7 @@ class _FindSreenState extends ConsumerState<FindSreen> {
             ? value.average
             : null;
       }
+      // do not treat a rating that is still loading as an unrated player
       if (error != null) {
         playerState = AsyncError(error, stack ?? StackTrace.current);
       } else if (loading) {
@@ -156,6 +160,7 @@ class _FindSreenState extends ConsumerState<FindSreen> {
               ),
         )
         .toList();
+    // allow loading more
     final showLoadMore = _showPlayers
         ? ref.watch(hasMorePlayersProvider)
         : ref.watch(hasMorePartiesProvider);
@@ -293,6 +298,7 @@ class _FindSreenState extends ConsumerState<FindSreen> {
                       padding: EdgeInsets.only(
                         bottom: MediaQuery.paddingOf(context).bottom,
                       ),
+                      // reserve extra list rows for the empty message and load more button
                       itemCount:
                           count + (showLoadMore ? 1 : 0) + (count == 0 ? 1 : 0),
                       separatorBuilder: (_, index) =>

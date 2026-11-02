@@ -3,11 +3,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../features/parties/models/party.dart';
 import '../services/party_service.dart';
 import 'auth_provider.dart';
-
 import '../core/data/game_catalog.dart'; 
 
 final partyServiceProvider = Provider<PartyService>((ref) => PartyService());
 
+// fetch one extra party to check whether another page exists
 final partyDiscoveryPageProvider = StreamProvider.autoDispose<List<Party>>((
   ref,
 ) {
@@ -22,12 +22,13 @@ final partyDiscoveryPageProvider = StreamProvider.autoDispose<List<Party>>((
       );
 }, retry: (retryCount, error) => null);
 
-// Fetch one extra party to determine whether another page actually exists.
+// show Load More only when the extra party confirms more results exist
 final hasMorePartiesProvider = Provider.autoDispose<bool>((ref) {
   final page = ref.watch(partyDiscoveryPageProvider).asData?.value;
   return page != null && page.length > ref.watch(partyDiscoveryLimitProvider);
 });
 
+// expose only the requested page size without showing the extra record
 final availablePartiesProvider = StreamProvider.autoDispose<List<Party>>((ref) {
   final page = ref.watch(partyDiscoveryPageProvider);
   final limit = ref.watch(partyDiscoveryLimitProvider);
@@ -39,7 +40,7 @@ final availablePartiesProvider = StreamProvider.autoDispose<List<Party>>((ref) {
   );
 }, retry: (retryCount, error) => null);
 
-// Host-owned parties remain available alongside the current joined squad.
+// keep the player hosted party updated from Firestore
 final currentHostedPartyProvider = StreamProvider.autoDispose<Party?>((ref) {
   final auth = ref.watch(authStateProvider);
   if (auth.hasError) return Stream.error(auth.error!);
@@ -49,6 +50,7 @@ final currentHostedPartyProvider = StreamProvider.autoDispose<Party?>((ref) {
   return ref.watch(partyServiceProvider).watchLatestHostedParty(uid);
 }, retry: (retryCount, error) => null);
 
+// watch one party by ID for previews and lobby updates
 final partyByIdProvider = StreamProvider.autoDispose.family<Party?, String>((
   ref,
   id,
@@ -59,12 +61,14 @@ final partyByIdProvider = StreamProvider.autoDispose.family<Party?, String>((
   return ref.watch(partyServiceProvider).watchParty(id);
 }, retry: (retryCount, error) => null);
 
+// watch the saved reference to the party this player joined
 final joinedPartyIdProvider = StreamProvider.autoDispose<String?>((ref) {
   final uid = ref.watch(authStateProvider).asData?.value?.uid;
   if (uid == null) return Stream.value(null);
   return ref.watch(partyServiceProvider).watchJoinedPartyId(uid);
 }, retry: (count, error) => null);
 
+// resolve the active joined or hosted party and ignore ended memberships
 final currentPartyProvider = Provider<AsyncValue<Party?>>((ref) {
   final hosted = ref.watch(currentHostedPartyProvider);
   final joined = ref.watch(joinedPartyIdProvider);
@@ -85,6 +89,7 @@ final currentPartyProvider = Provider<AsyncValue<Party?>>((ref) {
   return party;
 });
 
+// watch active squad member IDs for the selected party
 final partyMemberIdsProvider = StreamProvider.autoDispose
     .family<List<String>, String>((ref, id) {
       final uid = ref.watch(authStateProvider).asData?.value?.uid;
@@ -93,17 +98,21 @@ final partyMemberIdsProvider = StreamProvider.autoDispose
     }, retry: (count, error) => null);
 
 class LobbyNavigation extends Notifier<({Party party, int serial})?> {
+  // start without a pending request to open a lobby
   @override
   ({Party party, int serial})? build() => null;
+  // request the lobby again even when the party ID has not changed
   void open(Party party) =>
       state = (party: party, serial: (state?.serial ?? 0) + 1);
 }
 
+// let party actions ask the app shell to open a lobby
 final lobbyNavigationProvider =
     NotifierProvider<LobbyNavigation, ({Party party, int serial})?>(
       LobbyNavigation.new,
     );
 
+// watch the signed in player membership and removal status
 final myPartyMembershipProvider = StreamProvider.autoDispose
     .family<Map<String, dynamic>?, String>((ref, id) {
       final uid = ref.watch(authStateProvider).asData?.value?.uid;
@@ -111,6 +120,7 @@ final myPartyMembershipProvider = StreamProvider.autoDispose
       return ref.watch(partyServiceProvider).watchMembership(id, uid);
     }, retry: (count, error) => null);
 
+// watch all past and current member IDs for a history preview
 final partyHistoryMemberIdsProvider = StreamProvider.autoDispose
     .family<List<String>, String>((ref, id) {
       final uid = ref.watch(authStateProvider).asData?.value?.uid;
@@ -118,7 +128,7 @@ final partyHistoryMemberIdsProvider = StreamProvider.autoDispose
       return ref.watch(partyServiceProvider).watchHistoryMemberIds(id);
     }, retry: (retryCount, error) => null);
 
-//showing active game
+// expose the party game only while the player remains an active member
 final activePartyGameProvider = Provider.autoDispose<String?>((ref) {
   final partyState = ref.watch(currentPartyProvider);
 
