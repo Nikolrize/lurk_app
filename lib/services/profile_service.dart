@@ -66,77 +66,77 @@ class ProfileService {
     });
   }
 
-  Stream<PlayerPrivateInfo?> watchPrivateInfo(String uid) {
-    return _db.collection('player_private').doc(uid).snapshots().map((
-      document,
-    ) {
-      if (!document.exists) return null;
+  // Stream<PlayerPrivateInfo?> watchPrivateInfo(String uid) {
+  //   return _db.collection('player_private').doc(uid).snapshots().map((
+  //     document,
+  //   ) {
+  //     if (!document.exists) return null;
 
-      return PlayerPrivateInfo.fromDocument(document);
-    });
-  }
+  //     return PlayerPrivateInfo.fromDocument(document);
+  //   });
+  // }
 
-  Future<void> updateMyProfile({
-    required String username,
-    required String bio,
-    required String region,
-  }) {
-    final uid = _currentUid;
-    final cleanUsername = username.trim();
-    final cleanBio = bio.trim();
-    final cleanRegion = region.trim();
+  // Future<void> updateMyProfile({
+  //   required String username,
+  //   required String bio,
+  //   required String region,
+  // }) {
+  //   final uid = _currentUid;
+  //   final cleanUsername = username.trim();
+  //   final cleanBio = bio.trim();
+  //   final cleanRegion = region.trim();
 
-    if (cleanUsername.length < 3 || cleanUsername.length > 30) {
-      throw ArgumentError('Username must contain 3-30 characters.');
-    }
+  //   if (cleanUsername.length < 3 || cleanUsername.length > 30) {
+  //     throw ArgumentError('Username must contain 3-30 characters.');
+  //   }
 
-    if (cleanBio.length > 500) {
-      throw ArgumentError('Bio must not exceed 500 characters.');
-    }
+  //   if (cleanBio.length > 500) {
+  //     throw ArgumentError('Bio must not exceed 500 characters.');
+  //   }
 
-    if (!GamingRegions.values.contains(cleanRegion)) {
-      throw ArgumentError('Please select a supported gaming region.');
-    }
+  //   if (!GamingRegions.values.contains(cleanRegion)) {
+  //     throw ArgumentError('Please select a supported gaming region.');
+  //   }
 
-    return _db.collection('players').doc(uid).update({
-      'username': cleanUsername,
-      'bio': cleanBio,
-      'region': cleanRegion,
-      'updatedAt': FieldValue.serverTimestamp(),
-    });
-  }
+  //   return _db.collection('players').doc(uid).update({
+  //     'username': cleanUsername,
+  //     'bio': cleanBio,
+  //     'region': cleanRegion,
+  //     'updatedAt': FieldValue.serverTimestamp(),
+  //   });
+  // }
 
-  Future<void> updateMyPrivateInfo({
-    required DateTime? dateOfBirth,
-    required String gender,
-  }) {
-    final uid = _currentUid;
+  // Future<void> updateMyPrivateInfo({
+  //   required DateTime? dateOfBirth,
+  //   required String gender,
+  // }) {
+  //   final uid = _currentUid;
 
-    const allowedGenders = {'', 'male', 'female', 'other', 'prefer_not_to_say'};
+  //   const allowedGenders = {'', 'male', 'female', 'other', 'prefer_not_to_say'};
 
-    if (!allowedGenders.contains(gender)) {
-      throw ArgumentError('Invalid gender selection.');
-    }
+  //   if (!allowedGenders.contains(gender)) {
+  //     throw ArgumentError('Invalid gender selection.');
+  //   }
 
-    // Birth date represents a calendar date, stored at midnight UTC.
-    final birthDate = dateOfBirth == null
-        ? null
-        : DateTime.utc(dateOfBirth.year, dateOfBirth.month, dateOfBirth.day);
+  //   // Birth date represents a calendar date, stored at midnight UTC.
+  //   final birthDate = dateOfBirth == null
+  //       ? null
+  //       : DateTime.utc(dateOfBirth.year, dateOfBirth.month, dateOfBirth.day);
 
-    final today = DateTime.now();
-    final todayUtc = DateTime.utc(today.year, today.month, today.day);
+  //   final today = DateTime.now();
+  //   final todayUtc = DateTime.utc(today.year, today.month, today.day);
 
-    if (birthDate != null &&
-        (birthDate.year < 1900 || birthDate.isAfter(todayUtc))) {
-      throw ArgumentError('Please select a valid birth date.');
-    }
+  //   if (birthDate != null &&
+  //       (birthDate.year < 1900 || birthDate.isAfter(todayUtc))) {
+  //     throw ArgumentError('Please select a valid birth date.');
+  //   }
 
-    return _db.collection('player_private').doc(uid).update({
-      'dateOfBirth': birthDate == null ? null : Timestamp.fromDate(birthDate),
-      'gender': gender,
-      'updatedAt': FieldValue.serverTimestamp(),
-    });
-  }
+  //   return _db.collection('player_private').doc(uid).update({
+  //     'dateOfBirth': birthDate == null ? null : Timestamp.fromDate(birthDate),
+  //     'gender': gender,
+  //     'updatedAt': FieldValue.serverTimestamp(),
+  //   });
+  // }
 
   //loading
   Future<ProfileSetupData> loadMyProfileSetup(String uid) async {
