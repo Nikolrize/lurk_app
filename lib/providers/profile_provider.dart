@@ -19,12 +19,12 @@ final profileImageServiceProvider = Provider<ProfileImageService>((ref) {
   return ProfileImageService();
 });
 
-final profileInitializationProvider = FutureProvider.autoDispose
-    .family<void, String>((ref, uid) {
-      final service = ref.watch(profileServiceProvider);
+// final profileInitializationProvider = FutureProvider.autoDispose
+//     .family<void, String>((ref, uid) {
+//       final service = ref.watch(profileServiceProvider);
 
-      return service.ensureMyProfile(uid);
-    });
+//       return service.ensureMyProfile(uid);
+//     });
 
 final playerProfileProvider = StreamProvider.autoDispose
     .family<PlayerProfile?, String>((ref, uid) {
@@ -33,20 +33,20 @@ final playerProfileProvider = StreamProvider.autoDispose
       return service.watchProfile(uid);
     });
 
-final myPrivateInfoProvider = StreamProvider.autoDispose<PlayerPrivateInfo?>((
-  ref,
-) {
-  final authState = ref.watch(authStateProvider);
-  final user = authState.asData?.value;
+// final myPrivateInfoProvider = StreamProvider.autoDispose<PlayerPrivateInfo?>((
+//   ref,
+// ) {
+//   final authState = ref.watch(authStateProvider);
+//   final user = authState.asData?.value;
 
-  if (user == null) {
-    return Stream<PlayerPrivateInfo?>.value(null);
-  }
+//   if (user == null) {
+//     return Stream<PlayerPrivateInfo?>.value(null);
+//   }
 
-  final service = ref.watch(profileServiceProvider);
+//   final service = ref.watch(profileServiceProvider);
 
-  return service.watchPrivateInfo(user.uid);
-});
+//   return service.watchPrivateInfo(user.uid);
+// });
 
 final profileSetupProvider = FutureProvider.autoDispose
     .family<ProfileSetupData, String>((ref, uid) {
