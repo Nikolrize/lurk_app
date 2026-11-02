@@ -2,7 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../models/player_profile.dart';
 import '../services/profile_service.dart';
-import 'auth_provider.dart';
+// import 'auth_provider.dart';
 
 import '../models/gaming_preferences.dart';
 
