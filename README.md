@@ -1,17 +1,83 @@
-# lurk_app
+# Lurk
 
-A new Flutter project.
+Lurk is a Flutter app for finding gaming teammates and managing parties.
 
-## Getting Started
+## Features
 
-This project is a starting point for a Flutter application.
+- Player accounts, profiles, gaming preferences, availability, and identity verification.
+- Party discovery, search filters, personalized recommendations, and Quick Match.
+- Party creation, invitations, host controls, voice chat, and participation history.
+- Direct messages, party chat, and push notifications.
+- Teammate ratings, player reports, and blocking.
 
-A few resources to get you started if this is your first Flutter project:
+## Technology
 
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
+- **Flutter and Riverpod** — application UI and state management.
+- **Firebase** — authentication, Firestore data, Realtime Database presence, and FCM notifications.
+- **Supabase Storage** — profile photos and verification images.
+- **Agora** — voice chat, with a token server hosted on Render.
+- **Cloudflare Workers** — notification delivery.
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+## Getting started
+
+Install Flutter with Dart 3.12.2 or a compatible later 3.x version. Use an Android device or emulator to test voice chat and notifications.
+
+From the project root:
+
+```sh
+flutter pub get
+flutter devices
+flutter run -d <device-id>
+```
+
+The checked-in configuration targets the shared Lurk backend. Voice chat and notifications use hosted services; local servers are not required for normal app use.
+
+To build an Android release APK:
+
+```sh
+flutter build apk --release
+```
+
+## Configuration
+
+- Firebase settings: `lib/firebase_options.dart` and `android/app/google-services.json`.
+- Supabase initialization: `lib/main.dart`; storage policies are in `supabase/`.
+- Voice endpoint: `config/voice.json`. Use the ignored `config/voice.local.json` for local overrides.
+- Notification endpoint: `NOTIFICATION_WORKER_URL`, with a hosted default in `NotificationTriggerService`.
+- Firebase access rules and indexes: `firestore.rules`, `database.rules.json`, and `firestore.indexes.json`.
+
+Server credentials belong in server environment variables or secrets, never in Flutter assets or source control.
+
+Backend setup and deployment:
+
+- [Voice token server](tools/voice-server/README.md)
+- [Notification worker](tools/notification-worker/README.md)
+
+## Project structure
+
+| Directory | Purpose |
+| --- | --- |
+| `lib/features/` | Screens, widgets, and feature-specific models. |
+| `lib/core/` | Shared theme, widgets, configuration, and game catalogue. |
+| `lib/providers/` | Riverpod providers. |
+| `lib/services/` | Data access and service integrations. |
+| `assets/` | Images and sound effects. |
+| `test/` | Flutter tests and Firebase security-rule tests. |
+| `tools/` | Backend services and database maintenance scripts. |
+| `supabase/` | Storage policies and verification setup SQL. |
+
+## Tests
+
+```sh
+flutter analyze
+flutter test
+```
+
+Security-rule tests require Node.js 22 or later, the Firebase CLI, and Java:
+
+```sh
+npm ci --prefix test/firestore
+firebase emulators:exec --only firestore,database --project demo-lurk-tests "node --test --test-concurrency=1 test/firestore/*.test.mjs"
+```
+
+See each backend service's README for its setup and test commands.
