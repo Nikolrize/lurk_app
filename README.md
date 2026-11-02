@@ -2,6 +2,11 @@
 
 Lurk is a Flutter app for finding gaming teammates and managing parties.
 
+## Admin account credentials
+
+- Email: superuser@gmail.com
+- Password: superuser123
+
 ## Features
 
 - Player accounts, profiles, gaming preferences, availability, and identity verification.
@@ -42,7 +47,7 @@ flutter build apk --release
 
 - Firebase settings: `lib/firebase_options.dart` and `android/app/google-services.json`.
 - Supabase initialization: `lib/main.dart`; storage policies are in `supabase/`.
-- Voice endpoint: `config/voice.json`. Use the ignored `config/voice.local.json` for local overrides.
+- Voice endpoint: `config/voice.json`. Override it at launch with `--dart-define=VOICE_TOKEN_URL=<url>`.
 - Notification endpoint: `NOTIFICATION_WORKER_URL`, with a hosted default in `NotificationTriggerService`.
 - Firebase access rules and indexes: `firestore.rules`, `database.rules.json`, and `firestore.indexes.json`.
 
@@ -51,7 +56,7 @@ Server credentials belong in server environment variables or secrets, never in F
 Backend setup and deployment:
 
 - [Voice token server](tools/voice-server/README.md)
-- [Notification worker](tools/notification-worker/README.md)
+- [Notification worker](tools/notification-worker/)
 
 ## Project structure
 
@@ -63,7 +68,7 @@ Backend setup and deployment:
 | `lib/services/` | Data access and service integrations. |
 | `assets/` | Images and sound effects. |
 | `test/` | Flutter tests and Firebase security-rule tests. |
-| `tools/` | Backend services and database maintenance scripts. |
+| `tools/` | Voice token server and notification worker. |
 | `supabase/` | Storage policies and verification setup SQL. |
 
 ## Tests
@@ -80,4 +85,4 @@ npm ci --prefix test/firestore
 firebase emulators:exec --only firestore,database --project demo-lurk-tests "node --test --test-concurrency=1 test/firestore/*.test.mjs"
 ```
 
-See each backend service's README for its setup and test commands.
+See `tools/voice-server/README.md` for voice-server setup. Run notification-worker tests with `npm test --prefix tools/notification-worker` after installing its dependencies.

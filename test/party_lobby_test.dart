@@ -330,7 +330,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(
         find.text(
-          'Voice chat is not configured. Set VOICE_TOKEN_URL in config/voice.local.json and restart the app.',
+          'Voice chat is not configured. Set VOICE_TOKEN_URL in config/voice.json and restart the app.',
         ),
         findsOneWidget,
       );

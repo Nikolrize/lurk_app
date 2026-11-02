@@ -28,7 +28,7 @@ Keep the certificate on the server and do not commit `.env`.
 npm start
 ```
 
-To connect Flutter to this server, set `VOICE_TOKEN_URL` in `config/voice.local.json` to `http://<computer-ip>:8787/voice/token`, then restart the app. The device must be able to reach that address. Release builds require HTTPS.
+To connect Flutter to this server, launch from the project root with `flutter run --dart-define=VOICE_TOKEN_URL=http://<computer-ip>:8787/voice/token`. The device must be able to reach that address. Release builds require HTTPS.
 
 ## API
 
