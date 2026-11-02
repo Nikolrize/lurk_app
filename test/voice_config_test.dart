@@ -1,18 +1,17 @@
-import 'package:flutter/foundation.dart';
 import 'dart:convert';
-
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:lurk_app/core/config/voice_config.dart';
 
 class ConfigBundle extends CachingAssetBundle {
-  ConfigBundle(this.contents, {this.sharedContents});
-  final String? sharedContents;
+  ConfigBundle(this.contents);
   final String? contents;
+
   @override
   Future<ByteData> load(String key) async {
-    expect(['config/voice.json', 'config/voice.local.json'], contains(key));
-    final value = key == 'config/voice.json' ? sharedContents : contents;
+    expect(key, 'config/voice.json');
+    final value = contents;
     if (value == null) throw FlutterError('Asset is missing');
     return ByteData.sublistView(Uint8List.fromList(utf8.encode(value)));
   }
@@ -20,52 +19,64 @@ class ConfigBundle extends CachingAssetBundle {
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
-  test('A fresh checkout uses the shared hosted configuration', () async {
+
+  test('Plain launch reads the shared voice configuration', () async {
     final config = await VoiceConfig.load(
       bundle: ConfigBundle(
-        null,
-        sharedContents:
-            '{"AGORA_APP_ID":"shared-app","VOICE_TOKEN_URL":"https://voice.example.com/voice/token"}',
+        '{"AGORA_APP_ID":"shared-app","VOICE_TOKEN_URL":"https://voice.example.com/voice/token"}',
       ),
     );
     expect(config.appId, 'shared-app');
     expect(config.tokenUrl, 'https://voice.example.com/voice/token');
   });
-  test('Local settings override shared hosted defaults', () async {
+
+  test('A configuration without an App ID uses the default App ID', () async {
     final config = await VoiceConfig.load(
       bundle: ConfigBundle(
-        '{"VOICE_TOKEN_URL":"http://192.0.2.10:8787/voice/token"}',
-        sharedContents:
-            '{"AGORA_APP_ID":"shared-app","VOICE_TOKEN_URL":"https://voice.example.com/voice/token"}',
+        '{"VOICE_TOKEN_URL":"https://voice.example.com/voice/token"}',
       ),
     );
-    expect(config.appId, 'shared-app');
-    expect(config.tokenUrl, 'http://192.0.2.10:8787/voice/token');
+    expect(config.appId, VoiceConfig.defaultAppId);
+    expect(config.tokenUrl, 'https://voice.example.com/voice/token');
   });
-  test('Plain launch reads public voice settings from the local asset', () async {
+
+  test('Explicit launch settings override shared settings', () async {
     final config = await VoiceConfig.load(
       bundle: ConfigBundle(
-        '{"AGORA_APP_ID":"local-app","VOICE_TOKEN_URL":"http://192.0.2.10:8787/voice/token"}',
-      ),
-    );
-    expect(config.appId, 'local-app');
-    expect(config.tokenUrl, 'http://192.0.2.10:8787/voice/token');
-  });
-  test('Explicit launch settings override local settings', () async {
-    final config = await VoiceConfig.load(
-      bundle: ConfigBundle(
-        '{"AGORA_APP_ID":"local-app","VOICE_TOKEN_URL":"http://192.0.2.10:8787/voice/token"}',
+        '{"AGORA_APP_ID":"shared-app","VOICE_TOKEN_URL":"https://shared.example.com/voice/token"}',
       ),
       appIdOverride: 'override-app',
-      tokenUrlOverride: 'https://voice.example.com/voice/token',
+      tokenUrlOverride: 'https://override.example.com/voice/token',
     );
     expect(config.appId, 'override-app');
-    expect(config.tokenUrl, 'https://voice.example.com/voice/token');
+    expect(config.tokenUrl, 'https://override.example.com/voice/token');
   });
+
   test(
-    'Missing or invalid local config does not stop the rest of the app',
+    'Blank overrides preserve shared settings and values are trimmed',
     () async {
-      for (final contents in [null, 'invalid-json', '[]']) {
+      final config = await VoiceConfig.load(
+        bundle: ConfigBundle(
+          '{"AGORA_APP_ID":" shared-app ","VOICE_TOKEN_URL":" https://voice.example.com/voice/token "}',
+        ),
+        appIdOverride: ' ',
+        tokenUrlOverride: ' ',
+      );
+      expect(config.appId, 'shared-app');
+      expect(config.tokenUrl, 'https://voice.example.com/voice/token');
+    },
+  );
+
+  test(
+    'Missing, malformed or empty shared settings use safe defaults',
+    () async {
+      for (final contents in [
+        null,
+        'invalid-json',
+        '[]',
+        '{}',
+        '{"AGORA_APP_ID":7,"VOICE_TOKEN_URL":null}',
+      ]) {
         final config = await VoiceConfig.load(bundle: ConfigBundle(contents));
         expect(config.tokenUrl, isEmpty);
         expect(config.appId, VoiceConfig.defaultAppId);
