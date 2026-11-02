@@ -36,6 +36,7 @@ class _FilterPreferencesScreenState extends State<FilterPreferencesScreen> {
 
   List<String> get _rankNames => FilterPreferences.ranksForGame(_game);
 
+  // reset the rank range because each game has different ranks
   void _changeGame(String? value) {
     _game = value;
 
@@ -46,6 +47,7 @@ class _FilterPreferencesScreenState extends State<FilterPreferencesScreen> {
         : RangeValues(0, (names.length - 1).toDouble());
   }
 
+  // copy the saved filters into a draft so changes are not applied yet
   @override
   void initState() {
     super.initState();
@@ -59,6 +61,7 @@ class _FilterPreferencesScreenState extends State<FilterPreferencesScreen> {
     _preferredTimes = Set.of(f.preferredTimes);
     _weekday = f.scheduleWindow?.weekday;
     final window = f.scheduleWindow;
+    // a zero to zero window means any time on the selected day
     _matchScheduleTime =
         window != null && (window.startMinute != 0 || window.endMinute != 0);
     if (_matchScheduleTime) {
@@ -67,7 +70,7 @@ class _FilterPreferencesScreenState extends State<FilterPreferencesScreen> {
     }
     _maxPartySize = f.maxPartySize;
     final names = _rankNames;
-    //restores selected range while keeping slider within bounds
+    // restores selected range while keeping slider within bounds
     if (names.isEmpty) {
       _ranks = const RangeValues(0, 0);
     } else {
@@ -81,6 +84,7 @@ class _FilterPreferencesScreenState extends State<FilterPreferencesScreen> {
     _onlyAvailable = f.onlyAvailable;
   }
 
+  // clear the draft filters without changing the Find page yet
   void _reset() => setState(() {
     _game = null;
     _region = null;
@@ -98,6 +102,8 @@ class _FilterPreferencesScreenState extends State<FilterPreferencesScreen> {
     _rating = 0;
     _onlyAvailable = false;
   });
+
+  // let the user choose a time and store it as minutes after midnight
   Future<void> _pickScheduleTime(bool start) async {
     final minute = start ? _scheduleStart : _scheduleEnd;
     final selected = await showTimePicker(
@@ -114,10 +120,12 @@ class _FilterPreferencesScreenState extends State<FilterPreferencesScreen> {
     });
   }
 
+  // display the stored minutes using the device time format
   String _timeLabel(int minutes) => MaterialLocalizations.of(
     context,
   ).formatTimeOfDay(TimeOfDay(hour: minutes ~/ 60, minute: minutes % 60));
 
+  // keep filter headings styled consistently
   Widget _label(String label) => Padding(
     padding: const EdgeInsets.only(top: 18, bottom: 8),
     child: Text(
@@ -127,6 +135,8 @@ class _FilterPreferencesScreenState extends State<FilterPreferencesScreen> {
       ),
     ),
   );
+
+  // build a dropdown where Any means the filter is not applied
   Widget _select(
     String label,
     String? value,
@@ -138,6 +148,7 @@ class _FilterPreferencesScreenState extends State<FilterPreferencesScreen> {
       children: [
         _label(label),
         DropdownButtonFormField<String>(
+          // recreate the dropdown after reset so its displayed selection matches the draft
           key: ValueKey('$label:$value'),
           initialValue: value ?? '',
           isExpanded: true,
@@ -146,7 +157,7 @@ class _FilterPreferencesScreenState extends State<FilterPreferencesScreen> {
               horizontal: 16,
               vertical: 14,
             ),
-            // Labels remain available to screen readers without repeating visually.
+            // labels remain available to screen readers without repeating visually
             hintText: label,
           ),
           items: [
@@ -163,6 +174,7 @@ class _FilterPreferencesScreenState extends State<FilterPreferencesScreen> {
     );
   }
 
+  // allow one communication option to be selected or cleared
   Widget _chips(
     String label,
     String? selected,
@@ -189,6 +201,7 @@ class _FilterPreferencesScreenState extends State<FilterPreferencesScreen> {
     );
   }
 
+  // show player or party filters and return the draft when Show Results is pressed
   @override
   Widget build(BuildContext context) {
     final names = _rankNames;
@@ -414,6 +427,7 @@ class _FilterPreferencesScreenState extends State<FilterPreferencesScreen> {
                 );
                 return;
               }
+              // return the confirmed search preferences to Find
               Navigator.pop(
                 context,
                 FilterPreferences(

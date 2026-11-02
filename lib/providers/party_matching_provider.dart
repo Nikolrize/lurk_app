@@ -10,8 +10,7 @@ import 'party_provider.dart';
 import 'profile_provider.dart';
 import 'rating_provider.dart';
 
-// Only a get of the viewer's own block relationship is permitted, never a list
-// of another player's block list.
+// watch blocks before offering this host party
 final hostBlocksViewerProvider = StreamProvider.autoDispose
     .family<bool, String>((ref, host) async* {
       final uid = ref.watch(authStateProvider).asData?.value?.uid;
@@ -53,6 +52,7 @@ final hostBlocksViewerProvider = StreamProvider.autoDispose
       });
     }, retry: (retryCount, error) => null);
 
+// recommend eligible parties for saved games and prefer the main matchmaking game
 final recommendedPartiesProvider =
     Provider.autoDispose<AsyncValue<List<Party>>>((ref) {
       final uid = ref.watch(authStateProvider).asData?.value?.uid;
@@ -107,7 +107,7 @@ final recommendedPartiesProvider =
         if (!reverse.asData!.value) matches.add(party);
       }
       if (waiting) return const AsyncLoading();
-      // Prefer the main game, then the most recently created eligible parties.
+      // prefer the main game, then the most recently created eligible parties
       matches.sort((a, b) {
         final main =
             ((GameCatalog.find(b.gameId)?.id ??
@@ -129,6 +129,7 @@ final recommendedPartiesProvider =
       return AsyncData(matches);
     });
 
+// hide parties when the viewer and host have blocked each other
 final visiblePartiesProvider = Provider.autoDispose<AsyncValue<List<Party>>>((
   ref,
 ) {

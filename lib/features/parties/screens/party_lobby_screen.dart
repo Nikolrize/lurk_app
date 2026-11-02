@@ -16,8 +16,7 @@ import '../../chat/screens/party_chat_screen.dart';
 import '../models/party.dart';
 import '../widgets/lobby_member_card.dart';
 
-/// Tab content: AppShell owns the Scaffold and persistent bottom navigation.
-/// Party details stay in sync with Firestore; social actions are supplied separately.
+// keep the app navigation visible while this lobby follows live party updates
 class PartyLobbyScreen extends ConsumerStatefulWidget {
   const PartyLobbyScreen({
     super.key,
@@ -44,12 +43,14 @@ class PartyLobbyScreen extends ConsumerStatefulWidget {
 class _PartyLobbyScreenState extends ConsumerState<PartyLobbyScreen> {
   bool _leaving = false;
   String? _removing;
+  // put a muted voice connection after the lobby opens
   @override
   void initState() {
     super.initState();
     _scheduleVoiceConnection();
   }
 
+  // check the voice connection again when the party or player changes
   @override
   void didUpdateWidget(covariant PartyLobbyScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
@@ -59,6 +60,7 @@ class _PartyLobbyScreenState extends ConsumerState<PartyLobbyScreen> {
     }
   }
 
+  // wait for the first frame before connecting the player to voice
   void _scheduleVoiceConnection() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted &&
@@ -70,19 +72,22 @@ class _PartyLobbyScreenState extends ConsumerState<PartyLobbyScreen> {
     });
   }
 
+  // connect to voice and let the voice panel display any connection error
   Future<void> _connectVoice() async {
     try {
       await ref.read(partyVoiceServiceProvider).connect(party.id);
     } catch (_) {
-      /* The voice panel shows the connection error and retry. */
+      // the voice panel shows the connection error and retry
     }
   }
 
+  // use live party details while keeping the supplied party during loading
   Party get party =>
       ref.read(partyByIdProvider(widget.party.id)).asData?.value ??
       widget.party;
   String? get viewerUid => widget.viewerUid;
   List<LobbyMember>? get members => widget.members;
+  // read the mute state only from the voice connection for this party
   bool get micEnabled {
     if (widget.onToggleMic != null) return widget.micEnabled;
     final state = ref.read(partyVoiceServiceProvider).state;
@@ -94,6 +99,7 @@ class _PartyLobbyScreenState extends ConsumerState<PartyLobbyScreen> {
   VoidCallback? get onChat => widget.onChat;
   VoidCallback? get onToggleMic => widget.onToggleMic;
 
+  // mute or unmute the connected player and show errors when needed
   Future<void> _toggleVoice(BuildContext context) async {
     try {
       await ref.read(partyVoiceServiceProvider).toggle(party.id);
@@ -110,6 +116,7 @@ class _PartyLobbyScreenState extends ConsumerState<PartyLobbyScreen> {
     }
   }
 
+  // confirm the transfer so the selected member becomes the host
   Future<void> _makeHost(BuildContext context, String uid, String name) async {
     if (_removing != null ||
         _leaving ||
@@ -157,6 +164,7 @@ class _PartyLobbyScreenState extends ConsumerState<PartyLobbyScreen> {
     }
   }
 
+  // confirm removal and require a new invitation before that player can rejoin
   Future<void> _remove(BuildContext context, String uid, String name) async {
     if (_removing != null ||
         _leaving ||
@@ -204,6 +212,7 @@ class _PartyLobbyScreenState extends ConsumerState<PartyLobbyScreen> {
     }
   }
 
+  // open the chat invitation picker without showing players already in the party
   Future<void> _invite(BuildContext context) async {
     await Navigator.of(context).push<void>(
       MaterialPageRoute(
@@ -219,24 +228,28 @@ class _PartyLobbyScreenState extends ConsumerState<PartyLobbyScreen> {
     );
   }
 
+  // reuse the creation form with the current party details filled in
   Future<void> _edit(BuildContext context) async {
     await Navigator.of(context).push<String>(
       MaterialPageRoute(builder: (_) => CreatePartyScreen(party: party)),
     );
   }
 
+  // show a short message without leaving the lobby
   void _notice(BuildContext context, String message) {
     ScaffoldMessenger.of(
       context,
     ).showSnackBar(SnackBar(content: Text(message)));
   }
 
+  // open the selected squad member profile
   void _profile(BuildContext context, String uid) {
     Navigator.of(context).push(
       MaterialPageRoute<void>(builder: (_) => PlayerProfileScreen(uid: uid)),
     );
   }
 
+  // open the party preview without a Join button and allow host editing
   void _details(BuildContext context) {
     showPartyPreview(
       context,
@@ -246,6 +259,7 @@ class _PartyLobbyScreenState extends ConsumerState<PartyLobbyScreen> {
     );
   }
 
+  // confirm leaving and warn the host that it will end the whole session
   Future<void> _leave(BuildContext context) async {
     if (_leaving) return;
     if (viewerUid == null) {
@@ -296,6 +310,7 @@ class _PartyLobbyScreenState extends ConsumerState<PartyLobbyScreen> {
     }
   }
 
+  // keep party members and voice controls updated while handling removal or closure
   @override
   Widget build(BuildContext context) {
     final voice =
@@ -718,6 +733,7 @@ class _HostCard extends ConsumerWidget {
   final ValueChanged<String>? onMakeHost;
   final String uid, partyGame;
   final VoidCallback onViewProfile;
+  // load the member profile rating and rank for the party game
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final profile = ref.watch(playerProfileProvider(uid));

@@ -10,6 +10,7 @@ class PartyCard extends StatelessWidget {
 
   const PartyCard({super.key, required this.party, this.onJoin});
 
+  // show a reusable party summary with a Join action
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;

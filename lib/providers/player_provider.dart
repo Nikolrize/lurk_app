@@ -6,6 +6,7 @@ import '../services/player_service.dart';
 import 'auth_provider.dart';
 
 final playerServiceProvider = Provider<PlayerService>((ref) => PlayerService());
+// fetch enough eligible players plus one extra to check for another page
 final playerDiscoveryPageProvider = StreamProvider.autoDispose<List<Player>>((
   ref,
 ) {
@@ -27,11 +28,13 @@ final playerDiscoveryPageProvider = StreamProvider.autoDispose<List<Player>>((
       );
 }, retry: (retryCount, error) => null);
 
+// show Load More only when an extra player exists
 final hasMorePlayersProvider = Provider.autoDispose<bool>((ref) {
   final page = ref.watch(playerDiscoveryPageProvider).asData?.value;
   return page != null && page.length > ref.watch(playerDiscoveryLimitProvider);
 });
 
+// expose the requested players without showing the extra record
 final discoverablePlayersProvider = StreamProvider.autoDispose<List<Player>>((
   ref,
 ) {

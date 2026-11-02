@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 
-/// Initial connections may wait for Render Free to wake. Renewals stay bounded.
+// allow extra startup time for Render to wake up
 class VoiceTokenClient {
   VoiceTokenClient({
     required this.client,
@@ -13,6 +13,7 @@ class VoiceTokenClient {
   final http.Client client;
   final Duration startupTimeout, requestTimeout, wakeNoticeDelay;
 
+  // wait for Render to startup when needed then request an authenticated voice token
   Future<Map<String, dynamic>> request({
     required Uri endpoint,
     required String idToken,
@@ -26,6 +27,7 @@ class VoiceTokenClient {
         () => onServerWaitChanged?.call(true),
       );
       try {
+        // check Render health before sending authentication details
         final health = await client
             .get(endpoint.resolve('/health'))
             .timeout(startupTimeout);

@@ -12,6 +12,7 @@ class PartyHistoryCard extends ConsumerWidget {
   final PartyHistoryEntry entry;
   final VoidCallback? onRate;
 
+  // format time spent in the party
   String get _duration {
     final duration = entry.duration;
     if (duration == null) return 'Duration unavailable';
@@ -24,6 +25,7 @@ class PartyHistoryCard extends ConsumerWidget {
         : '${hours}h ${minutes}m';
   }
 
+  // show the past session with game details, preview and rating status
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final candidates = ref.watch(

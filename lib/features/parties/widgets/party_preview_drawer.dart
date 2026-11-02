@@ -11,6 +11,7 @@ import '../../profile/screens/player_profile_screen.dart';
 import '../actions/join_party.dart';
 import '../models/party.dart';
 
+// open a scrollable party preview
 Future<void> showPartyPreview(
   BuildContext context,
   Party party, {
@@ -55,6 +56,7 @@ class _PartyPreview extends ConsumerStatefulWidget {
 
 class _PartyPreviewState extends ConsumerState<_PartyPreview> {
   String? _error;
+  // load live details and members while keeping the Join action below the scroll area
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(partyByIdProvider(widget.party.id));
@@ -386,6 +388,7 @@ class _PreviewMember extends ConsumerWidget {
   const _PreviewMember({required this.uid, required this.isHost});
   final String uid;
   final bool isHost;
+  // show the member profile and let the user open it before joining
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final profile = ref.watch(playerProfileProvider(uid));
@@ -449,6 +452,7 @@ class _DetailChip extends StatelessWidget {
   const _DetailChip({required this.icon, required this.label});
   final IconData icon;
   final String label;
+  // display one party preference as an icon and label
   @override
   Widget build(BuildContext context) => Container(
     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),

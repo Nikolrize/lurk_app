@@ -7,6 +7,7 @@ import '../../../providers/auth_provider.dart';
 import '../../../providers/party_provider.dart';
 import '../models/party.dart';
 
+// turn join failures into messages the player can act on
 String partyJoinErrorMessage(Object error) {
   if (error is StateError) return error.message.toString();
   if (error is FirebaseException) {
@@ -43,6 +44,7 @@ class PartyJoinButton extends ConsumerStatefulWidget {
 
 class _PartyJoinButtonState extends ConsumerState<PartyJoinButton> {
   bool _joining = false;
+  // disable joining the current party and open a preview before confirming
   @override
   Widget build(BuildContext context) {
     final uid = ref.watch(authStateProvider).asData?.value?.uid;
@@ -96,6 +98,7 @@ class _PartyJoinButtonState extends ConsumerState<PartyJoinButton> {
   }
 }
 
+// confirm a party switch then join successfully before opening the new lobby
 Future<void> joinPartyAndOpen(
   BuildContext context,
   WidgetRef ref,

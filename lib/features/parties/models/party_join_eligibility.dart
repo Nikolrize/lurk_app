@@ -1,7 +1,7 @@
 import '../../../core/data/game_catalog.dart';
 import '../../../core/data/gaming_regions.dart';
 
-/// Uses fresh transaction reads, rather than cached preview/profile values.
+// explain which region, rank or rating requirement the player does not meet
 String? partyRequirementMessage({
   required Map<String, dynamic> party,
   required Map<String, dynamic>? profile,
@@ -10,6 +10,7 @@ String? partyRequirementMessage({
   if (profile == null) {
     return 'Complete your player profile before joining a party.';
   }
+  // convert a stored region ID into a readable name
   String? regionLabel(String? region) {
     final id = GamingRegions.idFor(region);
     for (final label in GamingRegions.values) {
@@ -65,17 +66,19 @@ String? partyRequirementMessage({
   return null;
 }
 
-/// Native transaction failures must not replace a known eligibility rejection.
-/// A new instance belongs to one join attempt; reset before each SDK retry.
+// keep specific join rejection messages when Android reports a generic error
 class PartyJoinRejection {
   StateError? _reason;
+  // clear the previous rejection before Firestore retries the transaction
   void reset() => _reason = null;
+  // remember the specific rejection before stopping the join
   Never reject(String message) {
     final reason = StateError(message);
     _reason = reason;
     throw reason;
   }
 
+  // keep the real rejection if Android replaces it with a generic transaction error
   Future<T> run<T>(Future<T> Function() operation) async {
     try {
       return await operation();

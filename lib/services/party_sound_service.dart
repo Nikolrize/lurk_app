@@ -10,6 +10,7 @@ class PartySoundService {
   AudioPlayer? _player;
   Future<void> _queue = Future.value();
   bool _disposed = false;
+  // queue sound effects so they do not overlap or interrupt the voice session
   void play(PartySound sound) {
     _queue = _queue.then((_) async {
       if (_disposed) return;
@@ -17,7 +18,7 @@ class PartySoundService {
         final asset = 'sounds/party_${sound.name}.wav';
         final path = await _cache.loadPath(asset);
         if (_disposed) return;
-        // Agora mixes this locally into the call; it is never published to peers.
+        // play sound effects in call
         if (!await playInVoice(path, switch (sound) {
           PartySound.join => 101,
           PartySound.leave => 102,
@@ -40,12 +41,12 @@ class PartySoundService {
         }
         await Future<void>.delayed(const Duration(milliseconds: 380));
       } catch (error) {
-        // A missing audio device/plugin must never prevent joining or leaving.
         debugPrint('Party sound could not play: ${error.runtimeType}');
       }
     });
   }
 
+  // stop future sound requests and release the player and cached audio
   Future<void> dispose() async {
     _disposed = true;
     await _player?.dispose();

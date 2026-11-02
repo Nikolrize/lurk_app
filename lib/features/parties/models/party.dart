@@ -44,7 +44,7 @@ class Party {
     required this.maxPlayers,
   });
 
-  /// Maps the Firestore schema to the display fields used by party cards.
+  // convert a Firestore party document into the values shown in the app
   factory Party.fromFirestoreData(String id, Map<String, dynamic> data) {
     String? string(String key) =>
         data[key] is String ? data[key] as String : null;
@@ -110,5 +110,6 @@ class Party {
           : null,
     );
   }
+  // check whether the party has reached its member limit
   bool get isFull => currentPlayers >= maxPlayers;
 }

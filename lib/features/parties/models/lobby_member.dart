@@ -1,5 +1,3 @@
-/// Presentation data for a lobby member. Populate from membership/profile streams
-/// when lobby sync is integrated. Null rating/mic state means unknown.
 class LobbyMember {
   const LobbyMember({
     required this.uid,

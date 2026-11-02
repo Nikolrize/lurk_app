@@ -9,6 +9,7 @@ class PlayerLoadError extends StatelessWidget {
   });
   final Object error;
   final VoidCallback onRetry;
+
   @override
   Widget build(BuildContext context) {
     final message = switch (error) {

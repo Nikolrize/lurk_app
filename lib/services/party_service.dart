@@ -11,6 +11,7 @@ class PartyService {
     : _firestore = firestore ?? FirebaseFirestore.instance;
   final FirebaseFirestore _firestore;
 
+  // create the party host membership and history together while preventing duplicate hosting
   Future<String> createParty(
     PartyDraft draft, {
     required String expectedUid,
@@ -21,7 +22,7 @@ class PartyService {
         'Your account changed. Sign in again before creating a party.',
       );
     }
-    // Include existing parties created before host slots were introduced.
+    // ensure the user does not already host an active party before creating a new one
     final existing = await _firestore
         .collection('parties')
         .where('hostId', isEqualTo: expectedUid)
@@ -91,6 +92,7 @@ class PartyService {
     return party.id;
   }
 
+  // check eligibility and join or switch parties in one transaction
   Future<void> joinParty(
     String id, {
     required String expectedUid,
@@ -221,7 +223,7 @@ class PartyService {
             );
           }
         }
-        // Preserve the completed visit before replacing the live membership.
+        // preserve the completed visit before replacing the live membership
         final previousVisit = membership.data();
         if (previousVisit?['joinedAt'] is Timestamp &&
             previousVisit?['leftAt'] is Timestamp) {
@@ -269,12 +271,14 @@ class PartyService {
     }
   }
 
+  // watch the saved party reference for this player
   Stream<String?> watchJoinedPartyId(String uid) => _firestore
       .collection('party_memberships')
       .doc(uid)
       .snapshots()
       .map((doc) => doc.data()?['partyId'] as String?);
 
+  // watch active members so the lobby updates when players join or leave
   Stream<List<String>> watchMemberIds(String id) => _firestore
       .collection('parties')
       .doc(id)
@@ -283,12 +287,14 @@ class PartyService {
       .snapshots()
       .map((snapshot) => snapshot.docs.map((doc) => doc.id).toList());
 
+  // stop the action if the signed in account has changed
   void _checkAccount(String uid) {
     if (FirebaseAuth.instance.currentUser?.uid != uid) {
       throw StateError('Your account changed. Sign in again.');
     }
   }
 
+  // keep one party document updated in the UI
   Stream<Party?> watchParty(String id) => _firestore
       .collection('parties')
       .doc(id)
@@ -298,6 +304,7 @@ class PartyService {
             doc.exists ? Party.fromFirestoreData(doc.id, doc.data()!) : null,
       );
 
+  // allow the host to edit an open party without shrinking it below its member count
   Future<void> updateParty(
     String id,
     PartyDraft draft, {
@@ -324,6 +331,7 @@ class PartyService {
     });
   }
 
+  // transfer ownership and membership roles together without ending the session
   Future<void> transferHost(
     String id,
     String newHostUid, {
@@ -387,6 +395,7 @@ class PartyService {
     });
   }
 
+  // mark a member as removed and free their place in the party
   Future<void> removeMember(
     String id,
     String memberUid, {
@@ -426,6 +435,7 @@ class PartyService {
     });
   }
 
+  // watch whether a player is still a member of this party
   Stream<Map<String, dynamic>?> watchMembership(String id, String uid) =>
       _firestore
           .collection('parties')
@@ -435,8 +445,7 @@ class PartyService {
           .snapshots()
           .map((doc) => doc.data());
 
-  /// Finish participation while authentication is still available, including
-  /// sessions hosted before the one-party restriction was introduced.
+  // leave active parties before logout while authentication is still available
   Future<void> leaveCurrentParties({required String expectedUid}) async {
     _checkAccount(expectedUid);
     final hosted = await _firestore
@@ -451,8 +460,8 @@ class PartyService {
     final ids = hosted.docs.map((doc) => doc.id).toSet();
     final joinedId = pointer.data()?['partyId'] as String?;
     if (joinedId != null) {
-      // A kicked member may retain a stale pointer; their own membership is
-      // always readable, even when private party details are no longer visible.
+      // a kicked member may retain a stale pointer;
+      // their own membership is always readable, even when private party details are no longer visible
       final member = await _firestore
           .collection('parties')
           .doc(joinedId)
@@ -466,9 +475,11 @@ class PartyService {
     }
   }
 
+  // leave the selected party using the shared leave transaction
   Future<void> leaveParty(String id, {required String expectedUid}) =>
       _leaveParty(id, expectedUid: expectedUid);
 
+  // end the session for a host or free one place for a regular member
   Future<void> _leaveParty(
     String id, {
     required String expectedUid,
@@ -519,6 +530,7 @@ class PartyService {
     if (left) PartyMembershipEvents.emit(expectedUid, id, PartySound.leave);
   }
 
+  // watch the most recent open party hosted by this player
   Stream<Party?> watchLatestHostedParty(String uid) {
     return _firestore
         .collection('parties')
@@ -539,9 +551,10 @@ class PartyService {
         });
   }
 
+  // load public open parties with a limit that grows when more results are requested
   Stream<List<Party>> watchDiscoverableParties({int limit = 100}) {
-    // Match security rules; private/completed parties never enter the client list.
-    // Find increases this live query limit when another page is requested.
+    // match security rules; private/completed parties never enter the client list
+    // find increases this live query limit when another page is requested
     return _firestore
         .collection('parties')
         .where('visibility', isEqualTo: 'public')
@@ -563,6 +576,7 @@ class PartyService {
         });
   }
 
+  // locate the private history record for one player and party
   DocumentReference<Map<String, dynamic>> _history(
     String uid,
     String partyId,
@@ -572,6 +586,7 @@ class PartyService {
       .collection('party_history')
       .doc(partyId);
 
+  // load the player history with the most recently joined parties first
   Stream<List<PartyHistoryRecord>> watchHistory(String uid, {int limit = 50}) =>
       _firestore
           .collection('players')
@@ -586,6 +601,7 @@ class PartyService {
                 .toList(),
           );
 
+  // include past members so completed sessions can show everyone who participated
   Stream<List<String>> watchHistoryMemberIds(String id) => _firestore
       .collection('parties')
       .doc(id)
@@ -593,11 +609,11 @@ class PartyService {
       .snapshots()
       .map((snapshot) => snapshot.docs.map((doc) => doc.id).toList());
 
+  // read matching game and region pages so Quick Match is not limited to the first page
   Future<List<Party>> findQuickMatchParties(
     String gameId, {
     required String regionId,
   }) async {
-    // Read the game-specific pool in pages; joining is validated transactionally.
     final query = _firestore
         .collection('parties')
         .where('gameId', isEqualTo: gameId)

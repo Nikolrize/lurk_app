@@ -12,6 +12,8 @@ class HomeGames extends ConsumerWidget {
   const HomeGames({super.key, required this.uid, this.onFindGame});
   final String? uid;
   final ValueChanged<String>? onFindGame;
+
+  // show saved game shortcuts
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     if (uid == null) return const Text('Sign in to choose your games.');

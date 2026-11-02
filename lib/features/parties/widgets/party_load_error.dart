@@ -5,6 +5,7 @@ class PartyLoadError extends StatelessWidget {
   const PartyLoadError({super.key, required this.error, required this.onRetry});
   final Object error;
   final VoidCallback onRetry;
+  // explain the party loading error and provide a retry action
   @override
   Widget build(BuildContext context) {
     final message = switch (error) {

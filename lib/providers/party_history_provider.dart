@@ -5,6 +5,7 @@ import '../features/parties/models/party_history_entry.dart';
 import 'auth_provider.dart';
 import 'party_provider.dart';
 
+// watch private history records for the player
 final partyHistoryProvider =
     StreamProvider.autoDispose<List<PartyHistoryRecord>>((ref) {
       final auth = ref.watch(authStateProvider);
@@ -17,6 +18,7 @@ final partyHistoryProvider =
           .watchHistory(uid, limit: ref.watch(historyLimitProvider));
     }, retry: (retryCount, error) => null);
 
+// watch completed visits and preserved when the player rejoined this party
 final archivedPartyVisitsProvider = StreamProvider.autoDispose
     .family<List<Map<String, dynamic>>, String>((ref, partyId) {
       final uid = ref.watch(authStateProvider).asData?.value?.uid;
@@ -30,6 +32,7 @@ final archivedPartyVisitsProvider = StreamProvider.autoDispose
           .map((snapshot) => snapshot.docs.map((doc) => doc.data()).toList());
     }, retry: (retryCount, error) => null);
 
+// add the current and archived visit times without counting time spent away
 Duration? participationDuration(
   Map<String, dynamic> member,
   List<Map<String, dynamic>> archived,
@@ -48,6 +51,7 @@ Duration? participationDuration(
   return total;
 }
 
+// show a history entry only after the player leaves or the party ends
 final partyHistoryEntryProvider = Provider.autoDispose
     .family<AsyncValue<PartyHistoryEntry?>, PartyHistoryRecord>((ref, record) {
       final membership = ref.watch(myPartyMembershipProvider(record.partyId));
@@ -76,8 +80,8 @@ final partyHistoryEntryProvider = Provider.autoDispose
           ),
         );
       }
-      // Remaining squad members receive the host's closed-party update live.
-      // Past private-party members need only their own history and membership.
+      // remaining squad members receive the host's closed-party update live
+      // past private-party members need only their own history and membership
       final party = ref.watch(partyByIdProvider(record.partyId));
       if (party.hasError) return AsyncError(party.error!, party.stackTrace!);
       if (!party.hasValue) return const AsyncLoading();
