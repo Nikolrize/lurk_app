@@ -28,8 +28,6 @@ android {
         versionName = flutter.versionName
     }
 
-    // Shared certificate for the private coursework submission. This keeps
-    // Android Google sign-in consistent when the source is built on another PC.
     signingConfigs {
         getByName("debug") {
             storeFile = rootProject.file("assessment-signing/lurk-assessment.jks")
@@ -41,8 +39,6 @@ android {
 
     buildTypes {
         release {
-            // Assessment builds share the registered coursework certificate.
-            // Use a separate private production key for any future publication.
             signingConfig = signingConfigs.getByName("debug")
         }
     }
