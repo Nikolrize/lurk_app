@@ -1,6 +1,7 @@
 {
   "project_info": {
     "project_number": "411881549954",
+    "firebase_url": "https://lurk-mae-default-rtdb.asia-southeast1.firebasedatabase.app",
     "project_id": "lurk-mae",
     "storage_bucket": "lurk-mae.firebasestorage.app"
   },
@@ -27,6 +28,14 @@
           "android_info": {
             "package_name": "com.example.lurk_app",
             "certificate_hash": "25699bf6fccf4c6b3be259f6e4def1e940bd6e4d"
+          }
+        },
+        {
+          "client_id": "411881549954-pnnv7sprghb4s6ff43uijh4ooq3r8aa3.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.lurk_app",
+            "certificate_hash": "d589e41c081bcf57b2060689295e496b9aaf6d77"
           }
         },
         {
